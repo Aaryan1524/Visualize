@@ -20,14 +20,16 @@ const wrongValue = defineScene({
   ],
 });
 
-/** Two labels drawn on top of each other. */
+/**
+ * More labels on one spot than the renderer's collision nudging can
+ * separate (it resolves a few; this crowd is too many).
+ */
 const crowdedLabels = defineScene({
   ...stack,
   id: "crowded-labels",
   view: (s, e) => [
     ...stack.view(s, e),
-    { kind: "label", key: "note-a", at: [40, 0, 0], text: "first label" },
-    { kind: "label", key: "note-b", at: [40, 1, 0], text: "second label" },
+    ...Array.from({ length: 12 }, (_, i) => ({ kind: "label" as const, key: `note-${i}`, at: [40, i * 0.1, 0] as const, text: `crowded label ${i}` })),
   ],
 });
 

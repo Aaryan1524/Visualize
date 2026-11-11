@@ -12,9 +12,9 @@
   --t-structure: #a3a8b0;
   --t-subject: #6f8fb4;
   --t-accent: #e4572e;
-  --t-hot: #d9480f;
+  --t-hot: #c4400c;
   --t-cold: #3d70ab;
-  --t-good: #2b8a5a;
+  --t-good: #23784d;
   --t-bad: #c92a2a;
   --t-muted: #cdc8bb;
 
@@ -192,7 +192,7 @@ body { padding: 32px 16px 48px; }
 .vz-face[data-shade="top"] { fill: color-mix(in oklab, var(--tone) var(--top-mix), var(--shade-top)); }
 .vz-face[data-shade="right"] { fill: var(--tone); }
 .vz-face[data-shade="left"] { fill: color-mix(in oklab, var(--tone) var(--left-mix), var(--shade-side)); }
-.vz-face[data-shade="front"] { fill: color-mix(in oklab, var(--tone) 88%, var(--shade-top)); }
+.vz-face[data-shade="front"] { fill: var(--tone); }
 
 .vz-edge {
   fill: none;
