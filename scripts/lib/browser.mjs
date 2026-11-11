@@ -48,6 +48,7 @@ export async function openPage(browser, file, { width = 1280, height = 1000, the
   const url = file.startsWith("http") || file.startsWith("file:") ? file : `file://${file}`;
   await page.goto(url, { waitUntil: "load" });
   await page.waitForFunction(() => Boolean(window.__viz), { timeout: 5000 });
+  await page.evaluate(() => document.fonts.ready);
   return { page, errors };
 }
 

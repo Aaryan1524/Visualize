@@ -101,3 +101,17 @@ Outputs: `scripts/export-svg.mjs` writes a standalone SVG of any step and compar
 Packaging: `SKILL.md` at the root, `references/` (kit, authoring, craft, verify), `evals/` (five held-out prompts) and `scripts/new-scene.mjs`. A clean copy installed with npm, and a separate project driving the skill by path, both scaffolded, tested, built and verified a new scene.
 
 Still open: attention in the editorial style and parts vocabulary; focus and de-emphasis; the two known LRU issues and back-porting the new finish to the rail; held-out generation runs and the with/without benchmark; and the official `skills-ref` validator, which was not run.
+
+## Visual standard 01 — checkpoint 1 candidate
+
+The [visual specification](VISUAL_STANDARD.md) defines Visualize's own neutral instrument direction: paired graphite/pale materials, blue request/input, amber processing, teal success and red unwanted outcomes; quiet navigation/selection ink; bundled Instrument Sans and IBM Plex Mono; and fixed type, spacing, edge-light and shadow rules. These live in shared tokens/styles rather than a retries-specific skin.
+
+The reference shortens the terminal and server, tightens lane spacing and plate depth, strengthens surface detail, and moves totals clear of the key store. The review presents the lost-response transition, key lookup/divergence, and final charge comparison. Existing model values and event order are preserved. Focus/reveal behavior, dynamic attachment contracts and stronger subject-only composition audits remain later checkpoints.
+
+Font assets carry their OFL notices. Standalone HTML and exported SVG inline them; React/DOM consumers can bundle the local CSS/WOFF2 imports. The player refits an embedded figure after font loading without changing its time or playback. The standalone bootstrap waits for fonts before mounting and emits `visualize:ready` for tooling. Planted faults now initialize on that signal, so they mutate the player rather than racing font loading.
+
+Verification caught a dark waiting-label contrast failure and a narrow-window total/key-tray overlap. Both were corrected without weakening their checks. The new font startup also exposed the fault harness's assumption that the player exists at the window load event; the explicit ready signal fixes that lifecycle mismatch.
+
+`pnpm build && node scripts/review-standard.mjs` writes `shots/visual-standard/`: the interactive three-moment review, saved before/after when available, a live token/type specimen, 1440×900 captures in both themes, 1920×1080 outcome captures and 4× close-ups. The captures were inspected at normal size and close-up. The localhost preview and offline font loading were exercised.
+
+Observed final results: 79 unit tests, typecheck and build passed; all four example pages passed rendered-page verification; all 36 planted faults were caught and both clean fixtures passed. The React embed check passed with both bundled fonts loaded, independent themes, maths, step isolation and cleanup; its planted page-mode figure was rejected. Light/dark SVG exports differed from the live stage at 0.08% / 0.10% of pixels, below the unchanged 0.3% tolerance. The served 1440×900 lookup preview passed desktop/copy checks; both font faces also loaded with the browser offline. Review captures cover the three moments and both themes, both desktop outcome sizes, and 4× front-assembly close-ups. These are verification results for a candidate visual standard, not approval of its appearance.

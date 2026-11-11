@@ -6,14 +6,15 @@
 //   node scripts/build.mjs path --out dir       write somewhere else (default dist/)
 
 import { build } from "esbuild";
+import { bundledStyles } from "./lib/styles.mjs";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PLAYER = join(ROOT, "src/render/player.ts");
-const CSS = join(ROOT, "src/render/styles.css");
 const PAGE_CSS = join(ROOT, "src/render/page.css");
+const KIT_CSS = await bundledStyles();
 const KATEX_DIR = join(ROOT, "node_modules/katex/dist");
 
 const args = process.argv.slice(2);
@@ -61,7 +62,10 @@ async function buildOne(dir) {
     const entry = `import * as m from ${JSON.stringify(scenePath)};
 import { mount } from ${JSON.stringify(PLAYER)};
 const scene = ${exportName === "default" ? "m.default" : `m.${exportName}`};
-mount(document.getElementById("app"), scene, { page: true });`;
+Promise.all([document.fonts.load('500 16px "Visualize Sans"'), document.fonts.load('500 16px "Visualize Mono"')]).then(() => {
+  mount(document.getElementById("app"), scene, { page: true });
+  window.dispatchEvent(new Event("visualize:ready"));
+});`;
 
     const result = await build({
       stdin: { contents: entry, resolveDir: dir, loader: "ts", sourcefile: "entry.ts" },
@@ -76,7 +80,7 @@ mount(document.getElementById("app"), scene, { page: true });`;
     });
     const js = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
     const usesKatex = Object.keys(result.metafile.inputs).some((p) => p.includes("node_modules/katex"));
-    const css = readFileSync(PAGE_CSS, "utf8") + "\n" + readFileSync(CSS, "utf8") + (usesKatex ? "\n" + katexCss() : "");
+    const css = readFileSync(PAGE_CSS, "utf8") + "\n" + KIT_CSS + (usesKatex ? "\n" + katexCss() : "");
 
     // A text version of every step for readers without scripts.
     const compiled = compile(variant);
@@ -119,7 +123,7 @@ for (const dir of dirs) {
 }
 
 if (all.length > 1 || (all.length && outDir === join(ROOT, "dist"))) {
-  const css = readFileSync(PAGE_CSS, "utf8") + "\n" + readFileSync(CSS, "utf8");
+  const css = readFileSync(PAGE_CSS, "utf8") + "\n" + KIT_CSS;
   const cards = all
     .map((w) => `<li><a href="${escapeHtml(basename(w.out))}"><strong>${escapeHtml(w.title)}</strong><span>${escapeHtml(w.question)}</span></a></li>`)
     .join("");

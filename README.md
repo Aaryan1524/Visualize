@@ -83,6 +83,10 @@ export default defineScene<State, Event>({
 
 Keys are model entity ids, and they are how motion, linking and checks find things. The three examples are the reference.
 
+## Visual standard under review
+
+The [visual specification](research/VISUAL_STANDARD.md) defines shared light/dark materials, semantic colours, bundled typography and composition rules. Run `pnpm build` and `node scripts/review-standard.mjs` for the three-moment retries review, style specimen and close-ups. This candidate awaits visual acceptance before the broader rollout.
+
 ## Reusable finished parts
 
 The [rail assembly](src/parts/README.md) supplies fitted trays, guides, surface details, slot anchors and finished entries. LRU uses it directly; review fixtures reuse it at one, three and six slots with identical styles. Run `node scripts/review-rail.mjs` for the local comparison and close-ups. This is the first assembly under review, not yet a general-purpose skill package.

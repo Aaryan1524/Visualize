@@ -42,11 +42,11 @@ export function terminal(key: string, at: Vec3, { status = "", lit = false }: { 
   const marks: Mark[] = [
     { kind: "box", key: `${key}/base`, at, size: [42, 26, 5], radius: 3, tone: "structure", surface: { seam: 0.5 } },
     {
-      kind: "box", key: `${key}/body`, at: add(at, [3, 3, 5]), size: [36, 17, 27], radius: 3, tone: "subject", role: "subject",
+      kind: "box", key: `${key}/body`, at: add(at, [3, 3, 5]), size: [36, 17, 22], radius: 3, tone: "subject", role: "subject",
       label: status, labelFace: "left", lit,
       surface: { seam: 0.1, panel: { face: "left", from: 0.34, to: 0.88, inset: 3.5 } },
     },
-    { kind: "box", key: `${key}/slot`, at: add(at, [9, 7, 32]), size: [24, 4, 1.2], radius: 0.6, tone: "structure" },
+    { kind: "box", key: `${key}/slot`, at: add(at, [9, 7, 27]), size: [24, 4, 1.2], radius: 0.6, tone: "structure" },
     { kind: "box", key: `${key}/port`, at: add(at, [42, 9, 0]), size: [3, 7, 4], radius: 0.6, tone: "structure" },
   ];
   return {
@@ -54,8 +54,8 @@ export function terminal(key: string, at: Vec3, { status = "", lit = false }: { 
     anchor: {
       port: add(at, [45, 12.5, 0]),
       outbox: add(at, [48, 9.5, 0.6]),
-      top: add(at, [21, 11.5, 32]),
-      screen: add(at, [21, 20, 22]),
+      top: add(at, [21, 11.5, 27]),
+      screen: add(at, [21, 20, 18]),
     },
   };
 }
@@ -71,7 +71,7 @@ export function server(key: string, at: Vec3, { lamp = "muted" as Tone, lit = fa
   const marks: Mark[] = [
     { kind: "box", key: `${key}/plinth`, at, size: [40, 34, 4], radius: 3, tone: "structure", surface: { seam: 0.5 } },
     {
-      kind: "box", key: `${key}/tower`, at: add(at, [3, 3, 4]), size: [34, 28, 50], radius: 3, tone: "subject", role: "subject", lit,
+      kind: "box", key: `${key}/tower`, at: add(at, [3, 3, 4]), size: [34, 28, 38], radius: 3, tone: "subject", role: "subject", lit,
       surface: {
         seams: [0.25, 0.5, 0.75],
         vents: { face: "left", from: 0.03, to: 0.47, count: 6, length: 18 },
@@ -85,9 +85,9 @@ export function server(key: string, at: Vec3, { lamp = "muted" as Tone, lit = fa
       inPort: add(at, [0, 17, 0]),
       inbox: add(at, [-14, 14, 0.6]),
       outPort: add(at, [40, 17, 0]),
-      top: add(at, [20, 17, 54]),
+      top: add(at, [20, 17, 42]),
       // On the tower's front face, not in the air in front of it.
-      front: add(at, [20, 31, 30]),
+      front: add(at, [20, 31, 24]),
     },
   };
 }

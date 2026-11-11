@@ -10,6 +10,7 @@
 // pixel by pixel with the live stage, ignoring one-pixel antialiasing shifts
 // and the HTML heading laid over the stage. Exits non-zero above 0.3%.
 
+import { bundledStyles } from "./lib/styles.mjs";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -33,7 +34,8 @@ try {
   if (opt.step !== null) await page.evaluate((k) => window.__viz.seekStep(k), Number(opt.step));
   await settle(page);
 
-  const { svg, width, height } = await page.evaluate((PROPS, plant) => {
+  const fontCss = await bundledStyles("fonts.css");
+  const { svg, width, height } = await page.evaluate((PROPS, plant, fontCss) => {
     const source = window.__viz.stage.svg;
     const copy = source.cloneNode(true);
     const a = [source, ...source.querySelectorAll("*")];
@@ -44,6 +46,9 @@ try {
       b[i].setAttribute("style", style);
       b[i].removeAttribute("class");
     });
+    const fonts = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    fonts.textContent = fontCss;
+    copy.prepend(fonts);
     // Drop what only the browser needs: the hidden ruler and pointer-only parts.
     for (const r of copy.querySelectorAll('[data-layer="ruler"]')) r.remove();
     // Planted fault for the comparison itself: an export that loses its text must fail.
@@ -60,7 +65,7 @@ try {
     copy.setAttribute("height", String(rect.height));
     copy.removeAttribute("style");
     return { svg: new XMLSerializer().serializeToString(copy), width: rect.width, height: rect.height };
-  }, PROPS, opt.plant);
+  }, PROPS, opt.plant, fontCss);
   writeFileSync(opt.out, `<?xml version="1.0" encoding="UTF-8"?>\n${svg}\n`);
 
   // Check: the file on its own must look like the live stage.
@@ -70,6 +75,7 @@ try {
   const alone = await browser.newPage();
   await alone.setViewport({ width: Math.ceil(width), height: Math.ceil(height), deviceScaleFactor: 2 });
   await alone.goto(pathToFileURL(resolve(opt.out)).href);
+  await alone.evaluate(() => document.fonts.ready);
   const exported = await alone.screenshot({ encoding: "base64", clip: { x: 0, y: 0, width, height } });
   // Compare on a plain HTML page: an SVG document has no HTML canvas.
   const cmp = await browser.newPage();

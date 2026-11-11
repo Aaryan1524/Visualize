@@ -2,6 +2,7 @@
 // Check that figures embed: two in one React app, each themed on its own root,
 // the host page's hash, globals and styles untouched, and unmounting cleans up.
 import { build } from "esbuild";
+import { bundledStyles } from "./lib/styles.mjs";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -11,7 +12,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const out = join(ROOT, "shots/embed");
 mkdirSync(out, { recursive: true });
 const js = (await build({ entryPoints: [join(ROOT, "test/embed/app.tsx")], bundle: true, write: false, format: "iife", jsx: "automatic", minify: true, define: { "process.env.NODE_ENV": '"production"' } })).outputFiles[0].text;
-const css = readFileSync(join(ROOT, "src/render/styles.css"), "utf8");
+const css = await bundledStyles();
 // Maths scenes also need KaTeX's stylesheet (with its fonts beside it).
 const katex = pathToFileURL(join(ROOT, "node_modules/katex/dist/katex.min.css")).href;
 const plant = process.argv.includes("--plant-page") ? "page" : "";
@@ -30,6 +31,7 @@ try {
   const expected = plant ? 4 : 3;
   await page.waitForFunction((n) => document.querySelectorAll(".vz").length === n, { timeout: 5000 }, expected);
   await new Promise((r) => setTimeout(r, 300));
+  await page.evaluate(() => document.fonts.ready);
   const s = await page.evaluate(() => ({
     figures: document.querySelectorAll(".vz").length,
     themes: [...document.querySelectorAll(".vz")].map((v) => v.dataset.theme),
@@ -38,10 +40,12 @@ try {
     global: "__viz" in window,
     bodyBg: getComputedStyle(document.body).backgroundColor,
     headingFont: getComputedStyle(document.getElementById("host-heading")).fontFamily,
+    fonts: [...document.fonts].filter(f => /^Visualize/.test(f.family.replace(/["']/g, ""))).map(f => ({family:f.family,status:f.status})),
     svgs: document.querySelectorAll(".vz-svg").length,
     maths: [...document.querySelectorAll(".vz .katex-html")].filter((k) => k.getBoundingClientRect().width > 20).length,
     katexFont: (() => { const k = document.querySelector(".vz .katex"); return k ? getComputedStyle(k).fontFamily : ""; })(),
   }));
+  if (s.fonts.length !== 2 || s.fonts.some(f => f.status !== "loaded")) problems.push("bundled figure fonts did not load");
   if (s.figures !== expected || s.svgs !== expected) problems.push(`expected ${expected} figures, found ${s.figures}`);
   if (s.themes.slice(0, 3).join() !== "light,dark,light") problems.push(`themes ${s.themes.join()}`);
   if (s.maths < 1) problems.push("the attention figure's equations did not render");

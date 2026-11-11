@@ -1,6 +1,6 @@
 /* Standalone pages only: the page around one figure. Not needed when embedding. */
 html, body { margin: 0; }
-body { padding: 32px 16px 48px; background: #f3f0e8; }
-@media (prefers-color-scheme: dark) { body:not([data-theme="light"]) { background: #121418; } }
-body[data-theme="dark"] { background: #121418; }
-body[data-theme="light"] { background: #f3f0e8; }
+body { padding: 32px 16px 48px; background: #eef0f3; }
+@media (prefers-color-scheme: dark) { body:not([data-theme="light"]) { background: #111923; } }
+body[data-theme="dark"] { background: #111923; }
+body[data-theme="light"] { background: #eef0f3; }

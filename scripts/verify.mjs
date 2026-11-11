@@ -32,18 +32,18 @@ let dirs = argv.filter((a, i) => !a.startsWith("--") && argv[i - 1] !== "--plant
 const { compile } = await import(pathToFileURL(join(ROOT, "src/core/scene.ts")).href);
 
 // ---- Planted faults ------------------------------------------------------------
-// Each one breaks the page in a specific way after it loads. Used by --controls
+// Each one breaks the page after standalone fonts and the player are ready. Used by --controls
 // to prove the checks can fail (see the coverage note at the top).
 const PLANTS = {
   "detached-surface": () => {
-    window.addEventListener("load", () => {
+    window.addEventListener("visualize:ready", () => {
       const v=window.__viz, seek=v.seek;
       v.seek=t=>{seek(t);v.stage.svg.querySelectorAll(".vz-surface").forEach(e=>e.setAttribute("transform","translate(30 -30)"));};
       v.seekStep=k=>v.seek(v.compiled.restTime(k));
     });
   },
   "missing-surface": () => {
-    window.addEventListener("load", () => {
+    window.addEventListener("visualize:ready", () => {
       const v=window.__viz, seek=v.seek;
       v.seek=t=>{seek(t);v.stage.svg.querySelectorAll(".vz-surface").forEach(e=>e.replaceChildren());};
       v.seekStep=k=>v.seek(v.compiled.restTime(k));
@@ -57,7 +57,7 @@ const PLANTS = {
     });
   },
   "copy-budget": () => {
-    window.addEventListener("load", () => {
+    window.addEventListener("visualize:ready", () => {
       const v = window.__viz, seek = v.seek;
       v.seek = t => {
         seek(t);
@@ -98,7 +98,7 @@ const PLANTS = {
     });
   },
   callouts: () => {
-    window.addEventListener("load",()=>{
+    window.addEventListener("visualize:ready",()=>{
       const v=window.__viz, seek=v.seek;
       v.seek=t=>{seek(t);v.stage.svg.querySelectorAll(".vz-leader").forEach(e=>e.setAttribute("x2","3000"));};
       v.seekStep=k=>v.seek(v.compiled.restTime(k));
@@ -116,11 +116,11 @@ const PLANTS = {
       };
       v.seekStep = (k) => v.seek(v.compiled.restTime(k));
     };
-    window.addEventListener("load", wrap);
+    window.addEventListener("visualize:ready", wrap);
   },
   // Leave history-dependent state behind after a seek.
   determinism: () => {
-    window.addEventListener("load", () => {
+    window.addEventListener("visualize:ready", () => {
       const v = window.__viz;
       const seek = v.seek;
       let n = 0;
@@ -149,7 +149,7 @@ const PLANTS = {
   },
   // Caption drawn from somewhere other than the model.
   caption: () => {
-    window.addEventListener("load", () => {
+    window.addEventListener("visualize:ready", () => {
       const v = window.__viz;
       const seek = v.seek;
       v.seek = (t) => {
@@ -161,13 +161,13 @@ const PLANTS = {
   },
   // An uncaught error.
   console: () => {
-    window.addEventListener("load", () => setTimeout(() => {
+    window.addEventListener("visualize:ready", () => setTimeout(() => {
       throw new Error("planted failure");
     }));
   },
   // The page ignores #step= and always opens at the start.
   "step-link": () => {
-    window.addEventListener("load", () => window.__viz.seek(0));
+    window.addEventListener("visualize:ready", () => window.__viz.seek(0));
   },
   // The page never learns that the reader asked for reduced motion.
   "reduced-motion": () => {
@@ -192,7 +192,7 @@ const PLANTS = {
   },
   // Content under the stage grows with the step, so the stage shrinks.
   "layout-shift": () => {
-    window.addEventListener("load", () => {
+    window.addEventListener("visualize:ready", () => {
       const v = window.__viz;
       const seek = v.seek;
       v.seek = (t) => {
@@ -204,7 +204,7 @@ const PLANTS = {
   },
   // The renderer stops hiding labels that do not fit their face.
   "show-unfit-labels": () => {
-    window.addEventListener("load", () => {
+    window.addEventListener("visualize:ready", () => {
       const v = window.__viz;
       const seek = v.seek;
       v.seek = (t) => {

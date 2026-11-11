@@ -1,0 +1,15 @@
+/* Bundled Latin subsets. See fonts/*-OFL.txt for the SIL Open Font Licenses. */
+@font-face {
+  font-family: "Visualize Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/instrument-sans-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Visualize Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-mono-latin-500.woff2") format("woff2");
+}

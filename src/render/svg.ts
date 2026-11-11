@@ -106,8 +106,8 @@ function luminanceOf(css: string): number {
   return 0.2126 * lin(d[0]!) + 0.7152 * lin(d[1]!) + 0.0722 * lin(d[2]!);
 }
 
-/** Relative luminance of the dark label ink, #15171b. */
-const INK_LUM = 0.0069;
+/** Measure the same dark ink used by .vz-solid-label. */
+const INK_LUM = luminanceOf("#10141a");
 
 /** "light" when white text contrasts more with this fill than dark ink does. */
 function inkFor(fill: string): "light" | "dark" {

@@ -74,8 +74,8 @@ marks.push(...plate("safe/plate", [-18, -20, 0], [254, 80]).marks,
 |---|---|---|
 | `railAssembly` | `(slots-1)·pitch + cell[0]` long | `slot(i)` (minimum corner of an entry at rest), `anchor.first`, `anchor.last`, `length` |
 | `cartridge(mark)` | the size you give | adds radius, inset, seam and the subject role |
-| `terminal` | 45 × 26, 32 tall | `port`, `outbox`, `top`, `screen` |
-| `server` | 40 × 34, 54 tall | `inPort`, `inbox`, `outPort`, `top`, `front` |
+| `terminal` | 45 × 26, body top 27 (slot top 28.2) | `port`, `outbox`, `top`, `screen` |
+| `server` | 40 × 34, 42 tall | `inPort`, `inbox`, `outPort`, `top`, `front` |
 | `ledger` | radius 19, 4.2 per coin | `inPort`, `top`, `front` |
 | `keyStore` | 28 × 22 | `top`, `front`; `stored`, `lit`, `pulse` options |
 | `plate` | `[w, d]`, at least 40 × 30 | `frontLeft`, `backRight` |

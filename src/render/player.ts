@@ -597,6 +597,9 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
       if (w.__viz === api) delete w.__viz;
     },
   };
+  // Embedded hosts can mount before the bundled fonts finish loading.
+  // Refit against their real metrics without changing playback or time.
+  void document.fonts.ready.then(() => { if (root.isConnected) { fit(); draw(); } });
   if (page) (window as unknown as { __viz?: PlayerApi }).__viz = api;
   return api;
 }

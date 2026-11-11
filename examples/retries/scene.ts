@@ -52,12 +52,12 @@ export function twin() {
 // ---- Stage --------------------------------------------------------------------------
 // Two identical systems on two plates, one behind the other. Every position
 // comes from a part's anchors; nothing below is placed by eye except the parts.
-const LANE = 112;
+const LANE = 94;
 const laneY = (w: World) => (w === "unsafe" ? 0 : LANE);
 const TERMINAL_X = 0;
-const SERVER_X = 96;
-const STORE_X = 146;
-const LEDGER_X = 214;
+const SERVER_X = 80;
+const STORE_X = 128;
+const LEDGER_X = 182;
 
 const STATUS: Record<Snapshot["client"]["status"], string> = {
   idle: "ready",
@@ -86,7 +86,7 @@ function view(s: Joint, e: JointEvent | null): Mark[] {
     const snap = s.worlds[w];
     const evs = e?.events[w] ?? [];
     const { y, term, srv, led, store } = rig(w, snap, evs);
-    marks.push(...plate(`${w}/plate`, [-18, y - 18, 0], [LEDGER_X + 40, 80]).marks);
+    marks.push(...plate(`${w}/plate`, [-18, y - 18, 0], [LEDGER_X + 40, 68]).marks);
     marks.push(cable(`${w}/wire`, term.anchor.port!, srv.anchor.inPort!));
     marks.push(cable(`${w}/db-wire`, srv.anchor.outPort!, led.anchor.inPort!));
     marks.push(...term.marks, ...srv.marks, ...led.marks, ...(store?.marks ?? []));
@@ -103,13 +103,13 @@ function view(s: Joint, e: JointEvent | null): Mark[] {
 
     // Lane title just outside the plate's far-left corner, and the running total above each ledger.
     // Each lane is named beyond its plate's outer front-right corner, next to its outcome.
-    marks.push({ kind: "label", key: `${w}/title`, at: [LEDGER_X + 30, y + 70, -5], text: LANE_TITLE[w], anchor: "start" });
+    marks.push({ kind: "label", key: `${w}/title`, at: [LEDGER_X + 30, y + 60, -5], text: LANE_TITLE[w], anchor: "start" });
     // The total floats at a fixed height that clears the tallest stack in the run.
-    marks.push({ kind: "label", key: `${w}/total`, at: [LEDGER_X + 4, y + 14.5, COIN_BASE + 3 * COIN_HEIGHT + 24], text: `$${totalCharged(snap)}`, size: "large" });
+    marks.push({ kind: "label", key: `${w}/total`, at: [LEDGER_X + 22, y + 14.5, COIN_BASE + 3 * COIN_HEIGHT + 24], text: `$${totalCharged(snap)}`, size: "large" });
   }
   // Part names once, in a row in front of the front plate, each pinned to its part.
   const front = rig("safe", s.worlds.safe, e?.events.safe ?? []);
-  const rowY = LANE + 72;
+  const rowY = LANE + 62;
   const name = (key: string, text: string, x: number, target: { key: string; at: Vec3 }): Mark => ({ kind: "label", key, at: [x, rowY, -5], text, size: "small", target });
   marks.push(
     name("name-terminal", "Terminal", 19, { key: "safe/terminal/base", at: [19, LANE + 28, 2.5] }),
