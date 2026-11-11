@@ -4,3 +4,6 @@ export { buildTimeline, frameIndexAt, DEFAULT_PHASES, DEFAULT_DURATION, DEFAULT_
 export { resolveFrame, DROP } from "./core/interpolate.ts";
 export { easeInOut, easeOut, easeIn, lerp, lerp3, bump } from "./core/ease.ts";
 export { TRUST_LEVELS, TRUST_LABEL, TRUST_MEANING } from "./core/trust.ts";
+export { project, depth, viewVector, ellipseAxes, type Pt } from "./iso/project.ts";
+export { geometryOf, boundsOf, screenExtent, type Bounds, type Face, type Shade, type SolidGeometry } from "./iso/solids.ts";
+export { depthSort, paintOrder, screenOverlap, type SortResult } from "./iso/sort.ts";
