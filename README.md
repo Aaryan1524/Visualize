@@ -29,11 +29,11 @@ Status: a working prototype with three example scenes. The LRU desktop layout an
 
 ## Use it as a skill
 
-This repository is an Agent Skill (`SKILL.md` at the root). Install it into a coding agent's skills folder and install its dependencies once:
+This repository is an Agent Skill (`SKILL.md` at the root). Clone it into your agent's skills folder under the name `visualize`, which must match the skill's `name`, and install its dependencies once:
 
 ```sh
-git clone <this repo> ~/.claude/skills/visualize
-cd ~/.claude/skills/visualize && npm install
+git clone https://github.com/Aaryan1524/Visualize.git <skills folder>/visualize
+cd <skills folder>/visualize && npm install
 ```
 
 Then ask for an explanation ("explain a token bucket visually"). The skill's workflow is: write and test the model, scaffold with `npm run new-scene <name>`, assemble the view from kit parts, declare observations, then build, verify and read the screenshots. `references/` holds the kit API, craft rules and every check.

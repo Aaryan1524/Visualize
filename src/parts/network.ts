@@ -86,10 +86,15 @@ export function server(key: string, at: Vec3, { lamp = "muted" as Tone, lit = fa
       inbox: add(at, [-14, 14, 0.6]),
       outPort: add(at, [40, 17, 0]),
       top: add(at, [20, 17, 54]),
-      front: add(at, [20, 34, 30]),
+      // On the tower's front face, not in the air in front of it.
+      front: add(at, [20, 31, 30]),
     },
   };
 }
+
+/** Coins stack face to face: the pitch equals a coin's height. */
+export const COIN_HEIGHT = 3.8;
+export const COIN_BASE = 8;
 
 export interface Coin {
   id: string;
@@ -106,7 +111,7 @@ export function ledger(key: string, centre: Vec3, coins: readonly Coin[]): Part 
   ];
   coins.forEach((c, i) => {
     marks.push({
-      kind: "cylinder", key: `${key}/coin-${c.id}`, at: add(centre, [0, 0, 8 + i * 4.2]), radius: 12, height: 3.6,
+      kind: "cylinder", key: `${key}/coin-${c.id}`, at: add(centre, [0, 0, COIN_BASE + i * COIN_HEIGHT]), radius: 12, height: COIN_HEIGHT,
       tone: c.tone, lit: c.lit ?? false, enter: "drop",
     } as CylinderMark);
   });
@@ -114,7 +119,7 @@ export function ledger(key: string, centre: Vec3, coins: readonly Coin[]): Part 
     marks,
     anchor: {
       inPort: add(centre, [-19, 0, 0]),
-      top: add(centre, [0, 0, 8 + coins.length * 4.2]),
+      top: add(centre, [0, 0, COIN_BASE + coins.length * COIN_HEIGHT]),
       front: add(centre, [0, 19, 4]),
     },
   };

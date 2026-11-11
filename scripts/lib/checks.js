@@ -34,7 +34,10 @@
       if (o.type === "text") {
         if (!el) failures.push(`text ${o.key}: no element`);
         else if (!isShown(el)) failures.push(`text ${o.key}: not visible`);
-        else {
+        else if (el.querySelector(".vz-solid-label") && !isShown(el.querySelector(".vz-solid-label"))) {
+          // The renderer can hide a face label (unfit, optional); a hidden value is not shown.
+          failures.push(`text ${o.key}: the label is not drawn (hidden because it does not fit its face?)`);
+        } else {
           const text = el.querySelector(".vz-solid-label")?.textContent ?? el.textContent;
           if (norm(text) !== norm(o.equals)) failures.push(`text ${o.key}: shows "${norm(text)}", model says "${o.equals}"`);
         }

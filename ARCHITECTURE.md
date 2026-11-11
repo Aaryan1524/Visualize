@@ -1,6 +1,6 @@
 # Visualize: repeatable visual explanations
 
-Architecture direction after the LRU redesign. The desktop shell and first rail assembly are implemented; the remaining capabilities below are targets, not shipped features.
+Architecture direction after the LRU redesign. Implemented so far: the desktop shell, the rail and the network parts (terminal, server, ledger, key store, plate, cable, message), side-face details, label rules, standalone SVG export, a React adapter, embedding and the skill package. The remaining capabilities below are targets, not shipped features.
 
 ## Product constraints
 
@@ -20,10 +20,10 @@ Proposed copy budgets for the next reference, subject to visual review: a title 
 |---|---|---|
 | Model and time | Pure models, trace, keyed identity, frameAt(t), seek and rewind | Keep these contracts stable while evolving the representation |
 | Geometry | Fixed isometric camera, boxes, rounded box plans, vertical cylinders, depth sort | Rounded extrusion profiles, real bevels, rings, rails, sockets, channels and routed connectors as examples require them |
-| Presentation | SVG reconciliation, desktop figure shell, role-based finish, first rail assembly and attached surface details | Broader parts vocabulary, dynamic semantic anchors and explicit material contracts |
+| Presentation | SVG reconciliation, desktop figure shell, role-based finish, rail and network parts, side-face panels, vents, lamps, turned cylinders, cables and label rules | Parts for attention-style mechanisms, dynamic semantic anchors, focus and de-emphasis, and explicit material contracts |
 | Teaching | Short actions, chapters, prediction pause, optional details drawer | Explicit per-step focus and staged reveal |
 | Verification | Model agreement, depth sampling, replay, readability, layout, interaction; LRU composition, tone and pin checks | Actual-shape clearances and support, connector terminals, line ends, motion-time anchoring and clearance checks |
-| Distribution | Standalone HTML, internal exported TypeScript functions | A tested public authoring API, standalone SVG export and React integration using the same geometry |
+| Distribution | Standalone HTML, standalone SVG export (checked against the live stage), React adapter and scoped embedding (checked), skill package with scaffold, references and evals | A published package with stable exports |
 | Skill | Research and three model-driven examples | A small entrypoint, capability-specific references, approved examples and held-out generation evaluations |
 
 The current composition check measures the width of the combined solids. It cannot distinguish an excellent composition from an oversized plate. The current pin check tests resting states; it does not establish anchoring throughout a move. Neither check is a visual quality score.

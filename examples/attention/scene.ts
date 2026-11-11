@@ -103,7 +103,7 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
     const max = Math.max(...g.values);
     for (let j = 0; j < N; j++) {
       const [cx, cy] = gaugeAt(j);
-      marks.push({ kind: "cylinder", key: `pad-${j}`, at: [cx, cy, 0], radius: 12, height: 1, tone: "muted" });
+      marks.push({ kind: "cylinder", key: `pad-${j}`, at: [cx, cy, 0], radius: 15, height: 1, tone: "muted" });
       const v = g.values[j];
       if (v === undefined) continue;
       const h = Math.max(0.6, v * g.unit);
@@ -111,7 +111,8 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
         kind: "cylinder",
         key: `gauge-${j}`,
         at: [cx, cy, 1],
-        radius: 8,
+        // Wide enough that its top holds the value it encodes.
+        radius: 11,
         height: h,
         tone: "subject",
         lit: weighted && v === max,
@@ -125,7 +126,7 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
         kind: "link",
         key: `reach-${j}`,
         from: [tx(f) + PLINTH[0] / 2, PLINTH[1], 0],
-        to: [cx, cy - 12, 0],
+        to: [cx, cy - 15, 0],
         width: weighted ? 1 + 7 * A.weights[f]![j]! : 1.25,
         dashed: !weighted,
         tone: weighted ? "accent" : "muted",
@@ -306,7 +307,7 @@ function observe(s: AttnState): Observation[] {
     g.values.forEach((v, j) => {
       obs.push({ type: "text", key: `gauge-${j}`, equals: fmt(v) });
       obs.push({ type: "visible", key: `gauge-${j}`, visible: true });
-      obs.push({ type: "extent", key: `gauge-${j}`, size: [16, 16, Math.max(0.6, v * g.unit)] });
+      obs.push({ type: "extent", key: `gauge-${j}`, size: [22, 22, Math.max(0.6, v * g.unit)] });
       if (weighted) obs.push({ type: "visible", key: `reach-${j}`, visible: true });
     });
     for (let j = g.values.length; j < N; j++) obs.push({ type: "visible", key: `gauge-${j}`, visible: false });

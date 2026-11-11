@@ -1,6 +1,6 @@
 import { defineScene } from "../../src/core/scene.ts";
 import type { Mark, Observation, Panel, Teaching, Tone, Vec3 } from "../../src/core/types.ts";
-import { cable, keyStore, ledger, message, plate, server, terminal } from "../../src/parts/network.ts";
+import { cable, COIN_BASE, COIN_HEIGHT, keyStore, ledger, message, plate, server, terminal } from "../../src/parts/network.ts";
 import { strip, totals, type StripItem } from "../../src/render/components.ts";
 import { simulate, totalCharged, type Config, type Ev, type Message, type Snapshot } from "./model.ts";
 
@@ -105,7 +105,7 @@ function view(s: Joint, e: JointEvent | null): Mark[] {
     // Each lane is named beyond its plate's outer front-right corner, next to its outcome.
     marks.push({ kind: "label", key: `${w}/title`, at: [LEDGER_X + 30, y + 70, -5], text: LANE_TITLE[w], anchor: "start" });
     // The total floats at a fixed height that clears the tallest stack in the run.
-    marks.push({ kind: "label", key: `${w}/total`, at: [LEDGER_X + 4, y + 14.5, 8 + 3 * 4.2 + 24], text: `$${totalCharged(snap)}`, size: "large" });
+    marks.push({ kind: "label", key: `${w}/total`, at: [LEDGER_X + 4, y + 14.5, COIN_BASE + 3 * COIN_HEIGHT + 24], text: `$${totalCharged(snap)}`, size: "large" });
   }
   // Part names once, in a row in front of the front plate, each pinned to its part.
   const front = rig("safe", s.worlds.safe, e?.events.safe ?? []);
@@ -239,7 +239,7 @@ function observe(s: Joint, e: JointEvent | null): Observation[] {
     obs.push({ type: "text", key: `${w}/terminal/body`, equals: STATUS[snap.client.status] });
     snap.ledger.forEach((c, k) => {
       obs.push({ type: "visible", key: `${w}/ledger/coin-${c.id}`, visible: true });
-      obs.push({ type: "extent", key: `${w}/ledger/coin-${c.id}`, size: [24, 24, 3.6] });
+      obs.push({ type: "extent", key: `${w}/ledger/coin-${c.id}`, size: [24, 24, COIN_HEIGHT] });
       obs.push({ type: "tone", key: `${w}/ledger/coin-${c.id}`, equals: k === 0 ? "good" : "bad" });
     });
     for (const m of snap.inflight) obs.push({ type: "visible", key: `${w}/msg-${m.id}`, visible: true });

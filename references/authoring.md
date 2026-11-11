@@ -55,12 +55,13 @@ Every step carries a trust level shown with the action. Use `sourced` only with 
 
 - **Standalone page:** `node scripts/build.mjs <dir>` writes `dist/<id>.html`, one file that opens from disk.
 - **SVG of one step:** `node scripts/export-svg.mjs dist/<id>.html --step k --out f.svg [--theme dark]`. Every style is resolved onto its element. The file is opened alone and compared with the live stage, both by structure (labels, shapes) and by pixels.
-- **React:**
+- **React:** import the component and your scene by path from the skill folder, and bundle them with any TypeScript-aware bundler (esbuild, Vite, Next.js). This is the route `pnpm check:embed` tests (`test/embed/app.tsx`).
 
   ```tsx
-  import { Figure } from "visualize/src/react/Figure.tsx";
+  import { Figure } from "<skill>/src/react/Figure.tsx";
+  import scene from "./explanations/my-scene/scene.ts";
   <Figure scene={scene} theme="dark" onReady={(player) => player.seekStep(4)} />
   ```
 
-  Import `src/render/styles.css` once. Figures are scoped to their own root: several can share a page, they do not touch the URL or globals, and unmounting removes them. `pnpm check:embed` proves this.
+  Load `<skill>/src/render/styles.css` once. Scenes with equations also need `katex/dist/katex.min.css`, served with its `fonts/` folder beside it. Figures are scoped to their own root: several can share a page, they do not touch the URL or globals, and unmounting removes them. `pnpm check:embed` proves this with three figures, one of them with maths, and a planted page-mode figure that must fail. The package is not published to npm.
 - **Plain DOM:** `mount(host, scene, { theme? })` returns a player with `seek`, `seekStep`, `play`, `pause` and `destroy`. Pass `{ page: true }` only for a standalone page that owns the URL.
