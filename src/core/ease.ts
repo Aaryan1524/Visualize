@@ -27,5 +27,7 @@ export function lerp3(
 
 /** A bump that is 0 at both ends and 1 in the middle. */
 export function bump(x: number): number {
-  return Math.sin(Math.PI * Math.min(1, Math.max(0, x)));
+  // Exactly 0 at and beyond the ends, so a hop or shake lands where it started.
+  if (x <= 0 || x >= 1) return 0;
+  return Math.sin(Math.PI * x);
 }
