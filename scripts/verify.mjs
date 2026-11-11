@@ -6,9 +6,7 @@
 //   node scripts/verify.mjs --quick           skip screenshots and contact sheets
 //   node scripts/verify.mjs --controls        planted faults: each must be caught
 //
-// Every check below has at least one planted fault in --controls, except the
-// "outside the card" part of the labels check, which the label-aware camera
-// fit makes hard to trigger and which has no control yet.
+// Every check has a planted fault in --controls, including editorial checks.
 //
 // The model is run here, in Node, independently of the page. Observations,
 // captions and readouts from that run are compared with what the browser
@@ -35,6 +33,39 @@ const { compile } = await import(pathToFileURL(join(ROOT, "src/core/scene.ts")).
 // Each one breaks the page in a specific way after it loads. Used by --controls
 // to prove the checks can fail (see the coverage note at the top).
 const PLANTS = {
+  prediction: () => {
+    document.addEventListener("click",e=>{
+      if (e.target.closest?.(".vz-predict-options")) e.stopImmediatePropagation();
+    },true);
+  },
+  "outside-card": () => {
+    document.addEventListener("DOMContentLoaded",()=>{
+      const s=document.createElement("style");
+      s.textContent=".vz-solid-label{transform:translateX(3000px)!important}";
+      document.head.append(s);
+    });
+  },
+  composition: () => {
+    document.addEventListener("DOMContentLoaded",()=>{
+      const s=document.createElement("style");
+      s.textContent=".vz-stage{width:25%!important}";
+      document.head.append(s);
+    });
+  },
+  semantics: () => {
+    document.addEventListener("DOMContentLoaded",()=>{
+      const s=document.createElement("style");
+      s.textContent=".vz-swatch{background:#ff00ff!important}";
+      document.head.append(s);
+    });
+  },
+  callouts: () => {
+    window.addEventListener("load",()=>{
+      const v=window.__viz, seek=v.seek;
+      v.seek=t=>{seek(t);v.stage.svg.querySelectorAll(".vz-leader").forEach(e=>e.setAttribute("x2","3000"));};
+      v.seekStep=k=>v.seek(v.compiled.restTime(k));
+    });
+  },
   // Paint solids in reverse depth order after every seek.
   depth: () => {
     const wrap = () => {
@@ -132,6 +163,12 @@ const PLANTS = {
 };
 
 const CONTROLS = [
+  { plant: "outside-card", expect: "labels" },
+  { variant:"editorial", plant:"composition", expect:"composition" },
+  { variant:"editorial", plant:"semantics", expect:"semantics" },
+  { variant:"editorial", plant:"callouts", expect:"callouts" },
+  { variant:"editorial", plant:"prediction", expect:"prediction" },
+  { variant:"wrong-tone", expect:"observations" },
   { plant: "depth", expect: "depth order" },
   { plant: "determinism", expect: "determinism" },
   { plant: "text-size", expect: "text size" },
@@ -303,6 +340,23 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
     report.add("text size", "every visible text node, at every step (11 px minimum)", [...small]);
     report.add("contrast", "WCAG ratio against the face or card behind each text, light theme", [...faint]);
     report.add("labels", "no overlaps, no spill off faces, not covered, inside the card, panels fit", [...labelProblems]);
+    if (scene.presentation === "editorial") {
+      const issues={composition:new Set(),semantics:new Set(),callouts:new Set()};
+      for (const theme of ["light","dark"]) for (const width of [1280,390]) {
+        await page.emulateMediaFeatures([{name:"prefers-color-scheme",value:theme}]);
+        await page.setViewport({width,height:1000,deviceScaleFactor:1});
+        await settle(page);
+        for (let k=0;k<=last;k++) {
+          await page.evaluate(k=>window.__viz.seekStep(k),k);
+          const result=await page.evaluate(()=>window.__vzCheck.design());
+          for (const name of Object.keys(issues)) result[name].forEach(p=>issues[name].add(`${theme} ${width}px step ${k}: ${p}`));
+        }
+      }
+      await page.setViewport({width:1280,height:1000,deviceScaleFactor:1});
+      await page.emulateMediaFeatures([{name:"prefers-color-scheme",value:"light"}]);
+      await settle(page);
+      for (const [name,problems] of Object.entries(issues)) report.add(name,"every step at desktop and phone widths, both themes",[...problems]);
+    }
 
     // Linked highlighting: pointing at a linked element lights exactly the
     // related elements (one's ids contain the other's), across stage and panels.
@@ -373,6 +427,32 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
     if (!(advanced > 0)) keyProblems.push("Space did not start playback");
     if (paused !== stillPaused) keyProblems.push("Space did not pause playback");
     report.add("keyboard", "arrows step and animate, Home/End, Space plays and pauses", keyProblems);
+    if (scene.teaching) {
+      const problems=[];
+      for (const [k,info] of steps.entries()) {
+        const prompt=info.teaching?.prediction;
+        if (!prompt) continue;
+        await page.evaluate(k=>window.__viz.seekStep(k),k);
+        await page.focus(".vz-stage");
+        await page.keyboard.press("ArrowRight");
+        if (await page.evaluate(()=>window.__viz.root.hasAttribute("data-playing"))) problems.push(`step ${k}: next bypassed the prediction`);
+        const choices=await page.$$(".vz-predict-options button");
+        if (choices.length!==prompt.choices.length) problems.push(`step ${k}: missing choices`);
+        const wrong=prompt.choices.findIndex(c=>c!==prompt.answer);
+        await choices[Math.max(0,wrong)].focus();
+        await page.keyboard.press("Enter");
+        const feedback=await page.$eval(".vz-predict-feedback",e=>e.textContent);
+        if (!feedback.includes(prompt.answer) || !feedback.includes(prompt.explanation)) problems.push(`step ${k}: feedback does not explain the model answer`);
+        await page.keyboard.press("ArrowRight");
+        const advanced=await page.waitForFunction(t=>window.__viz.time()===t,{timeout:4000},compiled.restTime(k+1)).then(()=>true,()=>false);
+        if (!advanced) problems.push(`step ${k}: cannot continue after answering`);
+        await page.evaluate(k=>{window.__viz.seekStep(k-1);window.__viz.play();},k);
+        const paused=await page.waitForFunction(t=>window.__viz.time()===t && !window.__viz.root.hasAttribute("data-playing"),{timeout:6000},compiled.restTime(k)).then(()=>true,()=>false);
+        if (!paused) problems.push(`step ${k}: playback did not pause before the prediction`);
+        await page.evaluate(()=>window.__viz.pause());
+      }
+      if (steps.some(s=>s.teaching?.prediction)) report.add("prediction","keyboard answers, explanatory feedback, gated next, automatic pause",problems);
+    }
 
     allErrors.push(...errors);
     await page.close();
@@ -531,13 +611,15 @@ try {
     }
     // The clean fixture itself must pass, or the controls prove nothing.
     const clean = await verifyPage(browser, { name: "clean fixture", scene: variants.clean, file: join(out, "clean.html"), shotsDir: out });
+    const editorial = await verifyPage(browser,{name:"clean editorial fixture",scene:variants.editorial,file:join(out,"editorial.html"),shotsDir:out});
     console.log("\nplanted-fault controls");
     for (const r of results) {
       console.log(`  ${r.caught ? "caught " : "MISSED "} ${r.control.padEnd(16)} expected "${r.expect}"; failing: ${r.failing.join(", ") || "none"}`);
     }
     clean.print();
+    editorial.print();
     const missed = results.filter((r) => !r.caught).length;
-    if (missed || clean.failed.length) {
+    if (missed || clean.failed.length || editorial.failed.length) {
       console.log(`\ncontrols: ${missed} missed${clean.failed.length ? ", clean fixture failed" : ""}`);
       process.exitCode = 1;
     } else console.log(`\ncontrols: all ${results.length} planted faults caught; clean fixture passes`);

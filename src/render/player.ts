@@ -58,22 +58,39 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   const { steps, timeline } = compiled;
   const projection = scene.projection ?? "iso";
   const last = steps.length - 1;
+  const editorial = scene.presentation === "editorial";
 
   const geometryBox = fitViewBox(
-    steps.map((s) => s.marks),
+    steps.map((s) => editorial ? s.marks.filter((m) => m.kind !== "label") : s.marks),
     projection,
+    editorial ? 10 : 18,
   );
   let viewBox = geometryBox;
   const stage = createStage(viewBox, projection, `${scene.title}. ${scene.question} Use the step controls or the arrow keys.`);
 
   // ---- DOM -------------------------------------------------------------
   const root = h("div", { class: "vz", "data-scene": scene.id });
+  if (editorial) root.dataset.presentation = "editorial";
   const card = h("article", { class: "vz-card" });
   const head = h("header", { class: "vz-head" });
   head.append(h("span", { class: "vz-kicker" }, escapeHtml(scene.title)));
   const themeBtn = h("button", { class: "vz-theme", type: "button" });
   head.append(themeBtn);
   const question = h("h1", { class: "vz-question" }, escapeHtml(scene.question));
+  const setup = h("p", {class:"vz-setup"},escapeHtml(scene.setup ?? ""));
+  const chapters = h("nav",{class:"vz-chapters","aria-label":"Chapters"});
+  const chapterButtons: {button: HTMLButtonElement; index: number}[] = [];
+  if (editorial) {
+    let previous = "";
+    steps.forEach((s,index) => {
+      if (!s.teaching || s.teaching.chapter === previous) return;
+      previous = s.teaching.chapter;
+      const button = h("button",{type:"button"},`<span>${String(chapterButtons.length+1).padStart(2,"0")}</span> ${escapeHtml(previous)}`);
+      button.addEventListener("click",() => goTo(index));
+      chapters.append(button);
+      chapterButtons.push({button,index});
+    });
+  }
 
   const anyPanels = steps.some((s) => s.panels.length > 0);
   const body = h("div", { class: "vz-body", "data-panels": anyPanels ? "1" : "0" });
@@ -98,6 +115,13 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   const source = h("span", { class: "vz-source", "data-role": "source" });
   meta.append(trust, readout, source);
   caption.append(count, text, meta);
+  const stepHeading = h("h2",{class:"vz-step-heading"});
+  const prediction = h("section",{class:"vz-predict","aria-label":"Predict the next step"});
+  prediction.hidden = true;
+  if (editorial) {
+    caption.prepend(stepHeading);
+    caption.append(prediction);
+  }
 
   const controls = h("div", { class: "vz-controls", role: "toolbar", "aria-label": "Playback" });
   const btn = (name: keyof typeof ICONS, label: string, primary = false) => {
@@ -127,7 +151,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
     const ul = h("ul", { class: "vz-legend", "aria-label": "Legend" });
     for (const item of scene.legend) {
       const li = h("li");
-      li.append(h("span", { class: "vz-swatch", style: `--tone: var(--t-${item.tone})`, "aria-hidden": "true" }), document.createTextNode(item.label));
+      li.append(h("span", { class: "vz-swatch", "data-tone":item.tone, style: `--tone: var(--t-${item.tone})`, "aria-hidden": "true" }), document.createTextNode(item.label));
       ul.append(li);
     }
     foot.append(ul);
@@ -151,7 +175,10 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   all.append(ol);
   foot.append(all);
 
-  card.append(head, question, body, caption, controls, foot);
+  if (editorial) {
+    body.insertBefore(caption,panelsBox);
+    card.append(head,question,setup,chapters,body,controls,foot);
+  } else card.append(head, question, body, caption, controls, foot);
   root.append(card);
   host.append(root);
 
@@ -274,9 +301,12 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
 
   // ---- Step info ------------------------------------------------------------
   let shown = -1;
+  let predictionAnswered = false;
   const showStep = (k: number, info: StepInfo) => {
     if (k === shown) return;
     shown = k;
+    predictionAnswered = false;
+    root.dataset.step = String(k);
     count.textContent = k === 0 ? `Start · ${last} steps` : `Step ${k} of ${last}`;
     text.textContent = info.caption;
     trust.textContent = TRUST_LABEL[info.trust];
@@ -289,6 +319,33 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
         : escapeHtml(info.source.label)
       : "";
     renderPanels(info.panels);
+    stepHeading.textContent = info.teaching?.heading ?? "";
+    for (const {button,index} of chapterButtons) {
+      const nextIndex = chapterButtons.find((c) => c.index > index)?.index ?? steps.length;
+      if (k >= index && k < nextIndex) button.setAttribute("aria-current","step");
+      else button.removeAttribute("aria-current");
+    }
+    prediction.replaceChildren();
+    const prompt = info.teaching?.prediction;
+    prediction.hidden = !prompt;
+    if (prompt) {
+      prediction.append(h("span",{class:"vz-predict-kicker"},"Before you continue"),h("p",{},escapeHtml(prompt.question)));
+      const options = h("div",{class:"vz-predict-options"});
+      const feedback = h("p",{class:"vz-predict-feedback","aria-live":"polite"});
+      for (const choice of prompt.choices) {
+        const b = h("button",{type:"button","aria-pressed":"false"},escapeHtml(choice));
+        b.addEventListener("click",() => {
+          predictionAnswered = true;
+          for (const other of options.querySelectorAll("button")) {
+            other.setAttribute("aria-pressed",String(other === b));
+            other.dataset.correct = String(other.textContent === prompt.answer);
+          }
+          feedback.textContent = `${choice === prompt.answer ? "Exactly." : `It’s ${prompt.answer}.`} ${prompt.explanation} Continue to see it happen.`;
+        });
+        options.append(b);
+      }
+      prediction.append(options,feedback);
+    }
     items.forEach((li, i) => (i === k ? li.setAttribute("aria-current", "step") : li.removeAttribute("aria-current")));
     range.setAttribute("aria-valuetext", `${count.textContent}: ${info.caption}`);
   };
@@ -364,6 +421,13 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
         return;
       }
     } else if (playing) {
+      const stop = steps.findIndex((s,k) => s.teaching?.prediction && compiled.restTime(k) > t && compiled.restTime(k) <= t + dt);
+      if (stop >= 0) {
+        t = compiled.restTime(stop);
+        draw();
+        setPlaying(false);
+        return;
+      }
       t += dt;
       if (t >= timeline.total) {
         t = timeline.total;
@@ -405,6 +469,10 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
     return { index, settled: progress >= 1 };
   };
   const next = () => {
+    if (steps[shown]?.teaching?.prediction && !predictionAnswered) {
+      prediction.querySelector("button")?.focus();
+      return;
+    }
     const { index, settled } = stepNow();
     goTo(settled ? index + 1 : index);
   };
@@ -420,6 +488,10 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
     if (playing) {
       target = null;
       setPlaying(false);
+      return;
+    }
+    if (steps[shown]?.teaching?.prediction && !predictionAnswered) {
+      prediction.querySelector("button")?.focus();
       return;
     }
     if (t >= timeline.total) t = 0;

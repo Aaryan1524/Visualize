@@ -1,6 +1,6 @@
 import { resolveFrame } from "./interpolate.ts";
 import { buildTimeline, frameIndexAt, type Timeline } from "./timeline.ts";
-import type { Mark, Observation, Panel, Resolved, Scene, Source, Trust } from "./types.ts";
+import type { Mark, Observation, Panel, Resolved, Scene, Source, Teaching, Trust } from "./types.ts";
 
 /** Identity helper that gives scene authors type inference. */
 export function defineScene<S, E>(scene: Scene<S, E>): Scene<S, E> {
@@ -8,6 +8,7 @@ export function defineScene<S, E>(scene: Scene<S, E>): Scene<S, E> {
 }
 
 export interface StepInfo {
+  teaching?: Teaching;
   caption: string;
   trust: Trust;
   source?: Source;
@@ -62,6 +63,7 @@ export function compile<S, E>(scene: Scene<S, E>, opts: { hold?: number } = {}):
     const marks = scene.view(s.state, s.event);
     checkKeys(marks, i, scene.id);
     return {
+      ...(scene.teaching ? { teaching: scene.teaching(s.state, s.event, i) } : {}),
       caption: s.caption,
       trust: s.trust,
       ...(s.source ? { source: s.source } : {}),

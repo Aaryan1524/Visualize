@@ -9,84 +9,64 @@ export const CAPACITY = 3;
  */
 export const REQUESTS = ["A", "B", "C", "A", "D", "B", "A", "E", "B"];
 
-// World layout, in units of about one screen pixel at 1×.
-const PITCH = 34; // distance between slots along the recency rail
-const BLOCK: Vec3 = [24, 24, 18];
-const TRAY_Z = 1.5; // entries sit on their trays
+// The rail carries recency, not insertion time. Every decorative part belongs
+// to a slot, its guide, or the request belt; all entries remain model entities.
+const PITCH = 42;
+const BLOCK: Vec3 = [28, 24, 17];
+const TRAY_Z = 3;
 const QUEUE_PITCH = 20;
 const QUEUE_SHOWN = 6;
-
 const railEnd = (CAPACITY - 1) * PITCH + BLOCK[0];
 
-function layout(flat: boolean) {
-  return {
-    slot: (i: number): Vec3 => [i * PITCH, 0, TRAY_Z],
-    // Off the cold end of the rail, where an evicted entry is pushed.
-    evicted: (): Vec3 => [-PITCH - 14, 0, TRAY_Z],
-    queue: (j: number): Vec3 => (flat ? [j * QUEUE_PITCH, 0, -40] : [j * QUEUE_PITCH, 50, -4]),
-    consumed: (): Vec3 => (flat ? [0, 0, -22] : [0, 36, 16]),
-    coldLabel: (): Vec3 => (flat ? [-6, 0, -18] : [-10, 30, -4]),
-    freshLabel: (): Vec3 => (flat ? [railEnd + 6, 0, -18] : [railEnd + 12, 30, -4]),
-  };
-}
-
 function viewFor(flat: boolean) {
-  const L = layout(flat);
+  const slot = (i: number): Vec3 => [i * PITCH, 0, TRAY_Z];
+  const queue = (j: number): Vec3 => flat ? [j*QUEUE_PITCH,0,-35] : [j*QUEUE_PITCH,53,-2];
   return (s: LruState, e: GetEvent | null): Mark[] => {
     const marks: Mark[] = [
-      { kind: "box", key: "base", at: [-PITCH - 26, -16, -8], size: [railEnd + PITCH + 60, flat ? 40 : 86, 4], tone: "base" },
-      { kind: "box", key: "rail", at: [-6, -6, -4], size: [railEnd + 12, BLOCK[1] + 12, 4], tone: "structure" },
+      {kind:"box",key:"base",at:[-10,-9,-7],size:[railEnd+20,42,5],radius:4,inset:true,tone:"base"},
+      {kind:"box",key:"rail",at:[-6,-5,-2],size:[railEnd+12,34,2],radius:2,tone:"structure",inset:true},
+      {kind:"box",key:"guide-back",at:[-4,-4,0],size:[railEnd+8,2,3],radius:0.8,tone:"structure"},
+      {kind:"box",key:"guide-front",at:[-4,26,0],size:[railEnd+8,2,3],radius:0.8,tone:"structure"},
     ];
-    for (let i = 0; i < s.capacity; i++) {
-      marks.push({ kind: "box", key: `tray-${i}`, at: [i * PITCH - 2, -2, 0], size: [BLOCK[0] + 4, BLOCK[1] + 4, TRAY_Z], tone: "muted" });
+    for (let i=0;i<s.capacity;i++) {
+      const x=i*PITCH;
+      marks.push(
+        {kind:"box",key:`tray-${i}`,at:[x-2,-1,0],size:[BLOCK[0]+4,26,TRAY_Z],radius:2,inset:true,tone:"muted"},
+        {kind:"label",key:`slot-${i}`,at:flat ? [x+14,0,-11] : [x+14,31,-2],text:String(i+1).padStart(2,"0"),size:"small"},
+      );
     }
-
-    // Cached entries, least recent at the cold end.
-    s.order.forEach((key, i) => {
-      const accessed = e?.key === key;
-      marks.push({
-        kind: "box",
-        key: `entry-${key}`,
-        at: L.slot(i),
-        size: BLOCK,
-        tone: accessed ? (e!.result === "hit" ? "good" : "accent") : "subject",
-        lit: accessed,
-        label: key,
-        link: `key-${key}`,
-        enter: "drop",
-        // A hit hops over the entries shifting toward the cold end.
-        ...(accessed && e!.result === "hit" ? { arc: BLOCK[2] * 1.9 } : {}),
+    // Fine ticks sit on the front guide, rather than floating on the plate.
+    if (!flat) for (let i=0;i<=28;i++) {
+      const x=-3+i*4;
+      marks.push({kind:"link",key:`tick-${i}`,from:[x,28,3],to:[x, i%7===0 ? 26 : 27,3],tone:"structure",width:i%7===0 ? 0.9 : 0.45,layer:"overlay"});
+    }
+    s.order.forEach((key,i) => {
+      const accessed=e?.key===key;
+      marks.push({kind:"box",key:`entry-${key}`,at:slot(i),size:BLOCK,radius:2,inset:true,
+        tone:accessed ? (e!.result==="hit" ? "good" : "accent") : "subject",
+        lit:accessed,label:key,link:`key-${key}`,enter:"drop",
+        title:`${key}, ${i===0 ? "least recently used" : i===s.order.length-1 ? "most recently used" : "middle of recency order"}`,
+        ...(accessed && e!.result==="hit" ? {arc:BLOCK[2]*2.3} : {}),
       });
     });
-    if (e?.evicted) {
-      marks.push({ kind: "box", key: `entry-${e.evicted}`, at: L.evicted(), size: BLOCK, tone: "bad", label: e.evicted, leaving: true });
-    }
-
-    // Requests still to come, next one first.
-    for (let j = 0; j < QUEUE_SHOWN; j++) {
-      const index = s.served + j;
-      const key = s.requests[index];
-      if (key === undefined) break;
-      marks.push({
-        kind: "box",
-        key: `req-${index}`,
-        at: L.queue(j),
-        size: [14, 14, 10],
-        tone: j === 0 ? "structure" : "muted",
-        label: key,
-        link: `key-${key}`,
-        enter: "fade",
-      });
-    }
-    // The request just served is consumed, rising toward the rail.
-    if (e) marks.push({ kind: "box", key: `req-${e.index}`, at: L.consumed(), size: [14, 14, 10], tone: "structure", label: e.key, leaving: true });
-
-    marks.push(
-      { kind: "label", key: "cold", at: L.coldLabel(), text: "least recent", anchor: "end", size: "small" },
-      { kind: "label", key: "fresh", at: L.freshLabel(), text: "most recent", anchor: "start", size: "small" },
-    );
+    if (e?.evicted) marks.push({kind:"box",key:`entry-${e.evicted}`,at:[-35,0,TRAY_Z],size:BLOCK,radius:2,inset:true,tone:"bad",label:e.evicted,leaving:true});
     if (s.served < s.requests.length) {
-      marks.push({ kind: "label", key: "next", at: flat ? [-6, 0, -36] : [-8, 66, -4], text: "next requests", anchor: "end", size: "small" });
+      marks.push({kind:"box",key:"belt",at:flat ? [-3,0,-38] : [-3,50,-5],size:[(QUEUE_SHOWN-1)*QUEUE_PITCH+20,flat ? 16 : 20,3],radius:3,tone:"base",inset:true});
+      for (let j=0;j<QUEUE_SHOWN;j++) {
+        const index=s.served+j,key=s.requests[index];
+        if (key===undefined) break;
+        marks.push({kind:"box",key:`req-${index}`,at:queue(j),size:[14,14,flat ? 12 : 5],radius:1.5,tone:j===0 ? "structure" : "muted",label:key,link:`key-${key}`,enter:"fade"});
+      }
+      marks.push({kind:"label",key:"next",at:flat ? [0,0,-53] : [55,94,-5],text:"Upcoming requests",size:"small"});
+    }
+    if (e && !flat) marks.push({kind:"box",key:`req-${e.index}`,at:flat ? [0,0,-22] : [0,38,18],size:[14,14,flat ? 12 : 5],radius:1.5,tone:"structure",label:e.key,leaving:true});
+    marks.push(
+      {kind:"label",key:"cold",at:flat ? [-8,0,12] : [-12,24,13],text:"Least recent",anchor:"end",size:"small",target:{key:"tray-0",at:[0,24,3]}},
+      {kind:"label",key:"fresh",at:flat ? [railEnd+8,0,12] : [railEnd+20,25,3],text:"Most recent",anchor:"start",size:"small",target:{key:"tray-2",at:[railEnd,24,3]}},
+    );
+    if (e) {
+      const index=s.order.indexOf(e.key),x=index*PITCH+BLOCK[0]/2;
+      marks.push({kind:"label",key:"change",at:flat ? [x,0,42] : [x+10,-14,43],text:e.result==="hit" ? `${e.key} is fresh again` : `${e.key} joins the cache`,anchor:"middle",target:{key:`entry-${e.key}`,at:[x+7,5,TRAY_Z+BLOCK[2]]}});
     }
     return marks;
   };
@@ -108,57 +88,39 @@ function caption(prev: LruState, s: LruState, e: GetEvent, fifo: Map<number, str
 }
 
 function panels(s: LruState) {
-  const cells = s.requests
-    .map((k, i) => {
-      const r = s.results[i];
-      const cls = i === s.served ? "vz-hot" : r === "hit" ? "vz-good" : r === "miss" ? "vz-bad" : "vz-dim";
-      return `<td class="${cls}" data-link="key-${k}">${k}</td>`;
-    })
-    .join("");
-  const marks = s.requests
-    .map((_, i) => {
-      const r = s.results[i];
-      return `<td class="vz-dim">${r === "hit" ? "H" : r === "miss" ? "M" : i === s.served ? "▲" : ""}</td>`;
-    })
-    .join("");
-  const rate = s.served ? `${Math.round((100 * s.hits) / s.served)}%` : "–";
-  return [
-    {
-      key: "rule",
-      title: "The rule",
-      html: `<p>On a <span class="vz-good">hit</span>, move the key to the most-recent end.<br>On a <span class="vz-bad">miss</span>, if the cache is full, evict the least-recent key; then store the new key at the most-recent end.</p>`,
-    },
-    {
-      key: "cache",
-      title: `Cache · ${s.capacity} slots · least → most recent`,
-      html: `<p data-key="recency" style="font:600 15px var(--mono)">${s.order.map((k) => `<span data-link="key-${k}">${k}</span>`).join(" · ") || "empty"}</p>`,
-    },
-    {
-      key: "requests",
-      title: "Requests",
-      html: `<table><tr>${cells}</tr><tr>${marks}</tr></table><p class="vz-dim" style="margin:6px 0 0;font-size:12px">H hit · M miss · ▲ next</p>`,
-    },
-    {
-      key: "counts",
-      title: "Counts",
-      html: `<table><tr><th>hits</th><th>misses</th><th>evictions</th><th>hit rate</th></tr><tr><td data-key="hits">${s.hits}</td><td data-key="misses">${s.misses}</td><td data-key="evictions">${s.evictions}</td><td data-key="rate">${rate}</td></tr></table>`,
-    },
-  ];
+  const chips=s.requests.map((key,i) => {
+    const result=s.results[i];
+    const status=result ?? (i===s.served ? "next" : "waiting");
+    return `<li data-status="${status}" data-link="key-${key}"><b>${key}</b><span>${status}</span></li>`;
+  }).join("");
+  return [{key:"requests",title:"The request sequence",html:`<ol class="lru-requests">${chips}</ol><div class="lru-totals"><span><b data-key="hits">${s.hits}</b> hits</span><span><b data-key="misses">${s.misses}</b> misses</span><span><b data-key="evictions">${s.evictions}</b> evictions</span></div>`}];
+}
+
+function teaching(s: LruState, e: GetEvent | null, index: number) {
+  if (index===0) return {chapter:"Fill",heading:"Three slots. Which keys deserve to stay?"};
+  if (index===REQUESTS.length) return {chapter:"Remember",heading:"Keep what was used most recently."};
+  if (index===4) return {chapter:"Refresh",heading:"A read changes the order.",prediction:{
+    question:"D is next, and the cache is full. Which key leaves?",
+    choices:["A","B","C"],answer:s.order[0]!,
+    explanation:"B was read least recently. A arrived first, but its latest read just moved it to the fresh end.",
+  }};
+  if (index<4) return {chapter:"Fill",heading:e?.key ? `${e.key} takes an empty slot.` : "Start with an empty cache."};
+  return {chapter:"Evict",heading:e?.evicted ? `${e.evicted} makes room for ${e.key}.` : `${e?.key} stays useful.`};
 }
 
 function observe(s: LruState, e: GetEvent | null): Observation[] {
   const obs: Observation[] = [
-    { type: "text", key: "recency", equals: s.order.join(" · ") || "empty" },
     { type: "text", key: "hits", equals: String(s.hits) },
     { type: "text", key: "misses", equals: String(s.misses) },
     { type: "text", key: "evictions", equals: String(s.evictions) },
     ...s.order.map((k) => ({ type: "text" as const, key: `entry-${k}`, equals: k })),
     ...s.order.map((k) => ({ type: "visible" as const, key: `entry-${k}`, visible: true })),
-    ...s.order.map((k) => ({ type: "extent" as const, key: `entry-${k}`, size: BLOCK })),
+    ...s.order.map((k) => ({ type: "extent" as const, key: `entry-${k}`, size: BLOCK, radius: 2 })),
   ];
   if (s.order.length > 1) obs.push({ type: "order", keys: s.order.map((k) => `entry-${k}`), axis: "x" });
   if (e?.evicted) obs.push({ type: "visible", key: `entry-${e.evicted}`, visible: false });
   if (e) obs.push({ type: "lit", key: `entry-${e.key}` });
+  if (e) obs.push({ type: "tone", key: `entry-${e.key}`, equals: e.result === "hit" ? "good" : "accent" });
   const next = s.requests[s.served];
   if (next) obs.push({ type: "text", key: `req-${s.served}`, equals: next });
   return obs;
@@ -168,7 +130,10 @@ function makeScene(flat: boolean): Scene<LruState, GetEvent> {
   return defineScene<LruState, GetEvent>({
     id: flat ? "lru-flat" : "lru",
     title: flat ? "LRU cache (flat)" : "LRU cache",
-    question: "When a cache is full, which entry does it throw away?",
+    question: "Why not just drop the oldest?",
+    presentation: "editorial",
+    setup: "The first key stored can still be the one you need. Follow a read, then decide what deserves to stay.",
+    teaching,
     trust: "computed",
     projection: flat ? "front" : "iso",
     assumptions: [
@@ -186,14 +151,16 @@ function makeScene(flat: boolean): Scene<LruState, GetEvent> {
         steps: steps.map(({ state, event }, i) => ({
           event,
           state,
-          caption: caption(i === 0 ? start : steps[i - 1]!.state, state, event, fifo),
+          caption: i === steps.length-1
+            ? `LRU tracks the last read, not the first arrival. A hit refreshes a key; a full-cache miss replaces the least recently used. This run ends with ${state.hits} hits, ${state.misses} misses and ${state.evictions} evictions.`
+            : caption(i === 0 ? start : steps[i - 1]!.state, state, event, fifo),
         })),
       };
     },
     view: viewFor(flat),
     panels,
     observe,
-    readout: (s) => `${s.order.length}/${s.capacity} slots · hits ${s.hits} · misses ${s.misses} · evictions ${s.evictions}`,
+    readout: (s) => `${s.order.length} of ${s.capacity} slots occupied`,
     timing: (e) => ({ duration: e.evicted ? 1600 : e.result === "hit" ? 1300 : 1100 }),
     legend: [
       { tone: "subject", label: "Cached entry" },

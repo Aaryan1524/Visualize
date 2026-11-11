@@ -85,6 +85,8 @@ interface Node {
   crease?: SVGPolylineElement;
   text?: SVGTextElement;
   line?: SVGLineElement;
+  inset?: SVGPolygonElement;
+  terminal?: SVGCircleElement;
 }
 
 /** Relative luminance of a CSS colour, resolved through a 1×1 canvas. */
@@ -135,7 +137,7 @@ function common(node: Node, m: Resolved): void {
     let t = r.querySelector(":scope > title");
     if (!t) r.prepend((t = el("title")));
     if (t.textContent !== m.title) t.textContent = m.title;
-  }
+  } else r.querySelector(":scope > title")?.remove();
 }
 
 function makeSolid(m: SolidMark): Node {
@@ -146,6 +148,8 @@ function makeSolid(m: SolidMark): Node {
     root.append(...node.faces);
     node.crease = el("polyline", { class: "vz-crease" });
     root.append(node.crease);
+    node.inset = el("polygon", { class: "vz-inset" });
+    root.append(node.inset);
   } else {
     node.faces = [el("polygon", { class: "vz-face", "data-shade": "right" }), el("polygon", { class: "vz-face", "data-shade": "front" })];
     node.top = el("ellipse", { class: "vz-face", "data-shade": "top" });
@@ -162,7 +166,23 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
   common(node, m);
   const g = geometryOf(m, projection);
   const byShade = new Map(g.faces.map((face) => [face.shade, face.points]));
-  for (const face of node.faces!) {
+  if (m.kind === "box") {
+    while (node.faces!.length > g.faces.length) node.faces!.pop()!.remove();
+    while (node.faces!.length < g.faces.length) {
+      const face = el("polygon", {class:"vz-face"});
+      node.root.insertBefore(face, node.crease!);
+      node.faces!.push(face);
+    }
+  }
+  for (const [i, face] of node.faces!.entries()) {
+    if (m.kind === "box") {
+      const surface = g.faces[i]!;
+      setAttr(face,"data-shade",surface.shade);
+      setAttr(face,"points",pts(surface.points));
+      setAttr(face,"style",surface.light === undefined ? null : `fill:color-mix(in oklab,var(--tone) ${surface.light*100}%,var(--shade-side));stroke:color-mix(in oklab,var(--tone) ${surface.light*100}%,var(--shade-side));stroke-width:0.15`);
+      setAttr(face,"display",null);
+      continue;
+    }
     const p = byShade.get(face.getAttribute("data-shade") as never);
     if (p) {
       setAttr(face, "points", pts(p));
@@ -180,10 +200,15 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
   if (node.crease && m.kind === "box" && projection === "iso") {
     // The two top edges nearest the viewer, where the top meets the sides.
     const top = byShade.get("top")!;
-    setAttr(node.crease, "points", pts([top[3]!, top[2]!, top[1]!]));
+    setAttr(node.crease, "points", pts(g.rim ?? [top[3]!, top[2]!, top[1]!]));
     setAttr(node.crease, "display", null);
   } else if (node.crease) setAttr(node.crease, "display", "none");
   setAttr(node.edge!, "points", pts(g.outline));
+  if (node.inset) {
+    setAttr(node.inset,"points",g.inset ? pts(g.inset) : "");
+    setAttr(node.inset,"display",g.inset ? null : "none");
+  }
+  setAttr(node.root,"data-rounded",m.kind === "box" && m.radius ? "" : null);
   const label = m.label ?? "";
   if (node.text!.textContent !== label) node.text!.textContent = label;
   setAttr(node.text!, "x", f(g.labelAt[0]));
@@ -194,8 +219,10 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
 function makeLabel(m: LabelMark): Node {
   const root = el("g", { class: "vz-label-g", "data-key": m.key, "data-kind": "label" });
   const text = el("text", { class: "vz-label" });
-  root.append(text);
-  return { root, kind: "label", text };
+  const line = el("line", {class:"vz-leader"});
+  const terminal = el("circle",{class:"vz-terminal",r:"0.9"});
+  root.append(line,terminal,text);
+  return { root, kind: "label", text, line, terminal };
 }
 
 function updateLabel(node: Node, m: Resolved<LabelMark>, projection: Projection): void {
@@ -207,6 +234,14 @@ function updateLabel(node: Node, m: Resolved<LabelMark>, projection: Projection)
   setAttr(t, "y", f(y));
   setAttr(t, "text-anchor", m.anchor ?? "middle");
   setAttr(t, "data-size", m.size ?? null);
+  setAttr(node.root,"data-target",m.target?.key ?? null);
+  node.line!.style.display = node.terminal!.style.display = m.target ? "" : "none";
+  if (m.target) {
+    const [tx,ty] = project(m.target.at,projection);
+    for (const [attr,v] of Object.entries({x1:x,y1:y+4,x2:tx,y2:ty})) setAttr(node.line!,attr,f(v));
+    setAttr(node.terminal!,"cx",f(tx));
+    setAttr(node.terminal!,"cy",f(ty));
+  }
 }
 
 function makeLink(m: LinkMark): Node {
@@ -298,11 +333,11 @@ export function createStage(viewBox: [number, number, number, number], projectio
         solids.push(m);
       } else if (m.kind === "label") {
         updateLabel(n, m, projection);
-        if (n.root.parentNode !== layers.labels) layers.labels.append(n.root);
+        layers.labels.append(n.root); // declared order, including re-entering labels
       } else {
         updateLink(n, m, projection);
         const layer = m.layer === "overlay" ? layers.overlay : layers.floor;
-        if (n.root.parentNode !== layer) layer.append(n.root);
+        layer.append(n.root);
       }
     }
     for (const [key, n] of nodes) {
@@ -339,7 +374,7 @@ export function createStage(viewBox: [number, number, number, number], projectio
       .sort((a, b) => rank[a.m.size ?? "normal"] - rank[b.m.size ?? "normal"] || a.i - b.i);
     const placed: DOMRect[] = [];
     const gap = 1.5;
-    for (const { text } of labels) {
+    for (const { text, m } of labels) {
       setAttr(text, "transform", null);
       if (!text.textContent) continue;
       const b = text.getBBox();
@@ -354,6 +389,7 @@ export function createStage(viewBox: [number, number, number, number], projectio
         dy = down ? hit.y + hit.height + gap - b.y : hit.y - gap - b.height - b.y;
       }
       if (dy) setAttr(text, "transform", `translate(0 ${f(dy)})`);
+      if (m.target) setAttr(nodes.get(m.key)!.line!,"y1",f(Number(text.getAttribute("y"))+dy+4));
       placed.push(new DOMRect(b.x, b.y + dy, b.width, b.height));
     }
   }

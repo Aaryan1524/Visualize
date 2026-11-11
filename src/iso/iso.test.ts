@@ -133,3 +133,16 @@ test("stacked boxes: the upper one is painted after the lower one", () => {
   const scene = [box("upper", [0, 0, 10], [10, 10, 4]), box("lower", [0, 0, 0], [10, 10, 10])];
   assert.deepEqual(depthSort(scene).order.map((m) => m.key), ["lower", "upper"]);
 });
+
+test("rounded extrusions keep their declared dimensions and an unbroken top rim", () => {
+  const m: BoxMark = {...box("rounded", [0,0,0], [28,24,17]), radius:2, inset:true};
+  const g=geometryOf(m);
+  const xs=g.outline.map(p=>p[0]), ys=g.outline.map(p=>p[1]);
+  const trim=4*(2-Math.SQRT2);
+  assert.ok(Math.abs(Math.max(...xs)-Math.min(...xs)-(52-trim)*Math.cos(Math.PI/6))<1e-6);
+  assert.ok(Math.abs(Math.max(...ys)-Math.min(...ys)-(17+(52-trim)/2))<1e-6);
+  assert.ok(g.faces.length>20,"curved corners have continuously changing face normals");
+  assert.ok(g.rim && g.rim.length>20);
+  assert.ok(g.inset && g.inset.length>20);
+  assert.deepEqual(geometryOf(m,"front").outline,geometryOf({...m,radius:0},"front").outline);
+});

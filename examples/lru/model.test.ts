@@ -108,3 +108,17 @@ test("FIFO reference: evicts in insertion order and ignores reads", () => {
   const f = runFifo(2, ["A", "B", "A", "C", "A"]);
   assert.deepEqual(f.map((x) => x.evicted), [null, null, null, "A", "B"]);
 });
+
+test("the prediction precedes the first eviction and answers from the current recency order", async () => {
+  const {compile}=await import('../../src/core/scene.ts');
+  const {default:scene}=await import('./scene.ts');
+  const compiled=compile(scene);
+  const promptIndex=compiled.steps.findIndex(s=>s.teaching?.prediction);
+  const {steps}=run(CAPACITY,REQUESTS);
+  const firstEviction=steps.findIndex(s=>s.event.evicted);
+  assert.equal(promptIndex,firstEviction);
+  const prompt=compiled.steps[promptIndex]!.teaching!.prediction!;
+  assert.equal(prompt.answer,steps[firstEviction]!.event.evicted);
+  assert.ok(prompt.choices.includes(prompt.answer));
+  assert.match(compiled.steps.at(-1)!.caption,/last read, not the first arrival/);
+});

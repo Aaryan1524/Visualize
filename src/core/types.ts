@@ -102,6 +102,10 @@ export interface BoxMark extends MarkBase {
   kind: "box";
   at: Vec3;
   size: Vec3;
+  /** Rounded floor-plan corners, in world units. */
+  radius?: number;
+  /** An inset rim on the top surface. */
+  inset?: boolean;
   /** Short text drawn upright on a face. */
   label?: string;
   /** Which visible face carries the label. Use a side when something sits on top. */
@@ -128,6 +132,8 @@ export interface LabelMark extends MarkBase {
   text: string;
   anchor?: "start" | "middle" | "end";
   size?: "small" | "normal" | "large";
+  /** A leader ending on the named solid, in world coordinates. */
+  target?: { key: string; at: Vec3 };
 }
 
 /** A straight line between two world points. */
@@ -173,12 +179,14 @@ export type Observation =
   | { type: "visible"; key: string; visible: boolean }
   /** The element with this key is the highlighted one. */
   | { type: "lit"; key: string }
+  /** Semantic colour role, independently asserted from the model event. */
+  | { type: "tone"; key: string; equals: Tone }
   /**
    * The solid with this key is drawn at this world size: [w, d, h] for a
    * box, [diameter, diameter, h] for a cylinder. Use it wherever a size
    * encodes a number. Checked against the drawn outline with the projection.
    */
-  | { type: "extent"; key: string; size: readonly [number, number, number]; tolerance?: number };
+  | { type: "extent"; key: string; size: readonly [number, number, number]; radius?: number; tolerance?: number };
 
 export interface Phases {
   exit: readonly [number, number];
@@ -187,6 +195,17 @@ export interface Phases {
 }
 
 export type Projection = "iso" | "front";
+
+export interface Teaching {
+  chapter: string;
+  heading: string;
+  prediction?: {
+    question: string;
+    choices: string[];
+    answer: string;
+    explanation: string;
+  };
+}
 
 export interface Scene<S, E> {
   id: string;
@@ -208,4 +227,8 @@ export interface Scene<S, E> {
   /** Legend entries: tone -> what it means in the concept's own words. */
   legend?: { tone: Tone; label: string }[];
   projection?: Projection;
+  /** Opt into the figure-first presentation without changing existing scenes. */
+  presentation?: "editorial";
+  setup?: string;
+  teaching?: (state: S, event: E | null, index: number) => Teaching;
 }

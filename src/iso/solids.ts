@@ -11,9 +11,12 @@ export type Shade = "top" | "left" | "right" | "front";
 export interface Face {
   shade: Shade;
   points: Pt[];
+  light?: number;
 }
 
 export interface SolidGeometry {
+  rim?: Pt[];
+  inset?: Pt[];
   /** Visible faces, safe to paint in this order. */
   faces: Face[];
   /** Silhouette, for the outline stroke and hit testing. */
@@ -68,7 +71,7 @@ function boxGeometry(m: BoxMark, projection: Projection): SolidGeometry {
         ? { at: P(x1, (y0 + y1) / 2, zm), width: m.size[1] * C30 * 0.8 }
         : // The top face spans (w + d)·cos30° at its widest row; leave margin for the slanted edges.
           { at: P((x0 + x1) / 2, (y0 + y1) / 2, z1), width: (m.size[0] + m.size[1]) * C30 * 0.55 };
-  return {
+  const basic: SolidGeometry = {
     faces: [
       { shade: "left", points: left },
       { shade: "right", points: right },
@@ -79,6 +82,42 @@ function boxGeometry(m: BoxMark, projection: Projection): SolidGeometry {
     labelWidth: label.width,
     labelShade: face,
   };
+  const r = Math.min(Math.max(m.radius ?? 0, 0), m.size[0] / 2, m.size[1] / 2);
+  if (!r) return basic;
+  // Rounded rectangular extrusion. Side facets follow the surface normal;
+  // the silhouette is the convex hull of the projected top and bottom.
+  const plan: Pt[] = [];
+  for (const [cx, cy, start] of [[x1-r, y0+r, -90], [x1-r, y1-r, 0], [x0+r, y1-r, 90], [x0+r, y0+r, 180]]) {
+    for (let i = 0; i <= 12; i++) {
+      const a = (start! + i * 90 / 12) * Math.PI / 180;
+      plan.push([cx! + r * Math.cos(a), cy! + r * Math.sin(a)]);
+    }
+  }
+  const roundedTop = plan.map(([x,y]) => P(x,y,z1));
+  const bottom = plan.map(([x,y]) => P(x,y,z0));
+  const sides: Face[] = [];
+  const rim: Pt[] = [];
+  for (let i = 0; i < plan.length; i++) {
+    const j = (i+1) % plan.length;
+    const dx = plan[j]![0] - plan[i]![0], dy = plan[j]![1] - plan[i]![1];
+    if (dy - dx <= 1e-8) continue;
+    const n = Math.hypot(dx, dy);
+    sides.push({ shade: dy > -dx ? "right" : "left", light: 0.72 + 0.22 * dy / n - 0.10 * (-dx / n), points: [roundedTop[i]!, roundedTop[j]!, bottom[j]!, bottom[i]!] });
+    if (!rim.length) rim.push(roundedTop[i]!);
+    rim.push(roundedTop[j]!);
+  }
+  const points = [...roundedTop, ...bottom].sort((a,b) => a[0]-b[0] || a[1]-b[1]);
+  const cross = (a: Pt,b: Pt,c: Pt) => (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+  const half = (points: Pt[]) => {
+    const h: Pt[] = [];
+    for (const p of points) {
+      while (h.length > 1 && cross(h[h.length-2]!,h[h.length-1]!,p) <= 1e-9) h.pop();
+      h.push(p);
+    }
+    return h.slice(0,-1);
+  };
+  const inset = plan.map(([x,y]) => P(x0 + 1.4 + (x-x0) * (m.size[0]-2.8)/m.size[0], y0 + 1.4 + (y-y0)*(m.size[1]-2.8)/m.size[1],z1));
+  return { ...basic, faces: [...sides, {shade:"top", points: roundedTop}], outline: [...half(points),...half([...points].reverse())], rim, ...(m.inset ? {inset} : {}) };
 }
 
 function cylinderGeometry(m: CylinderMark, projection: Projection): SolidGeometry {

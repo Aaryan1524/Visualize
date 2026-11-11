@@ -34,7 +34,10 @@
       if (o.type === "text") {
         if (!el) failures.push(`text ${o.key}: no element`);
         else if (!isShown(el)) failures.push(`text ${o.key}: not visible`);
-        else if (norm(el.textContent) !== norm(o.equals)) failures.push(`text ${o.key}: shows "${norm(el.textContent)}", model says "${o.equals}"`);
+        else {
+          const text = el.querySelector(".vz-solid-label")?.textContent ?? el.textContent;
+          if (norm(text) !== norm(o.equals)) failures.push(`text ${o.key}: shows "${norm(text)}", model says "${o.equals}"`);
+        }
       } else if (o.type === "visible") {
         const shown = isShown(el);
         if (!o.visible) {
@@ -49,6 +52,8 @@
         if (problem) failures.push(`extent ${o.key}: ${problem}`);
       } else if (o.type === "lit") {
         if (!el || !el.hasAttribute("data-lit")) failures.push(`lit ${o.key}: not highlighted`);
+      } else if (o.type === "tone") {
+        if (!el || el.getAttribute("data-tone") !== o.equals) failures.push(`tone ${o.key}: expected ${o.equals}, got ${el?.getAttribute("data-tone") ?? "missing"}`);
       } else if (o.type === "order") {
         const els = o.keys.map(byKey);
         const missing = o.keys.filter((_, i) => !els[i] || !isShown(els[i]));
@@ -137,7 +142,11 @@
     let W, H;
     if (projection() === "front") [W, H] = [w, h];
     else if (cyl) [W, H] = [Math.SQRT2 * C * w, h + w / Math.SQRT2];
-    else [W, H] = [(w + d) * C, (w + d) / 2 + h];
+    else {
+      const r = Math.min(Math.max(o.radius ?? 0, 0), w / 2, d / 2);
+      const trim = 2 * r * (2 - Math.SQRT2);
+      [W, H] = [(w + d - trim) * C, (w + d - trim) / 2 + h];
+    }
     const tol = o.tolerance ?? 0.6;
     if (Math.abs(b.width - W) > tol || Math.abs(b.height - H) > tol) {
       return `drawn ${b.width.toFixed(1)}×${b.height.toFixed(1)}, a ${o.size.join("×")} ${cyl ? "cylinder" : "box"} projects to ${W.toFixed(1)}×${H.toFixed(1)}`;
@@ -198,7 +207,18 @@
         t0 = Math.max(t0, m.at[i] - base[i]);
         t1 = Math.min(t1, m.at[i] + m.size[i] - base[i]);
       }
-      return t0 < t1 ? t1 : null;
+      if (t0 >= t1) return null;
+      const r = Math.min(Math.max(m.radius ?? 0, 0),m.size[0]/2,m.size[1]/2);
+      if (!r) return t1;
+      const x = bx+t1, y = by+t1;
+      const cx = Math.max(m.at[0]+r,Math.min(x,m.at[0]+m.size[0]-r));
+      const cy = Math.max(m.at[1]+r,Math.min(y,m.at[1]+m.size[1]-r));
+      if ((x-cx)**2+(y-cy)**2 <= r*r) return t1;
+      const dx=bx-cx, dy=by-cy;
+      const b=2*(dx+dy), c=dx*dx+dy*dy-r*r, disc=b*b-8*c;
+      if (disc<0) return null;
+      const lo=Math.max(t0,(-b-Math.sqrt(disc))/4), hi=Math.min(t1,(-b+Math.sqrt(disc))/4);
+      return lo<hi ? hi : null;
     }
     // Vertical cylinder: 2t² + 2t(dx + dy) + dx² + dy² − r² ≤ 0, and z0 ≤ t ≤ z1.
     const dx = bx - m.at[0], dy = by - m.at[1];
@@ -433,5 +453,44 @@
     };
   }
 
-  window.__vzCheck = { observe, depth, text, labels, snapshot, shown };
+  function design() {
+    const root=viz().root;
+    const composition=[], semantics=[], callouts=[];
+    if (root.dataset.presentation !== "editorial") return {composition,semantics,callouts};
+    const stage=root.querySelector(".vz-stage").getBoundingClientRect();
+    const body=root.querySelector(".vz-body").getBoundingClientRect();
+    if (stage.width < body.width*.9) composition.push("figure stage occupies less than 90% of the body width");
+    const solids=[...svg().querySelectorAll(".vz-solid")].filter(isShown).map(e=>e.getBoundingClientRect());
+    if (solids.length) {
+      const width=Math.max(...solids.map(r=>r.right))-Math.min(...solids.map(r=>r.left));
+      if (width/stage.width < .42) composition.push(`solid figure occupies only ${(100*width/stage.width).toFixed(0)}% of the stage width (min 42%)`);
+    }
+    const colour=css=>{const e=document.createElement("span");e.style.color=css;root.append(e);const c=getComputedStyle(e).color;e.remove();return c;};
+    for (const swatch of root.querySelectorAll(".vz-swatch[data-tone]")) {
+      const tone=swatch.dataset.tone;
+      for (const solid of svg().querySelectorAll(`.vz-solid[data-tone="${tone}"]`)) {
+        if (colour(getComputedStyle(swatch).backgroundColor)!==colour(getComputedStyle(solid).getPropertyValue("--tone"))) semantics.push(`${tone}: solid colour differs from its legend`);
+        if (solid.hasAttribute("data-lit")) {
+          const edge=getComputedStyle(solid.querySelector(".vz-edge")).stroke;
+          if (colour(edge)!==colour(getComputedStyle(solid).getPropertyValue("--tone"))) semantics.push(`${tone}: highlight introduces a different semantic colour`);
+        }
+      }
+    }
+    for (const label of svg().querySelectorAll(".vz-label-g[data-target]")) {
+      const key=label.dataset.target;
+      const target=viz().frame().marks.find(m=>m.key===key);
+      const authored=viz().frame().marks.find(m=>m.key===label.dataset.key);
+      if (!target || !authored?.target) {callouts.push(`${label.dataset.key}: missing target ${key}`);continue;}
+      const p=authored.target.at;
+      const inside=target.kind==="box" ? p.every((v,i)=>v>=target.at[i]-.05 && v<=target.at[i]+target.size[i]+.05) : target.kind==="cylinder" && Math.hypot(p[0]-target.at[0],p[1]-target.at[1])<=target.radius+.05 && p[2]>=target.at[2]-.05 && p[2]<=target.at[2]+target.height+.05;
+      if (!inside) callouts.push(`${label.dataset.key}: pin is outside ${key}`);
+      if (target.kind==="box" && !p.some((v,i)=>Math.abs(v-target.at[i])<.05 || Math.abs(v-target.at[i]-target.size[i])<.05)) callouts.push(`${label.dataset.key}: pin does not sit on a surface of ${key}`);
+      const expected=projection()==="front" ? [p[0],-p[2]] : [(p[0]-p[1])*C,(p[0]+p[1])*.5-p[2]];
+      const line=label.querySelector(".vz-leader");
+      if (!line || Math.hypot(Number(line.getAttribute("x2"))-expected[0],Number(line.getAttribute("y2"))-expected[1])>.1) callouts.push(`${label.dataset.key}: leader misses its model anchor`);
+    }
+    return {composition,semantics,callouts};
+  }
+
+  window.__vzCheck = { observe, depth, text, labels, snapshot, shown, design };
 })();
