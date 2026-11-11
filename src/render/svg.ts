@@ -115,6 +115,9 @@ function inkFor(fill: string): "light" | "dark" {
 export interface StageRenderer {
   svg: SVGSVGElement;
   render(marks: readonly Resolved[]): void;
+  setViewBox(vb: readonly [number, number, number, number]): void;
+  /** Union of these labels' boxes in viewBox units, at the current label size. */
+  measureLabels(labels: readonly LabelMark[]): [number, number, number, number] | null;
   /** Re-pick label colours after a theme change. */
   refreshInk(): void;
   /** Current painter's order of solids, for checks. */
@@ -317,12 +320,41 @@ export function createStage(viewBox: [number, number, number, number], projectio
     for (const m of solids) pickInk(nodes.get(m.key)!);
   }
 
+  const ruler = el("g", { class: "vz-layer", "data-layer": "ruler", visibility: "hidden", "aria-hidden": "true" });
+  svg.append(ruler);
+
+  function measureLabels(labels: readonly LabelMark[]): [number, number, number, number] | null {
+    if (!labels.length) return null;
+    ruler.replaceChildren();
+    const texts = labels.map((m) => {
+      const n = makeLabel(m);
+      updateLabel(n, { ...m, opacity: 1 }, projection);
+      n.root.removeAttribute("data-key");
+      ruler.append(n.root);
+      return n.text!;
+    });
+    let box: [number, number, number, number] | null = null;
+    for (const t of texts) {
+      const b = t.getBBox();
+      if (!b.width) continue;
+      box = box
+        ? [Math.min(box[0], b.x), Math.min(box[1], b.y), Math.max(box[2], b.x + b.width), Math.max(box[3], b.y + b.height)]
+        : [b.x, b.y, b.x + b.width, b.y + b.height];
+    }
+    ruler.replaceChildren();
+    return box;
+  }
+
+  function setViewBox(vb: readonly [number, number, number, number]): void {
+    setAttr(svg, "viewBox", vb.map(f).join(" "));
+  }
+
   function refreshInk(): void {
     inkCache.clear();
     for (const n of nodes.values()) if (n.text && n.kind !== "label" && n.kind !== "link") pickInk(n);
   }
 
-  return { svg, render, refreshInk, solidOrder: () => [...order], conflicts: () => lastConflicts };
+  return { svg, render, setViewBox, measureLabels, refreshInk, solidOrder: () => [...order], conflicts: () => lastConflicts };
 }
 
 export { DROP };
