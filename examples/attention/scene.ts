@@ -277,7 +277,7 @@ function caption(s: AttnState, e: AttnEvent): string {
       return `Score “${tok(f)}” against “${tok(j)}”: the dot product of its query with that key is ${fmt(A.scores[f]![j]!)}. A larger score means the key matches the query better.`;
     }
     case "scale":
-      return `Divide every score by √d_k = √${A.dk} ≈ ${fmt(Math.sqrt(A.dk))}. The authors scale because, for large d_k, dot products grow large and push softmax into regions with extremely small gradients.`;
+      return `Divide every score by √d_k = √${A.dk} ≈ ${fmt(Math.sqrt(A.dk))}. The authors suspect that for large d_k the dot products grow large, pushing softmax into regions with extremely small gradients, and scale to counteract it.`;
     case "softmax":
       return `Softmax turns the scaled scores into weights that are positive and sum to 1. “${tok(f)}” puts ${fmt(w[top]!)} of its attention on “${tok(top)}”. Gauge heights now show weights.`;
     case "mix":
@@ -293,11 +293,20 @@ function observe(s: AttnState): Observation[] {
   const f = s.focus;
   const obs: Observation[] = [];
   A.tokens.forEach((_, i) => [...A.Q[i]!, ...A.K[i]!, ...A.V[i]!].forEach((v, j) => obs.push({ type: "text", key: `vec-${i}-${j}`, equals: fmt(v, 1) })));
+  // Bar heights are the numbers: check the drawn size, not just the label.
+  A.tokens.forEach((_, i) =>
+    (["q", "k", "v"] as const).forEach((name) =>
+      A[name.toUpperCase() as "Q" | "K" | "V"][i]!.forEach((v, d) => obs.push({ type: "extent", key: `${name}-${i}-${d}`, size: [5, 8, barH(v)] })),
+    ),
+  );
   const g = gaugeValues(s);
   if (g) {
+    const weighted = s.phase === "softmax" || s.phase === "mix" || s.phase === "all";
     g.values.forEach((v, j) => {
       obs.push({ type: "text", key: `gauge-label-${j}`, equals: fmt(v) });
       obs.push({ type: "visible", key: `gauge-${j}`, visible: true });
+      obs.push({ type: "extent", key: `gauge-${j}`, size: [16, 16, Math.max(0.6, v * g.unit)] });
+      if (weighted) obs.push({ type: "visible", key: `reach-${j}`, visible: true });
     });
     for (let j = g.values.length; j < N; j++) obs.push({ type: "visible", key: `gauge-${j}`, visible: false });
   }
@@ -312,7 +321,11 @@ function observe(s: AttnState): Observation[] {
     }
   }
   const outRows = s.phase === "mix" ? [f] : s.phase === "all" ? A.tokens.map((_, i) => i) : [];
-  for (const i of outRows) A.output[i]!.forEach((z, d) => obs.push({ type: "text", key: `z-${i}-${d}-value`, equals: fmt(z) }));
+  for (const i of outRows)
+    A.output[i]!.forEach((z, d) => {
+      obs.push({ type: "text", key: `z-${i}-${d}-value`, equals: fmt(z) });
+      obs.push({ type: "extent", key: `z-${i}-${d}`, size: [6, 8, barH(z)] });
+    });
   if (s.phase !== "intro" && s.phase !== "all") obs.push({ type: "lit", key: `tok-${f}` });
   return obs;
 }
