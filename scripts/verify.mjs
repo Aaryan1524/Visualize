@@ -4,6 +4,7 @@
 //   node scripts/verify.mjs                   every examples/* scene
 //   node scripts/verify.mjs examples/lru      one scene directory (all its variants)
 //   node scripts/verify.mjs --quick           skip screenshots and contact sheets
+//   node scripts/verify.mjs <dir> --shots out  write screenshots to out/ (default: next to the scene)
 //   node scripts/verify.mjs --controls        planted faults: each must be caught
 //
 // Every check has a planted fault in --controls, including editorial checks.
@@ -14,7 +15,7 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { launch, settle } from "./lib/browser.mjs";
 
@@ -25,7 +26,8 @@ const argv = process.argv.slice(2);
 const flags = new Set(argv.filter((a) => a.startsWith("--")));
 const quick = flags.has("--quick");
 const plantArg = argv.find((a, i) => argv[i - 1] === "--plant");
-let dirs = argv.filter((a, i) => !a.startsWith("--") && argv[i - 1] !== "--plant").map((d) => resolve(d));
+const shotsArg = argv.find((a, i) => argv[i - 1] === "--shots");
+let dirs = argv.filter((a, i) => !a.startsWith("--") && argv[i - 1] !== "--plant" && argv[i - 1] !== "--shots").map((d) => resolve(d));
 
 const { compile } = await import(pathToFileURL(join(ROOT, "src/core/scene.ts")).href);
 
@@ -244,6 +246,8 @@ const CONTROLS = [
   { plant: "linking", expect: "linking" },
   { plant: "layout-shift", expect: "layout shift" },
   { variant: "label-on-part", expect: "labels" },
+  { variant: "hidden-value", expect: "observations" },
+  { variant: "loose-cable", expect: "mounts" },
   { variant: "wrong-value", expect: "observations" },
   { variant: "crowded-labels", expect: "labels" },
   { variant: "intersecting", expect: "depth order" },
@@ -338,6 +342,29 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
   };
 
   const allErrors = [];
+
+  // Mounts: every cable end sits on a standing part (within 1.5 units of its
+  // footprint and height), checked on the model-driven marks at every step.
+  {
+    const problems = [];
+    const standing = (m) => (m.kind === "box" || m.kind === "cylinder") && (m.kind === "box" ? m.at[2] + m.size[2] : m.at[2] + m.height) > 1e-6 && m.role !== "foundation";
+    const bounds = (m) => m.kind === "box"
+      ? [m.at, [m.at[0] + m.size[0], m.at[1] + m.size[1], m.at[2] + m.size[2]]]
+      : [[m.at[0] - m.radius, m.at[1] - m.radius, m.at[2]], [m.at[0] + m.radius, m.at[1] + m.radius, m.at[2] + m.height]];
+    const near = (p, [lo, hi]) => [0, 1, 2].every((i) => p[i] >= lo[i] - 1.5 && p[i] <= hi[i] + 1.5);
+    let ends = 0;
+    steps.forEach((st, k) => {
+      const solids = st.marks.filter(standing).map(bounds);
+      for (const m of st.marks) {
+        if (m.kind !== "link" || !m.cable || m.transient || m.leaving) continue;
+        for (const [name, p] of [["start", m.from], ["end", m.to]]) {
+          ends++;
+          if (!solids.some((b) => near(p, b))) problems.push(`step ${k}: cable ${m.key} ${name} at (${p.map((n) => n.toFixed(1)).join(", ")}) is not on a part`);
+        }
+      }
+    });
+    report.add("mounts", `${ends} cable ends checked against standing parts`, [...new Set(problems)].slice(0, 20));
+  }
 
   // -- Desktop, light: model agreement, depth, determinism, text ---------------
   {
@@ -768,7 +795,10 @@ try {
     if (dirs.length === 0) throw new Error("no scenes to verify");
     for (const dir of dirs) {
       const variants = await variantsOf(dir);
-      const out = join(ROOT, "shots", relative(join(ROOT, "examples"), dir).replace(/[\\/]/g, "-"));
+      // Screenshots go under the skill's shots/ for its own examples, and next to
+      // the scene (<parent>/shots/<name>) for scenes in another project.
+      const inside = !relative(join(ROOT, "examples"), dir).startsWith("..");
+      const out = shotsArg ? resolve(shotsArg) : inside ? join(ROOT, "shots", relative(join(ROOT, "examples"), dir).replace(/[\\/]/g, "-")) : join(dirname(dir), "shots", basename(dir));
       mkdirSync(out, { recursive: true });
       buildTo(dir, out);
       for (const [name, scene] of Object.entries(variants)) {

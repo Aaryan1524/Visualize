@@ -99,6 +99,21 @@ const coveredLabel = defineScene({
   view: (s, e) => stack.view(s, e).map((m) => (m.kind === "box" && m.label ? { ...m, labelFace: "top" as const } : m)),
 });
 
+/** A value the model says is shown, on a face too small for it: the renderer hides it. */
+const hiddenValue = defineScene({
+  ...stack,
+  id: "hidden-value",
+  view: (s, e) => stack.view(s, e).map((m) => (m.kind === "box" && m.label ? { ...m, label: `${m.label} = 1234567` } : m)),
+  observe: (s) => s.items.map((it) => ({ type: "text" as const, key: it.id, equals: `${it.value} = 1234567` })),
+});
+
+/** A cable whose far end hangs in the air instead of sitting on a part. */
+const looseCable = defineScene({
+  ...stack,
+  id: "loose-cable",
+  view: (s, e) => [...stack.view(s, e), { kind: "link", key: "loose", from: [24, 12, 0.4], to: [90, 12, 0.4], cable: true, width: 2.2, layer: "floor" }],
+});
+
 /** A free label drawn across a standing part it does not point to. */
 const labelOnPart = defineScene({
   ...stack,
@@ -120,6 +135,8 @@ export const variants = {
   "wide-label": wideLabel,
   "covered-label": coveredLabel,
   "label-on-part": labelOnPart,
+  "hidden-value": hiddenValue,
+  "loose-cable": looseCable,
 };
 
 export default clean;
