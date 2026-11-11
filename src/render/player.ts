@@ -5,7 +5,7 @@ import type { Panel, Resolved, Scene } from "../core/types.ts";
 import { createStage, fitViewBox, type StageRenderer } from "./svg.ts";
 
 /** Rendered label size in CSS px, independent of how large the stage is drawn. */
-const LABEL_PX = 13;
+const LABEL_PX = 14;
 
 const ICONS = {
   prev: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg>',
@@ -161,8 +161,12 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   themeBtn.addEventListener("click", () => {
     docEl.dataset.theme = currentTheme() === "dark" ? "light" : "dark";
     syncThemeBtn();
+    stage.refreshInk();
   });
-  media.addEventListener("change", syncThemeBtn);
+  media.addEventListener("change", () => {
+    syncThemeBtn();
+    stage.refreshInk();
+  });
   syncThemeBtn();
 
   // ---- Label size stays constant on screen --------------------------------

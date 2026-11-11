@@ -50,6 +50,7 @@ export default defineScene<State, Op>({
         size: [24, 24, 10],
         tone: i === s.items.length - 1 ? "accent" : "subject",
         label: it.value,
+        labelFace: "right",
         enter: "drop",
         exit: "lift",
         lit: e?.type === "push" && i === s.items.length - 1,
