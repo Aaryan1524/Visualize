@@ -60,5 +60,5 @@ export function railAssembly({ key, slots, at = [0, 0, 0], cell = RAIL_CELL, pit
 
 /** A keyed subject with its finish attached, including during hops and exits. */
 export function cartridge(mark: Omit<BoxMark, "kind" | "radius" | "inset" | "surface" | "role">): BoxMark {
-  return { ...mark, kind: "box", radius: 2, inset: true, role: "subject", surface: { seam: .22 } };
+  return { ...mark, kind: "box", radius: 2, inset: true, role: "subject", textRole: mark.textRole ?? "symbol", surface: { seam: .22 } };
 }

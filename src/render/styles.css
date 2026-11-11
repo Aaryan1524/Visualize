@@ -415,9 +415,13 @@
 .vz[data-presentation="editorial"] .vz-solid[data-role="foundation"] { filter: drop-shadow(0 5px 4px var(--shadow-foundation)); }
 .vz[data-presentation="editorial"] .vz-solid[data-role="subject"] { filter: drop-shadow(0 1.2px .9px var(--shadow-contact)); }
 .vz[data-presentation="editorial"] .vz-solid-label, .vz[data-presentation="editorial"] .vz-label { font-family: var(--sans); letter-spacing: 0; stroke: none; }
-.vz[data-presentation="editorial"] .vz-solid[data-role="subject"] .vz-solid-label { font-size: calc(var(--label-size) * 1.65); font-weight: 650; }
-.vz[data-presentation="editorial"] .vz-label-g[data-key^="slot-"] .vz-label { font-family: var(--mono); }
-.vz[data-presentation="editorial"] .vz-label-g[data-key="change"] .vz-label { font-weight: 600; }
+/* Roles carry typography; a model key or object colour never selects a font. */
+.vz .vz-label[data-text-role="name"], .vz .vz-solid-label[data-text-role="name"] { font-family: var(--sans); font-weight: 500; letter-spacing: 0; }
+.vz .vz-label[data-text-role="status"], .vz .vz-solid-label[data-text-role="status"] { font-family: var(--sans); font-size: var(--label-size); font-weight: 500; letter-spacing: 0; }
+.vz .vz-label[data-text-role="symbol"], .vz .vz-solid-label[data-text-role="symbol"] { font-family: var(--sans); font-weight: 600; letter-spacing: 0; }
+.vz .vz-label[data-text-role="value"], .vz .vz-solid-label[data-text-role="value"] { font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums lining-nums; letter-spacing: -.02em; }
+.vz[data-presentation="editorial"] .vz-solid-label[data-text-role="symbol"] { font-size: calc(var(--label-size) * 1.4); }
+.vz[data-presentation="editorial"] .vz-label[data-text-role="value"][data-size="large"] { font-size: calc(var(--label-size) * 1.3); }
 .vz-leader { stroke: var(--ink-2); stroke-width: .65; vector-effect: non-scaling-stroke; pointer-events: none; opacity: .65; }
 .vz-terminal { fill: var(--ink-2); pointer-events: none; }
 .vz[data-presentation="editorial"] .vz-caption { position: absolute; left: 26px; top: 24px; display: block; border: 0; padding: 0; margin: 0; min-height: 0; width: min(290px, 30%); }
@@ -490,7 +494,7 @@
   .vz[data-presentation="editorial"] .vz-panel-body { display: block; }
   .vz-strip { grid-template-columns: repeat(var(--vz-strip-count, 9), minmax(0, 1fr)); gap: 3px; }
   .vz-totals { margin-top: 16px; gap: 14px; }
-  .vz[data-presentation="editorial"] .vz-solid[data-role="subject"] .vz-solid-label { font-size: calc(var(--label-size) * 1.15); }
+  .vz[data-presentation="editorial"] .vz-solid-label[data-text-role="symbol"] { font-size: calc(var(--label-size) * 1.15); }
   .vz[data-presentation="editorial"] .vz-count { margin: 0 2px; white-space: nowrap; }
   .vz[data-presentation="editorial"] .vz-controls { gap: 5px; }
   .vz[data-presentation="editorial"] .vz-btn { flex: 0 0 32px; width: 32px; height: 32px; }
@@ -514,7 +518,7 @@
 .vz-surface [data-detail="lamp"][data-tone="bad"] { fill: var(--t-bad); }
 .vz-surface [data-detail="lamp"][data-tone="cold"] { fill: var(--t-cold); }
 /* Labels on a panel are lit text on glass. */
-.vz-solid-label[data-on-panel] { fill: #edf3f7 !important; font-family: var(--sans) !important; font-weight: 500 !important; font-size: var(--label-size) !important; letter-spacing: .02em; }
+.vz-solid-label[data-on-panel] { fill: #edf3f7 !important; font-size: var(--label-size) !important; letter-spacing: 0; }
 
 /* Cables: a darker casing under a lighter core. */
 .vz-link-g[data-cable] .vz-link { stroke: color-mix(in oklab, var(--t-structure) 55%, white); stroke-linecap: round; stroke-linejoin: round; }

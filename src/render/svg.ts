@@ -3,6 +3,7 @@ import type { LabelMark, LinkMark, Mark, Projection, Resolved, SolidMark, Vec3 }
 import { project, type Pt } from "../iso/project.ts";
 import { boundsOf, geometryOf, screenExtent } from "../iso/solids.ts";
 import { depthSort } from "../iso/sort.ts";
+import { textRole } from "./typography.ts";
 import { surfaceGeometry } from "../iso/surface.ts";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -106,8 +107,8 @@ function luminanceOf(css: string): number {
   return 0.2126 * lin(d[0]!) + 0.7152 * lin(d[1]!) + 0.0722 * lin(d[2]!);
 }
 
-/** Measure the same dark ink used by .vz-solid-label. */
-const INK_LUM = luminanceOf("#10141a");
+/** Relative luminance of #10141a; constant so Node imports need no DOM. */
+const INK_LUM = 0.00685052103958841;
 
 /** "light" when white text contrasts more with this fill than dark ink does. */
 function inkFor(fill: string): "light" | "dark" {
@@ -204,12 +205,19 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
     setAttr(path,"d",detail.points.map(([x,y],j)=>`${j ? "L" : "M"}${f(x)} ${f(y)}`).join("") + (detail.closed ? "Z" : ""));
   });
   const label = m.label ?? "";
+  setAttr(node.text!, "data-text-role", textRole(label, m.textRole, m.kind === "box" && m.surface?.panel ? "status" : "symbol"));
   if (node.text!.textContent !== label) node.text!.textContent = label;
-  setAttr(node.text!, "x", f(g.labelAt[0]));
-  setAttr(node.text!, "y", f(g.labelAt[1]));
+  const onPanel = m.kind === "box" && m.surface?.panel?.face === g.labelShade && Boolean(label) && projection === "iso";
+  // Screen text belongs to its side plane. Local x runs along the face and
+  // local y points down the face; external annotations remain upright.
+  const faceX = Math.cos(Math.PI / 6);
+  setAttr(node.text!, "x", onPanel ? "0" : f(g.labelAt[0]));
+  setAttr(node.text!, "y", onPanel ? "0" : f(g.labelAt[1]));
+  setAttr(node.text!, "transform", onPanel ? `matrix(${faceX} ${g.labelShade === "left" ? .5 : -.5} 0 1 ${f(g.labelAt[0])} ${f(g.labelAt[1])})` : null);
   setAttr(node.text!, "data-face", g.labelShade);
-  setAttr(node.text!, "data-on-panel", m.kind === "box" && m.surface?.panel?.face === g.labelShade && m.label ? "" : null);
-  setAttr(node.text!, "data-room", f(g.labelWidth));
+  setAttr(node.text!, "data-on-panel", onPanel ? "" : null);
+  setAttr(node.text!, "data-room", f(onPanel ? g.labelWidth / faceX : g.labelWidth));
+  setAttr(node.text!, "data-room-height", onPanel && m.kind === "box" && m.surface?.panel ? f(m.size[2] * (m.surface.panel.to - m.surface.panel.from) * .8) : null);
 }
 
 function makeLabel(m: LabelMark): Node {
@@ -230,6 +238,7 @@ function updateLabel(node: Node, m: Resolved<LabelMark>, projection: Projection)
   setAttr(t, "y", f(y));
   setAttr(t, "text-anchor", m.anchor ?? "middle");
   setAttr(t, "data-size", m.size ?? null);
+  setAttr(t, "data-text-role", textRole(m.text, m.textRole, "name"));
   setAttr(node.root,"data-target",m.target?.key ?? null);
   node.line!.style.display = node.terminal!.style.display = m.target ? "" : "none";
   if (m.target) {
@@ -407,7 +416,8 @@ export function createStage(viewBox: [number, number, number, number], projectio
     if (!t || !t.textContent || !t.isConnected) return;
     setAttr(t, "display", null);
     const room = Number(t.getAttribute("data-room"));
-    if (room > 0 && t.getComputedTextLength() > room) setAttr(t, "display", "none");
+    const height = Number(t.getAttribute("data-room-height"));
+    if ((room > 0 && t.getComputedTextLength() > room) || (height > 0 && t.getBBox().height > height)) setAttr(t, "display", "none");
   }
 
   /** Start each leader at the point of its text box nearest the target, outside the text. */

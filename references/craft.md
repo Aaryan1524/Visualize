@@ -51,3 +51,11 @@ The look comes from constraint: one camera, one material system, a few tones, fi
 ## What the checks cannot judge
 
 Whether the representation is the right one, whether the composition is beautiful, and whether the steps teach. Look at the step and motion contact sheets and at 4× close-ups of every junction, and compare against the reference examples.
+
+## Typography
+
+Use the shared `textRole` contract: `name`, `status`, `value`, `symbol`. Names are short sentence-case labels; screen statuses use the same family and weight; values use the bundled mono font with tabular numerals; entity keys and scientific symbols retain their exact case. Centre identifiers on their faces. Project screen text into the side-face plane with horizontal and vertical padding; pin external names consistently and keep numerical annotations upright. Do not apply uppercase, letter spacing or a display font to all labels. A typography audit checks the rendered family, weight and face anchoring; essential content is still subject to observations and readability checks.
+
+## Publication review
+
+Before calling an output ready to share, inspect it in separate passes: representation and silhouette at normal size; label hierarchy and subject emphasis; geometry and line junctions in close-up; transitions and reversals; then the actual standalone/embed/export target. Record each recurring defect as an example, a shared rule and, where measurable, a failing control. Mechanical checks and visual judgment are both required. Keep the smallest purposeful detail that explains the structure; more parts alone are not a quality target.

@@ -42,8 +42,8 @@ Volumes use the fixed isometric camera and existing normal-based side shading. T
 
 ## Typography and spacing
 
-- Instrument Sans, locally bundled Latin variable subset, weights 400–700: titles, actions, controls, labels and diagram annotations.
-- IBM Plex Mono, locally bundled Latin subset at weight 500: interface time, counts, strip values and supplementary numerical readouts. Money annotations on the diagram remain in the label family.
+- Manrope, locally bundled Latin variable subset, weights 400–700: titles, actions, controls, labels and diagram annotations.
+- IBM Plex Mono, locally bundled Latin subset at weight 500: values on the diagram, time, counts and strip values, with tabular numerals.
 - Desktop question: 28 px, weight 600, line-height 1.16, tracking −.04 em.
 - Current action: 21 px, weight 500, line-height 1.35. Up to 12 words.
 - Kicker: 11 px, weight 500, sentence case. Title: up to eight words.
@@ -53,6 +53,19 @@ Volumes use the fixed isometric camera and existing normal-based side shading. T
 - Card inset: 22 px vertically, 28 px horizontally; stage action inset: 24 px vertically, 26 px horizontally. Strip height: 48 px, independent of content, so the camera cannot shift with a changed note.
 
 Standalone pages load the fonts before initial camera measurement. Embedded figures refit when fonts finish loading without changing playback or timeline time. HTML and SVG embed font data. A host bundler importing `styles.css` must handle its CSS imports and WOFF2 assets. The supplied font files cover Latin; other scripts use the system fallback, and need their own typography review before being advertised as supported.
+
+### Diagram text roles
+
+`textRole` selects a shared treatment, not arbitrary per-scene CSS:
+
+| Role | Treatment | Content rule |
+|---|---|---|
+| `name` | Manrope 500 | Short sentence-case part name |
+| `status` | Manrope 500, standard label size | Human-readable status: Ready, Waiting, Retrying, Paid |
+| `value` | IBM Plex Mono 500, tabular numerals | Preserve the model's currency, sign, precision and units |
+| `symbol` | Manrope 600, larger on a solid | Preserve identifiers and scientific notation exactly, including case |
+
+Identifiers stay upright and centred on their faces; screen statuses follow the side face’s plane with padding in both dimensions. External names and values stay upright with consistent baseline, weight and leader treatment. The renderer never converts case or rewrites model values. Whole numeric annotations default to `value`; authors can override the role. Finished cartridges declare `symbol` even for a numeric key; terminal screens declare `status`. The browser typography audit checks the chosen role's font and weight, plus face-label centring and actual screen-opening containment in both themes. Planted wrong-font and flattened-screen-text styles must fail it.
 
 ## Composition
 

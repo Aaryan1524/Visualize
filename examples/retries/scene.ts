@@ -60,11 +60,11 @@ const STORE_X = 128;
 const LEDGER_X = 182;
 
 const STATUS: Record<Snapshot["client"]["status"], string> = {
-  idle: "ready",
-  waiting: "waiting",
-  retrying: "retry",
-  paid: "paid",
-  failed: "failed",
+  idle: "Ready",
+  waiting: "Waiting",
+  retrying: "Retrying",
+  paid: "Paid",
+  failed: "Failed",
 };
 
 /** The world's parts, built once per state so cables and messages use their anchors. */

@@ -17,12 +17,13 @@ Every mark has `key`, the model entity id. The key is identity across steps: the
 | `transient` + `travel` | Drawn only while transitioning, along `travel.from` → `travel.to`. |
 | `effect` | `pulse` (grows from its base) or `shake`; both cancel out by the end of the move. |
 | `title` | Accessible name. |
+| `textRole` | `name`, `status`, `value` or `symbol`: shared typography, preserving the authored text. Values use mono/tabular numerals; names, statuses and symbols use the main face. |
 
 **`box`**: `at` is the minimum corner and `size` is `[w, d, h]`.
 - `radius`: rounded plan corners; side facets are lit by their normal.
 - `inset`: a rim on the top face.
 - `role`: `foundation` for plates (drop shadow) or `subject` for the things that matter.
-- `label` and `labelFace` (`top`, `left`, `right`): upright text on a face. Use a side when something sits on top.
+- `label` and `labelFace` (`top`, `left`, `right`): upright text on a face; screen text follows the side panel’s plane. Use a side when something sits on top.
 - `surface`: owned details that follow the solid's motion and painter's order:
 
 | Detail | Shape | Notes |

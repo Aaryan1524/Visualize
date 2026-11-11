@@ -62,7 +62,12 @@ export type EnterStyle = "drop" | "fade" | "grow" | "none";
 export type ExitStyle = "fall" | "fade" | "lift" | "shrink" | "none";
 export type Effect = "shake" | "pulse";
 
+/** Visual treatment only; never alters case, identifiers or model values. */
+export type TextRole = "name" | "status" | "value" | "symbol";
+
 interface MarkBase {
+  /** Shared typography for a solid label or world annotation. */
+  textRole?: TextRole;
   /** Identity across steps. Use the model entity's id. */
   key: string;
   tone?: Tone;
@@ -129,7 +134,7 @@ export interface BoxMark extends MarkBase {
   };
   /** Visual hierarchy independent of model keys or a particular scene. */
   role?: "foundation" | "subject";
-  /** Short text drawn upright on a face. */
+  /** Short face text; upright by default, projected into the plane of a side panel. */
   label?: string;
   /** Which visible face carries the label. Use a side when something sits on top. */
   labelFace?: LabelFace;

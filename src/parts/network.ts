@@ -43,7 +43,7 @@ export function terminal(key: string, at: Vec3, { status = "", lit = false }: { 
     { kind: "box", key: `${key}/base`, at, size: [42, 26, 5], radius: 3, tone: "structure", surface: { seam: 0.5 } },
     {
       kind: "box", key: `${key}/body`, at: add(at, [3, 3, 5]), size: [36, 17, 22], radius: 3, tone: "subject", role: "subject",
-      label: status, labelFace: "left", lit,
+      label: status, labelFace: "left", textRole: "status", lit,
       surface: { seam: 0.1, panel: { face: "left", from: 0.34, to: 0.88, inset: 3.5 } },
     },
     { kind: "box", key: `${key}/slot`, at: add(at, [9, 7, 27]), size: [24, 4, 1.2], radius: 0.6, tone: "structure" },

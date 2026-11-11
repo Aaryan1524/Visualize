@@ -35,6 +35,20 @@ const { compile } = await import(pathToFileURL(join(ROOT, "src/core/scene.ts")).
 // Each one breaks the page after standalone fonts and the player are ready. Used by --controls
 // to prove the checks can fail (see the coverage note at the top).
 const PLANTS = {
+  "flat-screen-text": () => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s=document.createElement("style");
+      s.textContent=".vz-solid-label[data-on-panel]{transform:translate(0px,0px)!important}";
+      document.head.append(s);
+    });
+  },
+  "label-font": () => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s=document.createElement("style");
+      s.textContent=".vz [data-text-role]{font-family:Georgia,serif!important}";
+      document.head.append(s);
+    });
+  },
   "detached-surface": () => {
     window.addEventListener("visualize:ready", () => {
       const v=window.__viz, seek=v.seek;
@@ -225,6 +239,8 @@ const PLANTS = {
 };
 
 const CONTROLS = [
+  { variant:"face-label", plant:"flat-screen-text", expect:"typography" },
+  { plant:"label-font", expect:"typography" },
   { variant:"editorial", plant:"detached-surface", expect:"surface finish" },
   { variant:"editorial", plant:"missing-surface", expect:"surface finish" },
   { variant:"editorial", plant:"desktop-scroll", expect:"desktop viewport" },
@@ -318,6 +334,7 @@ class Report {
 // ---- One page -------------------------------------------------------------------
 async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
   const report = new Report(name);
+  const typographyProblems = new Set();
   const compiled = compile(scene);
   const steps = compiled.steps;
   const last = steps.length - 1;
@@ -445,6 +462,7 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
     for (let k = 0; k <= last; k++) {
       await page.evaluate((k) => window.__viz.seekStep(k), k);
       const tx = await page.evaluate(() => window.__vzCheck.text());
+      tx.typography.forEach(s => typographyProblems.add(`step ${k}: ${s}`));
       tx.small.forEach((s) => small.add(`step ${k}: ${s}`));
       tx.faint.forEach((s) => faint.add(s));
       const lb = await page.evaluate(() => window.__vzCheck.labels());
@@ -679,6 +697,7 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
             const lb = await page.evaluate(() => window.__vzCheck.labels());
             for (const list of [lb.overlaps, lb.spill, lb.hidden, lb.clipped, lb.panels, lb.onParts]) list.forEach((s) => layoutProblems.push(`390px step ${k}: ${s}`));
             const tx = await page.evaluate(() => window.__vzCheck.text());
+            tx.typography.forEach(s => typographyProblems.add(`${theme} ${width}px step ${k}: ${s}`));
             tx.small.forEach((s) => layoutProblems.push(`390px step ${k}: ${s}`));
           }
           await page.evaluate((k) => window.__viz.seekStep(k), last);
@@ -686,7 +705,9 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
         if (theme === "dark") {
           for (let k = 0; k <= last; k++) {
             await page.evaluate((k) => window.__viz.seekStep(k), k);
-            (await page.evaluate(() => window.__vzCheck.text())).faint.forEach((s) => darkFaint.add(s));
+            const tx = await page.evaluate(() => window.__vzCheck.text());
+            tx.faint.forEach(s => darkFaint.add(s));
+            tx.typography.forEach(s => typographyProblems.add(`dark ${width}px step ${k}: ${s}`));
           }
           await page.evaluate((k) => window.__viz.seekStep(k), last);
         }
@@ -746,6 +767,7 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
     await sheet(`${name}: every transition at 0, ¼, ½, ¾, 1`, motion, 5, join(shotsDir, "motion.png"), 220);
   }
 
+  report.add("typography", "shared name/status/value/symbol fonts, weights and centred face labels", [...typographyProblems]);
   report.add("console", "no errors or uncaught exceptions on any page", [...new Set(allErrors)]);
   if (shots.length) report.add("screenshots", shots.map((s) => relative(ROOT, s)).join(", "));
   return report;

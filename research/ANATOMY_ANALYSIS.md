@@ -56,3 +56,21 @@ The skill insists on reading every PNG at 4× zoom.
 | Monochrome tones, one lit accent | Semantic colour tones, trust labels on every step |
 
 The side-by-side screenshot shows the two are visually distinct: Anatomy's paper-white hairline machine against our coloured blocks with labels and panels. It also shows that Anatomy's level of craft is well beyond ours today. Closing that gap without copying its look is the main open design problem.
+
+## Article follow-up: construction and interaction
+
+Read [Ryan's “How I built it”](https://skills.wheresryan.sh/anatomy/how-i-built-it) on 2026-11-11 and inspected the installed dial-indicator/test-rig geometry and motion sources. The article's central method is repeated visual criticism turned into reusable rules. Geometry, line markup and appearance receive distinct checks. Interaction follows the mechanism, and close-ups plus motion sequences expose defects a resting screenshot misses.
+
+### Application to Visualize
+
+These are implementation recommendations for this project, not additional shipped capabilities:
+
+- Model the visible mechanism of lookup, stored response and replay; let the changing relationship carry more of the explanation than the actor housing.
+- Add focus/reveal to teaching beats and semantic attachment references to parts. Keep `frameAt(t)` pure so rewind, export and comparisons stay reproducible.
+- Offer meaningful scenario controls: which message is lost, whether a key is supplied, and retry timing. Regenerate the model trace from each choice and keep keyboard/reduced-motion behavior equivalent.
+- Add part inspection and a selected-operation view where these answer a real question. Use smooth transitions with continuous event emphasis rather than decorative motion.
+- Extend real shape/support/route records before introducing richer profiles or arbitrary rotation. Measure render cost and motion continuity for each new capability.
+- Keep vector SVG as the primary renderer for crisp documents and exports. Evaluate a canvas/shader layer only for an effect essential to a future subject. Camera rotation is a separate optional capability with substantial depth-order and interaction testing.
+- Record visual failures and remedies beside the reference captures. Preserve your own colour/type identity, minimal explanation copy and desktop viewport contract.
+
+The typography checkpoint implements the four shared text roles and a falsifiable font/weight audit. It does not implement the interaction proposals above; those remain the following review checkpoints.

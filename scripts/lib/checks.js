@@ -367,7 +367,8 @@
   }
 
   function text() {
-    const small = [], faint = [];
+    const root = viz().root;
+    const small = [], faint = [], typography = [];
     for (const el of textNodes()) {
       const inSvg = el instanceof SVGElement;
       let px;
@@ -379,6 +380,24 @@
       if (px < min - 0.05) small.push(`${norm(el.textContent).slice(0, 30)} at ${px.toFixed(1)}px (min ${min})`);
 
       const cs = getComputedStyle(el);
+      if (inSvg && el.matches(".vz-label, .vz-solid-label")) {
+        const role = el.dataset.textRole;
+        if (!["name", "status", "value", "symbol"].includes(role)) typography.push(`"${norm(el.textContent)}": missing or unknown text role`);
+        const first = v => v.split(",")[0].replace(/["']/g, "").trim();
+        const expected = first(getComputedStyle(root).getPropertyValue(role === "value" ? "--mono" : "--sans"));
+        if (first(cs.fontFamily) !== expected) typography.push(`"${norm(el.textContent)}": ${role} uses ${cs.fontFamily}, expected ${expected}`);
+        const weight = role === "symbol" ? "600" : "500";
+        if (cs.fontWeight !== weight) typography.push(`"${norm(el.textContent)}": ${role} weight ${cs.fontWeight}, expected ${weight}`);
+        if (el.classList.contains("vz-solid-label") && el.getAttribute("text-anchor") !== "middle") typography.push(`"${norm(el.textContent)}": face label is not centred`);
+        if (el.hasAttribute("data-on-panel")) {
+          const panel=el.closest("[data-key]").querySelector('[data-detail="panel"]');
+          const matrix=el.getCTM(), slope=el.dataset.face==="left" ? Math.tan(Math.PI/6) : -Math.tan(Math.PI/6);
+          if (Math.abs(matrix.b/matrix.a-slope)>.01) typography.push(`"${norm(el.textContent)}": screen text does not follow its face`);
+          const b=el.getBBox(), toPanel=panel.getScreenCTM().inverse().multiply(el.getScreenCTM());
+          const corners=[[b.x,b.y],[b.x+b.width,b.y],[b.x+b.width,b.y+b.height],[b.x,b.y+b.height]];
+          if (corners.some(([x,y])=>!panel.isPointInFill(new DOMPoint(x,y).matrixTransform(toPanel)))) typography.push(`"${norm(el.textContent)}": text exceeds its screen opening`);
+        }
+      }
       const fg = rgba(inSvg ? cs.fill : cs.color);
       let bg;
       if (inSvg && el.classList.contains("vz-solid-label")) {
@@ -388,7 +407,7 @@
       const need = px >= 18 || (px >= 14 && Number(cs.fontWeight) >= 600) ? 3 : 4.5;
       if (r < need) faint.push(`"${norm(el.textContent).slice(0, 30)}" contrast ${r.toFixed(2)} < ${need}`);
     }
-    return { small, faint };
+    return { small, faint, typography };
   }
 
   function labels() {

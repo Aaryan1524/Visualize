@@ -1,10 +1,12 @@
 // Fixture for `verify --controls`. The clean variant must pass every check;
 // each broken variant must be caught by the check named in verify.mjs.
 import stack from "../stack/scene.ts";
+import retries from "../../../examples/retries/scene.ts";
 import lru from "../../../examples/lru/scene.ts";
 import { defineScene } from "../../../src/core/scene.ts";
 import type { Mark } from "../../../src/core/types.ts";
 
+const faceLabel = defineScene({ ...retries, id: "face-label" });
 const clean = defineScene({ ...stack, id: "clean" });
 const editorial = defineScene({ ...lru, id: "editorial" });
 const wrongTone = defineScene({
@@ -122,6 +124,7 @@ const labelOnPart = defineScene({
 });
 
 export const variants = {
+  "face-label": faceLabel,
   clean,
   editorial,
   "wrong-tone":wrongTone,
