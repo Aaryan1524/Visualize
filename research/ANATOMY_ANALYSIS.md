@@ -1,6 +1,6 @@
 # Anatomy: analysis
 
-Anatomy ([github.com/wheresryan22/anatomy](https://github.com/wheresryan22/anatomy), MIT, about 26.7k stars as of 2026-11-11) is an Agent Skill for interactive isometric SVG figures that explain an idea as a physical object. This analysis is based on reading its `SKILL.md`, the kit reference, motion, verification and craft guides, its evals, the source of `kit/iso-kit.ts` and `kit/audit.mjs`, and the `dial-indicator` example build. Its shipped push-button example was also rendered next to our LRU figure. No Anatomy code is used in this repository.
+Anatomy ([github.com/wheresryan22/anatomy](https://github.com/wheresryan22/anatomy), MIT, about 26.7k stars as of 2026-11-11) is an Agent Skill for interactive isometric SVG figures that explain an idea as a physical object. This analysis is based on reading its `SKILL.md`, the kit reference, motion, verification and craft guides, its evals, the source of `kit/iso-kit.ts` and `kit/audit.mjs`, and the `dial-indicator` example build. Its shipped push-button example (`examples/push-button/push-button-light.html` in the skill) was also rendered in headless Chrome next to our LRU figure ([images/lru.png](images/lru.png)); that screenshot is not committed here because it is Anatomy's output. No Anatomy code is used in this repository.
 
 ## How it works
 

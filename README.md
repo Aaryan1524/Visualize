@@ -14,7 +14,10 @@ The engine handles the rest:
 - a single standalone HTML file per scene;
 - **checks that the rendered page shows what the model computed**, at every step.
 
-Status: a working prototype with three example scenes. See [Plan.md](Plan.md) for the plan and [research/PROTOTYPE_FINDINGS.md](research/PROTOTYPE_FINDINGS.md) for what the prototypes showed, including what doesn't work yet.
+Status: a working prototype with three example scenes.
+
+![Attention, pointing at one weight lights the vectors it came from](research/images/attention-linked.png)
+ See [Plan.md](Plan.md) for the plan and [research/PROTOTYPE_FINDINGS.md](research/PROTOTYPE_FINDINGS.md) for what the prototypes showed, including what doesn't work yet.
 
 ## Examples
 
@@ -38,7 +41,7 @@ pnpm test              # models against reference implementations, engine unit t
 pnpm typecheck
 pnpm build             # dist/<scene>.html, one standalone file each, plus dist/index.html
 pnpm verify            # headless-browser checks of every scene against its model
-pnpm verify:controls   # planted faults: proves each check can fail
+pnpm verify:controls   # 21 planted faults: proves the checks can fail
 node scripts/shoot.mjs dist/lru.html --out shot.png --step 4 [--width 390] [--theme dark] [--hover <selector>]
 ```
 

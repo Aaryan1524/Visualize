@@ -22,7 +22,7 @@ It is not a paper summarizer, a chart template set, a Manim wrapper, a 3D render
 Strongest ideas, all worth keeping in spirit:
 
 1. **One model drives motion, readout and caption.** Nothing on screen is typed by hand.
-2. **Verification is part of the kit.** Shapes are recorded as they are drawn, and an audit proves depth order, clearance and line ends; scripted Chrome sessions produce close-ups and slow-motion contact sheets. Each check has a planted-fault control.
+2. **Verification is part of the kit.** Shapes are recorded as they are drawn, and an audit proves depth order, clearance and support, while a separate script checks line ends; scripted Chrome sessions produce close-ups and slow-motion contact sheets. The 3D checks run planted-fault controls.
 3. **A small vocabulary with strong craft rules** written as "what got rejected and why", plus complete examples to copy from.
 4. **A representation ladder** (real thing, then the concept's own parts, then analogy with a mapping table) that stops the author defaulting to metaphor.
 
@@ -36,7 +36,7 @@ Limits for our goal:
 
 ## C. Engine concepts and ranking
 
-`research/ENGINE_CONCEPTS.md` covers 20 concepts (the 15 starting hypotheses plus five new ones) against ten criteria. The five additions:
+`research/ENGINE_CONCEPTS.md` covers 20 concepts (the 15 starting hypotheses plus five new ones) scored on six criteria. The five additions:
 
 - **Witness marks:** every drawn mark carries the id of the model entity it shows, so a checker can read the page and compare it with the model at every step.
 - **Counterfactual twin worlds:** the same deterministic simulation run twice with one premise changed, played in sync, with the point of divergence marked.
@@ -62,7 +62,7 @@ Working hypothesis, which the prototypes test: **all three approaches reduce to 
 
 - **Model:** a pure TypeScript function returning `Step[]`, where a step is `{ event, state, note, trust }`.
 - **View:** a pure function from `(state, event)` to a flat list of keyed marks. A key is the model entity's id.
-- **Engine:** `frameAt(t)` is pure. It maps time to a step and a progress value, matches marks by key between adjacent steps, and interpolates. The event type picks the choreography from a small motion vocabulary (move, enter, exit, travel, emphasize, fail). Scrubbing, rewind, determinism and reduced motion follow from purity, with no stateful tweens.
+- **Engine:** `frameAt(t)` is pure. It maps time to a step and a progress value, matches marks by key between adjacent steps, and interpolates. Choreography comes from a small motion vocabulary (move, enter, exit, leaving, arc, travel, pulse, shake), set by the view per mark and timed per event. Scrubbing, rewind, determinism and reduced motion follow from purity, with no stateful tweens.
 - **Renderer:** SVG and HTML. A mark lives in one of two spaces: the isometric stage (world coordinates, projected at a fixed angle) or a flat panel. KaTeX renders math in flat panels. No Canvas, WebGL or true 3D until an example needs it.
 
 ### Visual direction (decided)
@@ -118,5 +118,5 @@ Not in this pass: `ARCHITECTURE.md`, `API_DESIGN.md`, `VISUAL_CRAFT.md`, `ROADMA
 - `pnpm test`: model tests, including the reference comparison for LRU, the numeric invariants for attention and the charge counts for retries.
 - `pnpm typecheck`.
 - `pnpm build`: three standalone HTML files in `dist/`, openable from disk with no server.
-- `pnpm verify`: exits non-zero on any failed check. Each check has a planted-fault control (for example a view that shows a wrong number) that proves the check can fail.
+- `pnpm verify`: exits non-zero on any failed check. `pnpm verify:controls` plants faults (for example a view that shows a wrong number) to prove the checks can fail: at least one per check, with one known gap, the labels check's outside-the-card test.
 - Every screenshot is reviewed by eye, and the report says what passed, what failed and what could only be judged visually.

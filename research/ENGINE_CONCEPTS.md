@@ -1,6 +1,6 @@
 # Engine concepts
 
-Twenty candidate architectures: fifteen starting hypotheses and five new ones. **The scores are judgment**, made before and during prototyping. Only the three concepts marked *prototyped* have evidence behind them, which is recorded in [PROTOTYPE_FINDINGS.md](PROTOTYPE_FINDINGS.md).
+Twenty candidate architectures: fifteen starting hypotheses and five new ones. **The scores are judgment**, made before and during prototyping. Only the four concepts marked *prototyped* have evidence behind them, which is recorded in [PROTOTYPE_FINDINGS.md](PROTOTYPE_FINDINGS.md).
 
 ## Criteria
 
