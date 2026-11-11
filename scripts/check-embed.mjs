@@ -12,8 +12,11 @@ const out = join(ROOT, "shots/embed");
 mkdirSync(out, { recursive: true });
 const js = (await build({ entryPoints: [join(ROOT, "test/embed/app.tsx")], bundle: true, write: false, format: "iife", jsx: "automatic", minify: true, define: { "process.env.NODE_ENV": '"production"' } })).outputFiles[0].text;
 const css = readFileSync(join(ROOT, "src/render/styles.css"), "utf8");
-const file = join(out, "index.html");
-writeFileSync(file, `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Georgia,serif;background:rgb(255, 0, 255)}</style><style>${css}</style></head><body><div id="root"></div><script>${js.replace(/<\/script/gi, "<\\/script")}</script></body></html>`);
+// Maths scenes also need KaTeX's stylesheet (with its fonts beside it).
+const katex = pathToFileURL(join(ROOT, "node_modules/katex/dist/katex.min.css")).href;
+const plant = process.argv.includes("--plant-page") ? "page" : "";
+const file = join(out, plant ? "planted.html" : "index.html");
+writeFileSync(file, `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Georgia,serif;background:rgb(255, 0, 255)}</style><link rel="stylesheet" href="${katex}"><style>${css}</style><script>window.__plant=${JSON.stringify(plant)}</script></head><body><div id="root"></div><script>${js.replace(/<\/script/gi, "<\\/script")}</script></body></html>`);
 
 const problems = [];
 const browser = await launch();
@@ -24,7 +27,8 @@ try {
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await page.setViewport({ width: 1440, height: 1800 });
   await page.goto(pathToFileURL(file).href + "#host=1");
-  await page.waitForFunction(() => document.querySelectorAll(".vz").length === 2, { timeout: 5000 });
+  const expected = plant ? 4 : 3;
+  await page.waitForFunction((n) => document.querySelectorAll(".vz").length === n, { timeout: 5000 }, expected);
   await new Promise((r) => setTimeout(r, 300));
   const s = await page.evaluate(() => ({
     figures: document.querySelectorAll(".vz").length,
@@ -35,9 +39,13 @@ try {
     bodyBg: getComputedStyle(document.body).backgroundColor,
     headingFont: getComputedStyle(document.getElementById("host-heading")).fontFamily,
     svgs: document.querySelectorAll(".vz-svg").length,
+    maths: [...document.querySelectorAll(".vz .katex-html")].filter((k) => k.getBoundingClientRect().width > 20).length,
+    katexFont: (() => { const k = document.querySelector(".vz .katex"); return k ? getComputedStyle(k).fontFamily : ""; })(),
   }));
-  if (s.figures !== 2 || s.svgs !== 2) problems.push(`expected 2 figures, found ${s.figures}`);
-  if (s.themes.join() !== "light,dark") problems.push(`themes ${s.themes.join()}`);
+  if (s.figures !== expected || s.svgs !== expected) problems.push(`expected ${expected} figures, found ${s.figures}`);
+  if (s.themes.slice(0, 3).join() !== "light,dark,light") problems.push(`themes ${s.themes.join()}`);
+  if (s.maths < 1) problems.push("the attention figure's equations did not render");
+  if (!/KaTeX/.test(s.katexFont)) problems.push(`equations are not using KaTeX fonts (${s.katexFont})`);
   if (s.cards[0] === s.cards[1]) problems.push("both figures have the same card colour; themes are not scoped");
   if (s.hash !== "#host=1") problems.push(`host hash changed to ${s.hash}`);
   if (s.global) problems.push("window.__viz was published by an embedded figure");
@@ -48,15 +56,15 @@ try {
   await page.click(".vz:nth-of-type(1) [data-action='next']");
   await new Promise((r) => setTimeout(r, 1600));
   const counts = await page.evaluate(() => [...document.querySelectorAll(".vz-count")].map((c) => c.textContent));
-  if (counts[0] === counts[1] && counts[0]?.startsWith("00")) problems.push(`stepping the first figure did not move it (${counts.join(" / ")})`);
+  if (!counts[0]?.startsWith("01")) problems.push(`stepping the first figure did not move it to step 01 (${counts.join(" / ")})`);
   if (!counts[1]?.startsWith("00")) problems.push(`the second figure moved when the first was stepped (${counts.join(" / ")})`);
   await page.evaluate(() => window.__unmountSecond());
   await new Promise((r) => setTimeout(r, 200));
   const after = await page.evaluate(() => document.querySelectorAll(".vz").length);
-  if (after !== 1) problems.push(`after unmounting, ${after} figures remain`);
+  if (after !== expected - 1) problems.push(`after unmounting one, ${after} figures remain (expected ${expected - 1})`);
   problems.push(...errors.map((e) => `console: ${e}`));
 } finally {
   await browser.close();
 }
-console.log(problems.length ? `embed: FAILED\n${problems.map((p) => `  - ${p}`).join("\n")}` : "embed: passed (two figures, scoped themes, host untouched, step isolation, clean unmount)");
+console.log(problems.length ? `embed${plant ? " (planted page mode)" : ""}: FAILED\n${problems.map((p) => `  - ${p}`).join("\n")}` : "embed: passed (three figures incl. maths, scoped themes, host untouched, step isolation, clean unmount)");
 if (problems.length) process.exitCode = 1;
