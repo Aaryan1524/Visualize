@@ -33,6 +33,20 @@ const { compile } = await import(pathToFileURL(join(ROOT, "src/core/scene.ts")).
 // Each one breaks the page in a specific way after it loads. Used by --controls
 // to prove the checks can fail (see the coverage note at the top).
 const PLANTS = {
+  "detached-surface": () => {
+    window.addEventListener("load", () => {
+      const v=window.__viz, seek=v.seek;
+      v.seek=t=>{seek(t);v.stage.svg.querySelectorAll(".vz-surface").forEach(e=>e.setAttribute("transform","translate(30 -30)"));};
+      v.seekStep=k=>v.seek(v.compiled.restTime(k));
+    });
+  },
+  "missing-surface": () => {
+    window.addEventListener("load", () => {
+      const v=window.__viz, seek=v.seek;
+      v.seek=t=>{seek(t);v.stage.svg.querySelectorAll(".vz-surface").forEach(e=>e.replaceChildren());};
+      v.seekStep=k=>v.seek(v.compiled.restTime(k));
+    });
+  },
   "desktop-scroll": () => {
     document.addEventListener("DOMContentLoaded", () => {
       const s = document.createElement("style");
@@ -185,6 +199,8 @@ const PLANTS = {
 };
 
 const CONTROLS = [
+  { variant:"editorial", plant:"detached-surface", expect:"surface finish" },
+  { variant:"editorial", plant:"missing-surface", expect:"surface finish" },
   { variant:"editorial", plant:"desktop-scroll", expect:"desktop viewport" },
   { variant:"editorial", plant:"copy-budget", expect:"copy budget" },
   { variant:"editorial", plant:"drawer", expect:"details drawer" },
@@ -328,15 +344,19 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
     }
     let samples = 0;
     const depthProblems = [];
+    const surfaceProblems = new Set();
     const conflictSet = new Set();
     for (const { label, t } of instants) {
       await page.evaluate((t) => window.__viz.seek(t), t);
       const d = await page.evaluate(() => window.__vzCheck.depth());
+      for (const p of await page.evaluate(() => window.__vzCheck.surfaces())) surfaceProblems.add(`${label}: ${p}`);
       samples += d.samples;
       for (const w of d.wrong.slice(0, 2)) depthProblems.push(`${label}: at ${w.at} ${w.expected} is nearer but ${w.painted} is painted on top`);
       for (const [a, b] of d.conflicts) conflictSet.add(`${a} and ${b} intersect (${label})`);
     }
     report.add("depth order", `${instants.length} instants · ${samples} overlap samples ray-cast`, [...depthProblems, ...[...conflictSet].slice(0, 8)]);
+
+    report.add("surface finish", "rendered details stay on their owning solids at rest and during motion", [...surfaceProblems]);
 
     // Determinism: the same time shows the same page whatever was seen before.
     const r = rng(1234);
@@ -424,10 +444,10 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
         await page.evaluate(() => document.querySelectorAll(".vz-drawer details").forEach(e => e.open = true));
         const expanded = await page.evaluate(() => {
           const body = document.querySelector(".vz-drawer-body"), r = body.getBoundingClientRect();
-          return { width: document.scrollingElement.scrollWidth, height: document.scrollingElement.scrollHeight, internal: body.scrollHeight > body.clientHeight, fits: r.bottom <= innerHeight && r.top >= 0 };
+          return { width: document.scrollingElement.scrollWidth, height: document.scrollingElement.scrollHeight, internal: body.scrollHeight > body.clientHeight, scrollable: ["auto","scroll"].includes(getComputedStyle(body).overflowY), fits: r.bottom <= innerHeight && r.top >= 0 };
         });
         if (expanded.width !== beforeDetails.width || expanded.height !== beforeDetails.height) drawerProblems.push("opening Details resized the main page");
-        if (!expanded.internal || !expanded.fits) drawerProblems.push("expanded transcript does not fit in an internally scrolling drawer");
+        if (!expanded.scrollable || !expanded.fits) drawerProblems.push("expanded transcript does not fit in an internally scrolling drawer");
         await page.keyboard.press("Escape");
         if (await page.$eval(".vz-drawer", e => e.open)) drawerProblems.push("Escape did not close Details");
         if (!await page.evaluate(() => document.activeElement?.getAttribute("aria-haspopup") === "dialog")) drawerProblems.push("closing Details did not restore focus to its button");

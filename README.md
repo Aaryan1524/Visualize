@@ -14,7 +14,7 @@ The engine handles the rest:
 - a single standalone HTML file per scene;
 - **checks that the rendered page shows what the model computed**, at every step.
 
-Status: a working prototype with three example scenes. The LRU desktop layout with minimal copy is ready for review on `feat/premium-redesign`; see [the review notes](research/PREMIUM_REDESIGN.md).
+Status: a working prototype with three example scenes. The LRU desktop layout and first reusable finished rail are ready for review on `feat/premium-redesign`; see [the review notes](research/PREMIUM_REDESIGN.md).
 
 ![Attention, pointing at one weight lights the vectors it came from](research/images/attention-linked.png)
  See [Plan.md](Plan.md) for the plan and [research/PROTOTYPE_FINDINGS.md](research/PROTOTYPE_FINDINGS.md) for what the prototypes showed, including what doesn't work yet.
@@ -64,6 +64,10 @@ export default defineScene<State, Event>({
 
 Keys are model entity ids, and they are how motion, linking and checks find things. The three examples are the reference.
 
+## Reusable finished parts
+
+The [rail assembly](src/parts/README.md) supplies fitted trays, guides, surface details, slot anchors and finished entries. LRU uses it directly; review fixtures reuse it at one, three and six slots with identical styles. Run `node scripts/review-rail.mjs` for the local comparison and close-ups. This is the first assembly under review, not yet a general-purpose skill package.
+
 ## What `verify` checks
 
 The model runs in Node, separately from the page. Its observations, captions and readouts are compared with what Chrome actually draws:
@@ -73,6 +77,7 @@ The model runs in Node, separately from the page. Its observations, captions and
 | Observations | Each step declares what the reader should see: a value, an order, a drawn size, what is visible, what is lit. Each one is read from the rendered page. "Visible" means unobstructed at a real share of the mark, not merely present |
 | Captions | Caption, readout and trust label match the model at every step |
 | Depth order | Wherever solids overlap on screen, the line of sight is ray-cast against the true geometry and compared with the element the browser paints on top, at rest and inside every transition |
+| Surface finish | Actual surface paths remain inside their owning solids at resting and sampled moving states; required finishes are present |
 | Determinism | A time shows the same page whatever was seen before it |
 | Text | 11 px minimum, and WCAG contrast against the face or card behind it, in both themes |
 | Labels | No overlaps, nothing wider than its face, nothing covered, nothing outside the card |
@@ -88,7 +93,8 @@ It also writes screenshots and two contact sheets per scene to `shots/`: every s
 
 ```
 src/core     trace, steps, timeline, keyed interpolation, motion vocabulary, trust levels
-src/iso      projection, solids, depth sort
+src/iso      projection, solids, depth sort, owned surface geometry
+src/parts    reusable finished assemblies, slot positions and anchors
 src/render   SVG stage, player, panels, KaTeX helpers, styles
 scripts      build, verify, in-page checks, screenshots
 examples     the three scenes, each a model, its tests and a scene

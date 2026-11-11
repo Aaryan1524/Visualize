@@ -464,6 +464,7 @@
     }
     for (const selector of [".vz-head", ".vz-stage", ".vz-panels", ".vz-controls", ".vz-caption"]) {
       const e = root.querySelector(selector);
+      if (selector === ".vz-panels" && !e?.children.length) continue;
       if (!isShown(e)) { viewport.push(`${selector} is not visible`); continue; }
       const r = e.getBoundingClientRect();
       if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) viewport.push(`${selector} falls outside the viewport`);
@@ -528,5 +529,34 @@
     return {composition,semantics,callouts};
   }
 
-  window.__vzCheck = { observe, depth, text, labels, snapshot, shown, design, desktop };
+  // Sample actual DOM paths in the owner's coordinate system, including transforms.
+  // This proves containment and attachment, not manufacturing realism or beauty.
+  function surfaces() {
+    const problems=[];
+    for (const m of viz().frame().marks) {
+      if (m.kind !== "box" || !m.surface || m.opacity < .01) continue;
+      const owner=byKey(m.key), edge=owner?.querySelector(".vz-edge");
+      if (!edge) { problems.push(`${m.key}: missing surface owner`); continue; }
+      const paths=[...owner.querySelectorAll(".vz-surface path")];
+      const required=projection()==="front" ? (m.surface.seam ? ["seam"] : []) : Object.keys(m.surface).map(k=>({fasteners:"fastener",ticks:"tick"}[k]??k));
+      for(const kind of required) if(!paths.some(p=>p.dataset.detail===kind)) problems.push(`${m.key}: missing ${kind} finish`);
+      const poly=parsePoints(edge.getAttribute("points"));
+      const nearEdge=(p)=>poly.some((a,i)=>{
+        const b=poly[(i+1)%poly.length],dx=b[0]-a[0],dy=b[1]-a[1];
+        const u=Math.max(0,Math.min(1,((p.x-a[0])*dx+(p.y-a[1])*dy)/(dx*dx+dy*dy||1)));
+        return Math.hypot(p.x-a[0]-u*dx,p.y-a[1]-u*dy)<.08;
+      });
+      for(const path of paths) {
+        const transform=edge.getScreenCTM().inverse().multiply(path.getScreenCTM());
+        const length=path.getTotalLength();
+        for(let i=0;i<=12;i++) {
+          const p=path.getPointAtLength(length*i/12).matrixTransform(transform);
+          if(!inside(poly,p.x,p.y)&&!nearEdge(p)) { problems.push(`${m.key}: ${path.dataset.detail} leaves its owning surface`);break; }
+        }
+      }
+    }
+    return problems;
+  }
+
+  window.__vzCheck = { observe, depth, text, labels, snapshot, shown, design, desktop, surfaces };
 })();

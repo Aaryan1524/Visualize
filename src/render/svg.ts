@@ -3,6 +3,7 @@ import type { LabelMark, LinkMark, Mark, Projection, Resolved, SolidMark, Vec3 }
 import { project, type Pt } from "../iso/project.ts";
 import { boundsOf, geometryOf, screenExtent } from "../iso/solids.ts";
 import { depthSort } from "../iso/sort.ts";
+import { surfaceGeometry } from "../iso/surface.ts";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -87,6 +88,7 @@ interface Node {
   line?: SVGLineElement;
   inset?: SVGPolygonElement;
   terminal?: SVGCircleElement;
+  surface?: SVGGElement;
 }
 
 /** Relative luminance of a CSS colour, resolved through a 1×1 canvas. */
@@ -156,6 +158,8 @@ function makeSolid(m: SolidMark): Node {
     root.append(...node.faces, node.top);
   }
   node.edge = el("polygon", { class: "vz-edge" });
+  node.surface = el("g", { class: "vz-surface", "aria-hidden": "true" });
+  root.append(node.surface);
   root.append(node.edge);
   node.text = el("text", { class: "vz-solid-label", "text-anchor": "middle" });
   root.append(node.text);
@@ -209,6 +213,15 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
     setAttr(node.inset,"display",g.inset ? null : "none");
   }
   setAttr(node.root,"data-rounded",m.kind === "box" && m.radius ? "" : null);
+  setAttr(node.root,"data-role",m.kind === "box" ? m.role ?? null : null);
+  const details = m.kind === "box" ? surfaceGeometry(m, projection) : [];
+  while (node.surface!.children.length > details.length) node.surface!.lastElementChild!.remove();
+  details.forEach((detail, i) => {
+    let path = node.surface!.children[i];
+    if (!path) { path = el("path"); node.surface!.append(path); }
+    setAttr(path,"data-detail",detail.kind);
+    setAttr(path,"d",detail.points.map(([x,y],j)=>`${j ? "L" : "M"}${f(x)} ${f(y)}`).join("") + (detail.closed ? "Z" : ""));
+  });
   const label = m.label ?? "";
   if (node.text!.textContent !== label) node.text!.textContent = label;
   setAttr(node.text!, "x", f(g.labelAt[0]));

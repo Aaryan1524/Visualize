@@ -106,6 +106,17 @@ export interface BoxMark extends MarkBase {
   radius?: number;
   /** An inset rim on the top surface. */
   inset?: boolean;
+  /** Shared finish. Surface details belong to this solid and follow its motion. */
+  surface?: {
+    /** Height of a housing seam as a fraction of the solid's height. */
+    seam?: number;
+    fasteners?: { inset: number; radius: number };
+    ticks?: { step: number; majorEvery: number };
+    /** Inset of the socket's recessed floor treatment. */
+    well?: number;
+  };
+  /** Visual hierarchy independent of model keys or a particular scene. */
+  role?: "foundation" | "subject";
   /** Short text drawn upright on a face. */
   label?: string;
   /** Which visible face carries the label. Use a side when something sits on top. */

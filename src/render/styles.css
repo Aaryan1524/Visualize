@@ -416,10 +416,10 @@ body { padding: 32px 16px 48px; }
 .vz[data-presentation="editorial"] .vz-solid[data-lit] .vz-edge { stroke: var(--tone); stroke-opacity: .65; stroke-width: 1; }
 .vz[data-presentation="editorial"] .vz-crease { stroke: white; stroke-opacity: .5; stroke-width: 1; }
 .vz-inset { fill: none; stroke: color-mix(in oklab,var(--tone) 80%,black); stroke-opacity: .3; stroke-width: .45; vector-effect: non-scaling-stroke; pointer-events: none; }
-.vz[data-presentation="editorial"] .vz-solid[data-key="base"] { filter: drop-shadow(0 6px 5px #1e35251a); }
-.vz[data-presentation="editorial"] .vz-solid[data-key^="entry-"] { filter: drop-shadow(0 2px 1.4px #142e252a); }
+.vz[data-presentation="editorial"] .vz-solid[data-role="foundation"] { filter: drop-shadow(0 6px 5px #1e35251a); }
+.vz[data-presentation="editorial"] .vz-solid[data-role="subject"] { filter: drop-shadow(0 2px 1.4px #142e252a); }
 .vz[data-presentation="editorial"] .vz-solid-label, .vz[data-presentation="editorial"] .vz-label { font-family: var(--sans); letter-spacing: 0; stroke: none; }
-.vz[data-presentation="editorial"] .vz-solid[data-key^="entry-"] .vz-solid-label { font-size: calc(var(--label-size) * 1.65); font-weight: 650; }
+.vz[data-presentation="editorial"] .vz-solid[data-role="subject"] .vz-solid-label { font-size: calc(var(--label-size) * 1.65); font-weight: 650; }
 .vz[data-presentation="editorial"] .vz-label-g[data-key^="slot-"] .vz-label { font-family: var(--mono); }
 .vz[data-presentation="editorial"] .vz-label-g[data-key="change"] .vz-label { font-weight: 600; }
 .vz-leader { stroke: var(--ink-2); stroke-width: .65; vector-effect: non-scaling-stroke; pointer-events: none; opacity: .65; }
@@ -494,8 +494,17 @@ body { padding: 32px 16px 48px; }
   .vz[data-presentation="editorial"] .vz-panel-body { display: block; }
   .lru-requests { grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 3px; }
   .lru-totals { margin-top: 16px; gap: 14px; }
-  .vz[data-presentation="editorial"] .vz-solid[data-key^="entry-"] .vz-solid-label { font-size: calc(var(--label-size) * 1.15); }
+  .vz[data-presentation="editorial"] .vz-solid[data-role="subject"] .vz-solid-label { font-size: calc(var(--label-size) * 1.15); }
   .vz[data-presentation="editorial"] .vz-count { margin: 0 2px; white-space: nowrap; }
   .vz[data-presentation="editorial"] .vz-controls { gap: 5px; }
   .vz[data-presentation="editorial"] .vz-btn { flex: 0 0 32px; width: 32px; height: 32px; }
 }
+
+/* Surface finish is attached to the owning solid, so depth and motion stay true. */
+.vz-surface { pointer-events: none; }
+.vz-surface path { fill: none; stroke: color-mix(in oklab, var(--tone) 55%, var(--shade-side)); stroke-width: .3; stroke-linejoin: round; stroke-linecap: round; }
+.vz-surface [data-detail="seam"] { stroke-opacity: .5; stroke-width: .25; }
+.vz-surface [data-detail="fastener"] { fill: color-mix(in oklab, var(--tone) 84%, var(--shade-side)); stroke-opacity: .65; stroke-width: .2; }
+.vz-surface [data-detail="slot"] { stroke-width: .22; stroke-opacity: .8; }
+.vz-surface [data-detail="tick"] { stroke-width: .2; stroke-opacity: .65; }
+.vz-surface [data-detail="well"] { fill: color-mix(in oklab, var(--tone) 82%, var(--shade-side)); stroke: color-mix(in oklab, var(--tone) 65%, var(--shade-side)); stroke-width: .45; }

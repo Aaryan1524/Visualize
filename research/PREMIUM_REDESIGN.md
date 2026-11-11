@@ -60,3 +60,23 @@ Small or unusually short windows retain a readable scrolling fallback. Existing 
 Review images are in `shots/desktop-review/`: the prior layout, both desktop sizes and themes, prediction feedback, the expanded drawer, start/eviction/recap views, a short-window fallback, and complete step and motion sheets.
 
 Validation for the desktop checkpoint: 51 unit tests, typecheck and build passed; rendered-page verification passed on all four pages; all 30 planted faults were caught and both clean fixtures passed. The served localhost LRU preview was also checked at 1440×900: step link, current action, caption/model agreement, viewport fit and copy budget passed with no browser console errors.
+
+## Reusable rail and surface-finish checkpoint
+
+The rail is now `src/parts/rail.ts`, with parameterized capacity, placement, cell dimensions, slot positions and endpoint anchors. Its housing, pads, guides, open-ended trays and cartridges inherit the same finish. Housing seams, screw seats, guide ticks and recessed floor shading are owned by their solids, so they follow the same motion and painter's order. Foundation and subject styles use roles instead of LRU entity keys. The LRU scene consumes the API; independent review fixtures exercise one, three and six slots without custom CSS.
+
+An early design raised the tray ends. Motion verification found entries passing through those ends while changing recency. The finished trays are open along the travel direction; their side lips retain the fitted appearance without obstructing that motion. This was corrected in geometry, without a depth-order bias or a check exemption.
+
+The new browser audit samples the actual rendered surface paths in each owner's coordinate system at rest and during transitions. It rejects missing finishes and paths leaving their owner's silhouette. Two controls deliberately remove and detach the details. This is a containment check, not proof that every detail has manufacturing realism or that all continuous motion is collision-free. The existing depth/ray and replay checks still run.
+
+Fixtures without a panel no longer fail solely because the optional panel is absent. A short transcript can fit inside Details without needing to scroll; the drawer audit requires a contained, scroll-enabled surface rather than requiring every transcript to overflow it. The long LRU transcript continues to exercise internal scrolling.
+
+### Upstream geometry probe
+
+`node scripts/probe-anatomy.mjs /path/to/anatomy/kit/iso-kit.mjs` probes the installed kit without copying or bundling it. With azimuth 45°, elevation 35.26438968° and scale 0.96824584, its projection matches this engine's fixed isometric projection over 2,079 points to a maximum error of 4.50e-14 world-screen units. `slabOf` supplies four shade layers and a bevel path.
+
+The output is SVG path strings, while this engine carries polygon faces and model dimensions through interpolation, depth sorting and independent ray checks. Camera compatibility alone is not a drop-in renderer adapter. This checkpoint keeps the existing geometry and adds native assemblies and owned surface detail. Upstream lathe/tube capabilities remain candidates for a future shape-record adapter; no upstream implementation is vendored here. This deliberately avoids replacing a tested shape pipeline just to draw another rounded slab.
+
+Review: `node scripts/review-rail.mjs` builds `shots/rail-review/index.html`, with LRU, three capacities, and the saved previous version. It captures light/dark desktop views, both requested desktop sizes for LRU, 4× assembly close-ups, every resting step and ten samples across the hit and first eviction.
+
+Observed results for this checkpoint: 58 unit tests, typecheck and build passed. All four existing pages and all three rail fixtures passed rendered-page verification. All 32 planted faults were caught; both clean fixtures passed. The served 1440×900 LRU preview passed its step-link, copy/viewport and surface checks with no console errors, and its review gallery loaded. A 120-seek browser probe measured 1.8 ms median and 3.5 ms p95 synchronous seek work on this machine; this is not a frame-rate measurement. Both desktop sizes/themes, all capacity specimens, assembly close-ups and the step/motion sheet were visually inspected. The reference remains subject to the user's visual review before broader rollout.

@@ -1,5 +1,6 @@
 import { defineScene } from "../../src/core/scene.ts";
 import type { Mark, Observation, Scene, Vec3 } from "../../src/core/types.ts";
+import { railAssembly, cartridge, RAIL_CELL, RAIL_PITCH } from "../../src/parts/rail.ts";
 import { fifoContrast, initial, run, type GetEvent, type LruState } from "./model.ts";
 
 export const CAPACITY = 3;
@@ -11,45 +12,29 @@ export const REQUESTS = ["A", "B", "C", "A", "D", "B", "A", "E", "B"];
 
 // The rail carries recency, not insertion time. Every decorative part belongs
 // to a slot, its guide, or the request belt; all entries remain model entities.
-const PITCH = 42;
-const BLOCK: Vec3 = [28, 24, 17];
+const PITCH = RAIL_PITCH;
+const BLOCK: Vec3 = RAIL_CELL;
 const TRAY_Z = 3;
 const QUEUE_PITCH = 20;
 const QUEUE_SHOWN = 6;
 const railEnd = (CAPACITY - 1) * PITCH + BLOCK[0];
 
 function viewFor(flat: boolean) {
-  const slot = (i: number): Vec3 => [i * PITCH, 0, TRAY_Z];
+
   const queue = (j: number): Vec3 => flat ? [j*QUEUE_PITCH,0,-35] : [j*QUEUE_PITCH,53,-2];
   return (s: LruState, e: GetEvent | null): Mark[] => {
-    const marks: Mark[] = [
-      {kind:"box",key:"base",at:[-10,-9,-7],size:[railEnd+20,42,5],radius:4,inset:true,tone:"base"},
-      {kind:"box",key:"rail",at:[-6,-5,-2],size:[railEnd+12,34,2],radius:2,tone:"structure",inset:true},
-      {kind:"box",key:"guide-back",at:[-4,-4,0],size:[railEnd+8,2,3],radius:0.8,tone:"structure"},
-      {kind:"box",key:"guide-front",at:[-4,26,0],size:[railEnd+8,2,3],radius:0.8,tone:"structure"},
-    ];
-    for (let i=0;i<s.capacity;i++) {
-      const x=i*PITCH;
-      marks.push(
-        {kind:"box",key:`tray-${i}`,at:[x-2,-1,0],size:[BLOCK[0]+4,26,TRAY_Z],radius:2,inset:true,tone:"muted"},
-        {kind:"label",key:`slot-${i}`,at:flat ? [x+14,0,-11] : [x+14,31,-2],text:String(i+1).padStart(2,"0"),size:"small"},
-      );
-    }
-    // Fine ticks sit on the front guide, rather than floating on the plate.
-    if (!flat) for (let i=0;i<=28;i++) {
-      const x=-3+i*4;
-      marks.push({kind:"link",key:`tick-${i}`,from:[x,28,3],to:[x, i%7===0 ? 26 : 27,3],tone:"structure",width:i%7===0 ? 0.9 : 0.45,layer:"overlay"});
-    }
+    const rail = railAssembly({key: "", slots: s.capacity, flat});
+    const marks: Mark[] = [...rail.marks];
     s.order.forEach((key,i) => {
       const accessed=e?.key===key;
-      marks.push({kind:"box",key:`entry-${key}`,at:slot(i),size:BLOCK,radius:2,inset:true,
+      marks.push(cartridge({key:`entry-${key}`,at:rail.slot(i),size:BLOCK,
         tone:accessed ? (e!.result==="hit" ? "good" : "accent") : "subject",
         lit:accessed,label:key,link:`key-${key}`,enter:"drop",
         title:`${key}, ${i===0 ? "least recently used" : i===s.order.length-1 ? "most recently used" : "middle of recency order"}`,
         ...(accessed && e!.result==="hit" ? {arc:BLOCK[2]*2.3} : {}),
-      });
+      }));
     });
-    if (e?.evicted) marks.push({kind:"box",key:`entry-${e.evicted}`,at:[-35,0,TRAY_Z],size:BLOCK,radius:2,inset:true,tone:"bad",label:e.evicted,leaving:true});
+    if (e?.evicted) marks.push(cartridge({key:`entry-${e.evicted}`,at:[-35,0,TRAY_Z],size:BLOCK,tone:"bad",label:e.evicted,leaving:true}));
     if (s.served < s.requests.length) {
       marks.push({kind:"box",key:"belt",at:flat ? [-3,0,-38] : [-3,50,-5],size:[(QUEUE_SHOWN-1)*QUEUE_PITCH+20,flat ? 16 : 20,3],radius:3,tone:"base",inset:true});
       for (let j=0;j<QUEUE_SHOWN;j++) {
@@ -61,8 +46,8 @@ function viewFor(flat: boolean) {
     }
     if (e && !flat) marks.push({kind:"box",key:`req-${e.index}`,at:flat ? [0,0,-22] : [0,38,18],size:[14,14,flat ? 12 : 5],radius:1.5,tone:"structure",label:e.key,leaving:true});
     marks.push(
-      {kind:"label",key:"cold",at:flat ? [-8,0,12] : [-12,24,13],text:"Least recent",anchor:"end",size:"small",target:{key:"tray-0",at:[0,24,3]}},
-      {kind:"label",key:"fresh",at:flat ? [railEnd+8,0,12] : [railEnd+20,25,3],text:"Most recent",anchor:"start",size:"small",target:{key:"tray-2",at:[railEnd,24,3]}},
+      {kind:"label",key:"cold",at:flat ? [-8,0,12] : [-12,24,13],text:"Least recent",anchor:"end",size:"small",target:rail.anchor.first},
+      {kind:"label",key:"fresh",at:flat ? [railEnd+8,0,12] : [railEnd+20,25,3],text:"Most recent",anchor:"start",size:"small",target:rail.anchor.last},
     );
 
     return marks;
