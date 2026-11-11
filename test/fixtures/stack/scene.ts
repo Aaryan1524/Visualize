@@ -51,6 +51,7 @@ export default defineScene<State, Op>({
         tone: i === s.items.length - 1 ? "accent" : "subject",
         label: it.value,
         labelFace: "right",
+        link: `item-${it.id}`,
         enter: "drop",
         exit: "lift",
         lit: e?.type === "push" && i === s.items.length - 1,
@@ -63,7 +64,7 @@ export default defineScene<State, Op>({
     {
       key: "list",
       title: "Contents, bottom to top",
-      html: `<p data-key="contents">${s.items.map((i) => i.value).join(" · ") || "empty"}</p>`,
+      html: `<p data-key="contents">${s.items.map((i) => `<span data-link="item-${i.id}">${i.value}</span>`).join(" · ") || "empty"}</p>`,
     },
   ],
   observe: (s) => [

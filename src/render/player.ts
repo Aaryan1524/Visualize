@@ -209,7 +209,11 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   fit();
 
   // ---- Linked highlighting --------------------------------------------------
+  // data-link holds one or more entity ids separated by spaces. Pointing at an
+  // element lights every element that shares at least one of its ids, so a
+  // score cell linked to "q-sat k-cat" lights both vectors it was made from.
   let activeLink: string | null = null;
+  const idsOf = (v: string | null) => (v ? v.split(/\s+/).filter(Boolean) : []);
   const applyLink = () => {
     if (activeLink === null) {
       delete root.dataset.linking;
@@ -217,8 +221,9 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
       return;
     }
     root.dataset.linking = activeLink;
+    const active = new Set(idsOf(activeLink));
     for (const e of root.querySelectorAll<HTMLElement | SVGElement>("[data-link]")) {
-      e.classList.toggle("is-linked", e.getAttribute("data-link") === activeLink);
+      e.classList.toggle("is-linked", idsOf(e.getAttribute("data-link")).some((id) => active.has(id)));
     }
   };
   const linkOf = (t: EventTarget | null) => (t instanceof Element ? t.closest("[data-link]")?.getAttribute("data-link") ?? null : null);

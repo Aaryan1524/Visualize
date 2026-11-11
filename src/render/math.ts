@@ -17,10 +17,11 @@ export function tex(source: string, { display = false } = {}): string {
   });
 }
 
-/** Wrap a TeX fragment so the rendered term links to an entity. */
-export function linked(id: string, body: string): string {
-  if (!/^[\w-]+$/.test(id)) throw new Error(`link id must be word characters or hyphens: ${id}`);
-  return String.raw`\htmlData{link=${id}}{${body}}`;
+/** Wrap a TeX fragment so the rendered term links to one or more entities. */
+export function linked(ids: string | readonly string[], body: string): string {
+  const list = typeof ids === "string" ? [ids] : ids;
+  for (const id of list) if (!/^[\w-]+$/.test(id)) throw new Error(`link id must be word characters or hyphens: ${id}`);
+  return String.raw`\htmlData{link=${list.join(" ")}}{${body}}`;
 }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -30,7 +31,7 @@ export interface GridOptions {
   cols?: string[];
   /** Digits after the decimal point. */
   digits?: number;
-  /** Entity link for a cell. */
+  /** Entity link(s) for a cell, space-separated. */
   link?: (i: number, j: number) => string | undefined;
   /** data-key for a cell, so checks can read its value. */
   key?: (i: number, j: number) => string | undefined;

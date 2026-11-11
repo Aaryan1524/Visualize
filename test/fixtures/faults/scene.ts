@@ -10,8 +10,14 @@ const clean = defineScene({ ...stack, id: "clean" });
 const wrongValue = defineScene({
   ...stack,
   id: "wrong-value",
-  panels: (s, e) =>
-    stack.panels!(s, e).map((p) => ({ ...p, html: p.html.replace(/>([^<]*)<\/p>/, (_, t) => `>${t.split(" · ").reverse().join(" · ")}</p>`) })),
+  // The view lists the items top to bottom while the model (and the panel title) say bottom to top.
+  panels: (s) => [
+    {
+      key: "list",
+      title: "Contents, bottom to top",
+      html: `<p data-key="contents">${[...s.items].reverse().map((i) => i.value).join(" · ") || "empty"}</p>`,
+    },
+  ],
 });
 
 /** Two labels drawn on top of each other. */
