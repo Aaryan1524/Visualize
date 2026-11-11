@@ -16,7 +16,8 @@
     "shoot": "node scripts/shoot.mjs",
     "verify:controls": "node scripts/verify.mjs --controls --quick",
     "export:svg": "node scripts/export-svg.mjs",
-    "check:embed": "node scripts/check-embed.mjs"
+    "check:embed": "node scripts/check-embed.mjs",
+    "new-scene": "node scripts/new-scene.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

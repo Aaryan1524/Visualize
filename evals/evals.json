@@ -1,0 +1,39 @@
+{
+  "skill_name": "visualize",
+  "note": "Held-out prompts: none of these concepts ships as an example. Score each run on the criteria below, and record any manual repair. A with/without-skill comparison needs fresh sessions with the same model, prompt and tool budget.",
+  "criteria": [
+    "verify passes on the generated scene with no checks removed or weakened",
+    "the model is tested against a separately written reference implementation, and the chosen inputs provably include the interesting cases",
+    "the representation is the concept's own structure built from kit parts (or a new kit part), not a boxes-and-arrows diagram or a decorative metaphor",
+    "no scene-specific CSS; no hand-typed numbers in the view",
+    "one short action per step, a prediction before the causal moment, at most 5 chapters",
+    "screenshots and contact sheets were read; defects found by eye were fixed in the kit when they would recur"
+  ],
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Explain a token-bucket rate limiter visually for our API docs: the bucket holds 10 tokens, refills 2 per second, each request takes one token, and requests are rejected when it is empty. Show a burst that drains it and the recovery.",
+      "expected_output": "An editorial scene whose model is a discrete-time token bucket tested against a reference, with a burst that empties it and a later request that succeeds after refill. The bucket is built from kit parts with one token solid per token (counted true). Requests and rejections appear in the strip, and a prediction comes before the first rejection. verify passes."
+    },
+    {
+      "id": 2,
+      "prompt": "Make an interactive explainer of a ring buffer with capacity 6: writes advance the head, reads advance the tail, and a write to a full buffer overwrites the oldest value.",
+      "expected_output": "Slots arranged as the buffer's own structure, with head and tail markers driven by the model, and an overwrite shown as the old value leaving and the new one entering the same slot. Observations cover head, tail, contents and the overwrite. verify passes."
+    },
+    {
+      "id": 3,
+      "prompt": "Explain database connection pooling for our Next.js docs: a pool of 4 connections, requests borrow and return them, and extra requests wait in a queue. Give me a React component too.",
+      "expected_output": "A scene with server-like parts for the pool and the database (or a new kit part where none fits), requests riding cables, and a visible wait queue. The scene is exported through src/react/Figure.tsx, check:embed passes, and verify passes."
+    },
+    {
+      "id": 4,
+      "prompt": "Show binary search on a sorted array of 15 numbers, looking for 37, step by step.",
+      "expected_output": "Cells for the array, with lo, mid and hi driven by the model. Discarded halves are visibly de-emphasised, and the number of comparisons appears in totals. A prediction asks which half survives. The model is tested against a reference search over many targets, including misses. verify passes."
+    },
+    {
+      "id": 5,
+      "prompt": "Explain TCP retransmission: a segment is lost, the sender times out and retransmits, and duplicate ACKs trigger fast retransmit. I want an SVG of the key moment for a blog post.",
+      "expected_output": "Terminal-like sender and receiver parts, messages on cables with a lost segment, and the model's timer and ACK counts in the strip. export-svg.mjs produces an SVG of the fast-retransmit step that passes its structural and pixel comparison. verify passes."
+    }
+  ]
+}
