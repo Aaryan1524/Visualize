@@ -64,6 +64,34 @@ const wrongSize = defineScene({
   observe: (s) => s.items.map((it) => ({ type: "extent" as const, key: it.id, size: [24, 24, 12] as const })),
 });
 
+/** The declared order is the reverse of what is drawn. */
+const wrongOrder = defineScene({
+  ...stack,
+  id: "wrong-order",
+  observe: (s) => (s.items.length > 1 ? [{ type: "order" as const, keys: s.items.map((i) => i.id), axis: "y" as const }] : []),
+});
+
+/** The model says the pushed item is the one to watch; the view never lights it. */
+const unlit = defineScene({
+  ...stack,
+  id: "unlit",
+  view: (s, e) => stack.view(s, e).map((m) => ({ ...m, lit: false })),
+});
+
+/** A label far wider than the face it sits on. */
+const wideLabel = defineScene({
+  ...stack,
+  id: "wide-label",
+  view: (s, e) => stack.view(s, e).map((m) => (m.kind === "box" && m.label ? { ...m, label: `${m.label} is a very long label` } : m)),
+});
+
+/** Labels on the tops of stacked blocks, covered by the block above. */
+const coveredLabel = defineScene({
+  ...stack,
+  id: "covered-label",
+  view: (s, e) => stack.view(s, e).map((m) => (m.kind === "box" && m.label ? { ...m, labelFace: "top" as const } : m)),
+});
+
 export const variants = {
   clean,
   "wrong-value": wrongValue,
@@ -71,6 +99,10 @@ export const variants = {
   intersecting,
   "hidden-behind": hiddenBehind,
   "wrong-size": wrongSize,
+  "wrong-order": wrongOrder,
+  unlit,
+  "wide-label": wideLabel,
+  "covered-label": coveredLabel,
 };
 
 export default clean;
