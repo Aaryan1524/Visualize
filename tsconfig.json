@@ -11,7 +11,8 @@
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
     "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "jsx": "react-jsx"
   },
   "include": ["src", "examples", "test"]
 }

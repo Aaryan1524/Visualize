@@ -15,12 +15,17 @@
     "verify": "node scripts/verify.mjs",
     "shoot": "node scripts/shoot.mjs",
     "verify:controls": "node scripts/verify.mjs --controls --quick",
-    "export:svg": "node scripts/export-svg.mjs"
+    "export:svg": "node scripts/export-svg.mjs",
+    "check:embed": "node scripts/check-embed.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "esbuild": "^0.28.2",
     "puppeteer-core": "^25.17.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "typescript": "^7.0.2"
   },
   "dependencies": {
