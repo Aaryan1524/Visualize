@@ -37,7 +37,16 @@
         else if (norm(el.textContent) !== norm(o.equals)) failures.push(`text ${o.key}: shows "${norm(el.textContent)}", model says "${o.equals}"`);
       } else if (o.type === "visible") {
         const shown = isShown(el);
-        if (shown !== o.visible) failures.push(`visible ${o.key}: expected ${o.visible ? "drawn" : "hidden"}, is ${shown ? "drawn" : "hidden"}`);
+        if (!o.visible) {
+          if (shown) failures.push(`visible ${o.key}: should not be drawn, but is`);
+        } else if (!shown) failures.push(`visible ${o.key}: not drawn`);
+        else {
+          const share = seenShare(el);
+          if (share < MIN_SEEN) failures.push(`visible ${o.key}: drawn but only ${(share * 100).toFixed(0)}% of it can be seen (min ${MIN_SEEN * 100}%)`);
+        }
+      } else if (o.type === "extent") {
+        const problem = extentProblem(el, o);
+        if (problem) failures.push(`extent ${o.key}: ${problem}`);
       } else if (o.type === "lit") {
         if (!el || !el.hasAttribute("data-lit")) failures.push(`lit ${o.key}: not highlighted`);
       } else if (o.type === "order") {
@@ -59,6 +68,81 @@
       }
     }
     return failures;
+  }
+
+  // ---- Seen, not just present ---------------------------------------------------
+  const MIN_SEEN = 0.15;
+  const NO_HIT = '[data-layer="overlay"],[data-layer="labels"],.vz-solid-label{pointer-events:none!important}';
+
+  /**
+   * Share of an element's area where the browser reports it on top. For a
+   * solid, sample its drawn outline; for a line, sample along it; for HTML,
+   * sample its box.
+   */
+  function seenShare(el) {
+    const guard = document.createElement("style");
+    guard.textContent = NO_HIT;
+    document.head.append(guard);
+    try {
+      const pts = [];
+      const edge = el.querySelector && el.querySelector(".vz-edge");
+      const line = el.querySelector && el.querySelector("line.vz-link");
+      if (edge) {
+        const poly = parsePoints(edge.getAttribute("points"));
+        const ctm = edge.getScreenCTM();
+        const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]);
+        const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+        const N = 9;
+        for (let i = 0; i < N; i++)
+          for (let j = 0; j < N; j++) {
+            const x = x0 + ((i + 0.5) / N) * (x1 - x0), y = y0 + ((j + 0.5) / N) * (y1 - y0);
+            if (inside(poly, x, y)) pts.push([ctm.a * x + ctm.c * y + ctm.e, ctm.b * x + ctm.d * y + ctm.f]);
+          }
+      } else if (line) {
+        const ctm = line.getScreenCTM();
+        const [x1, y1, x2, y2] = ["x1", "y1", "x2", "y2"].map((a) => Number(line.getAttribute(a)));
+        for (let i = 1; i < 12; i++) {
+          const x = x1 + ((x2 - x1) * i) / 12, y = y1 + ((y2 - y1) * i) / 12;
+          pts.push([ctm.a * x + ctm.c * y + ctm.e, ctm.b * x + ctm.d * y + ctm.f]);
+        }
+      } else {
+        if (el instanceof SVGElement && el.closest('[data-layer="labels"]')) return 1; // labels are drawn above everything
+        const r = el.getBoundingClientRect();
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) pts.push([r.left + ((i + 0.5) / 3) * r.width, r.top + ((j + 0.5) / 3) * r.height]);
+      }
+      if (!pts.length) return 0;
+      let seen = 0;
+      for (const [x, y] of pts) {
+        const top = document.elementFromPoint(x, y);
+        if (top && (top === el || el.contains(top))) seen++;
+      }
+      return seen / pts.length;
+    } finally {
+      guard.remove();
+    }
+  }
+
+  /**
+   * Compare a solid's drawn outline with the screen box its declared world
+   * size must project to. Isometric: a box w×d×h spans (w+d)·cos30° by
+   * (w+d)/2 + h; a cylinder of diameter D spans √2·cos30°·D by h + D/√2.
+   * Front: w by h.
+   */
+  function extentProblem(el, o) {
+    const edge = el && el.querySelector(".vz-edge");
+    if (!edge) return "no solid with this key";
+    const b = edge.getBBox();
+    const [w, d, h] = o.size;
+    const cyl = el.getAttribute("data-kind") === "cylinder";
+    let W, H;
+    if (projection() === "front") [W, H] = [w, h];
+    else if (cyl) [W, H] = [Math.SQRT2 * C * w, h + w / Math.SQRT2];
+    else [W, H] = [(w + d) * C, (w + d) / 2 + h];
+    const tol = o.tolerance ?? 0.6;
+    if (Math.abs(b.width - W) > tol || Math.abs(b.height - H) > tol) {
+      return `drawn ${b.width.toFixed(1)}×${b.height.toFixed(1)}, a ${o.size.join("×")} ${cyl ? "cylinder" : "box"} projects to ${W.toFixed(1)}×${H.toFixed(1)}`;
+    }
+    return null;
   }
 
   // ---- Geometry helpers ------------------------------------------------------

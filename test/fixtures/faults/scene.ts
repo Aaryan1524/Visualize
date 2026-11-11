@@ -44,11 +44,33 @@ const intersecting = defineScene({
   observe: () => [{ type: "visible", key: "intruder", visible: true }],
 });
 
+/** A mark that exists in the DOM but sits entirely behind a larger solid. */
+const hiddenBehind = defineScene({
+  ...stack,
+  id: "hidden-behind",
+  view: (s, e) => [
+    ...stack.view(s, e),
+    // Directly behind the screen along the line of sight (−1, −1, −1), away from the stack.
+    { kind: "box", key: "screen", at: [60, -40, 0], size: [30, 30, 60], tone: "structure" },
+    { kind: "box", key: "hidden", at: [51, -49, 6], size: [8, 8, 8], tone: "bad" },
+  ],
+  observe: () => [{ type: "visible", key: "hidden", visible: true }],
+});
+
+/** A bar drawn at a different height from the one its value implies. */
+const wrongSize = defineScene({
+  ...stack,
+  id: "wrong-size",
+  observe: (s) => s.items.map((it) => ({ type: "extent" as const, key: it.id, size: [24, 24, 12] as const })),
+});
+
 export const variants = {
   clean,
   "wrong-value": wrongValue,
   "crowded-labels": crowdedLabels,
   intersecting,
+  "hidden-behind": hiddenBehind,
+  "wrong-size": wrongSize,
 };
 
 export default clean;

@@ -250,7 +250,10 @@ function observe(s: Joint): Observation[] {
     obs.push({ type: "text", key: `total-${w}`, equals: `$${totalCharged(snap)}` });
     obs.push({ type: "text", key: `status-${w}`, equals: STATUS[snap.client.status] });
     obs.push({ type: "text", key: `ledger-total-${w}`, equals: `$${totalCharged(snap)}` });
-    for (const c of snap.ledger) obs.push({ type: "visible", key: `charge-${w}-${c.id}`, visible: true });
+    for (const c of snap.ledger) {
+      obs.push({ type: "visible", key: `charge-${w}-${c.id}`, visible: true });
+      obs.push({ type: "extent", key: `charge-${w}-${c.id}`, size: [30, 30, 8] });
+    }
     for (const m of snap.inflight) obs.push({ type: "visible", key: `msg-${w}-${m.id}`, visible: true });
   }
   obs.push({ type: "visible", key: "stored-key", visible: s.worlds.safe.store !== null });

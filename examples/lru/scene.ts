@@ -154,6 +154,7 @@ function observe(s: LruState, e: GetEvent | null): Observation[] {
     { type: "text", key: "evictions", equals: String(s.evictions) },
     ...s.order.map((k) => ({ type: "text" as const, key: `entry-${k}`, equals: k })),
     ...s.order.map((k) => ({ type: "visible" as const, key: `entry-${k}`, visible: true })),
+    ...s.order.map((k) => ({ type: "extent" as const, key: `entry-${k}`, size: BLOCK })),
   ];
   if (s.order.length > 1) obs.push({ type: "order", keys: s.order.map((k) => `entry-${k}`), axis: "x" });
   if (e?.evicted) obs.push({ type: "visible", key: `entry-${e.evicted}`, visible: false });
