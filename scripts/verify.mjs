@@ -92,6 +92,10 @@ const PLANTS = {
       throw new Error("planted failure");
     }));
   },
+  // Pointing at a linked element lights nothing.
+  linking: () => {
+    window.addEventListener("pointerover", (e) => e.stopImmediatePropagation(), true);
+  },
   // Keyboard does nothing.
   keyboard: () => {
     window.addEventListener("keydown", (e) => e.stopImmediatePropagation(), true);
@@ -106,6 +110,7 @@ const CONTROLS = [
   { plant: "caption", expect: "captions" },
   { plant: "console", expect: "console" },
   { plant: "keyboard", expect: "keyboard" },
+  { plant: "linking", expect: "linking" },
   { variant: "wrong-value", expect: "observations" },
   { variant: "crowded-labels", expect: "labels" },
   { variant: "intersecting", expect: "depth order" },
@@ -259,6 +264,42 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
     report.add("text size", "every visible text node, at every step (11 px minimum)", [...small]);
     report.add("contrast", "WCAG ratio against the face or card behind each text, light theme", [...faint]);
     report.add("labels", "no overlaps, no spill off faces, not covered, inside the card, panels fit", [...labelProblems]);
+
+    // Linked highlighting: pointing at a linked element lights exactly the
+    // elements that share one of its ids, across stage and panels.
+    {
+      const linkProblems = [];
+      let tried = 0;
+      for (let k = 0; k <= last && tried < 6; k++) {
+        await page.evaluate((k) => window.__viz.seekStep(k), k);
+        await settle(page);
+        const targets = await page.$$(".vz-panel [data-link], .vz-svg [data-link]");
+        for (const el of targets.slice(0, 2)) {
+          const box = await el.boundingBox();
+          if (!box || box.width < 2) continue;
+          tried++;
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          const res = await page.evaluate((x, y) => {
+            const hovered = document.elementFromPoint(x, y)?.closest("[data-link]");
+            if (!hovered) return { skipped: true };
+            const ids = new Set(hovered.getAttribute("data-link").split(/\s+/));
+            const all = [...document.querySelectorAll("[data-link]")];
+            const shares = (e) => e.getAttribute("data-link").split(/\s+/).some((id) => ids.has(id));
+            return {
+              ids: [...ids],
+              missing: all.filter((e) => shares(e) && !e.classList.contains("is-linked")).length,
+              extra: all.filter((e) => !shares(e) && e.classList.contains("is-linked")).length,
+              lit: all.filter((e) => e.classList.contains("is-linked")).length,
+            };
+          }, box.x + box.width / 2, box.y + box.height / 2);
+          if (res.skipped) continue;
+          if (res.missing) linkProblems.push(`step ${k}: pointing at ${res.ids.join(" ")} left ${res.missing} sharing elements unlit`);
+          if (res.extra) linkProblems.push(`step ${k}: pointing at ${res.ids.join(" ")} lit ${res.extra} unrelated elements`);
+        }
+      }
+      await page.mouse.move(1, 1);
+      if (tried) report.add("linking", `${tried} linked elements pointed at`, linkProblems);
+    }
 
     // Keyboard.
     const keyProblems = [];

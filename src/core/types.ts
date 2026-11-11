@@ -68,7 +68,10 @@ interface MarkBase {
   tone?: Tone;
   /** The one thing the reader should watch in this state. */
   lit?: boolean;
-  /** Entity id shared with panel elements for linked highlighting. */
+  /**
+   * Entity id(s), space-separated, shared with panel elements for linked
+   * highlighting. Pointing at either side lights everything sharing an id.
+   */
   link?: string;
   enter?: EnterStyle;
   exit?: ExitStyle;

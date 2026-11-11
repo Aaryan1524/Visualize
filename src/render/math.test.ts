@@ -17,6 +17,10 @@ test("tex: invalid input throws instead of rendering an error", () => {
   assert.throws(() => tex(String.raw`\frac{1}{`));
 });
 
+test("linked: several ids become one space-separated attribute", () => {
+  assert.match(tex(linked(["q-the", "q-cat"], "Q")), /data-link="q-the q-cat"/);
+});
+
 test("linked: rejects ids that could break out of the attribute", () => {
   assert.throws(() => linked('a"b', "x"));
 });
