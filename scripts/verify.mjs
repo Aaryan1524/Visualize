@@ -33,6 +33,28 @@ const { compile } = await import(pathToFileURL(join(ROOT, "src/core/scene.ts")).
 // Each one breaks the page in a specific way after it loads. Used by --controls
 // to prove the checks can fail (see the coverage note at the top).
 const PLANTS = {
+  "desktop-scroll": () => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s = document.createElement("style");
+      s.textContent = "body{min-height:1600px!important}";
+      document.head.append(s);
+    });
+  },
+  "copy-budget": () => {
+    window.addEventListener("load", () => {
+      const v = window.__viz, seek = v.seek;
+      v.seek = t => {
+        seek(t);
+        v.root.querySelector('[data-role="action"]').textContent = "This paragraph adds far too many unnecessary words to a screen that should explain each change through its moving diagram.";
+      };
+      v.seekStep = k => v.seek(v.compiled.restTime(k));
+    });
+  },
+  drawer: () => {
+    document.addEventListener("click", e => {
+      if (e.target.closest?.('[aria-haspopup="dialog"]')) e.stopImmediatePropagation();
+    }, true);
+  },
   prediction: () => {
     document.addEventListener("click",e=>{
       if (e.target.closest?.(".vz-predict-options")) e.stopImmediatePropagation();
@@ -163,6 +185,9 @@ const PLANTS = {
 };
 
 const CONTROLS = [
+  { variant:"editorial", plant:"desktop-scroll", expect:"desktop viewport" },
+  { variant:"editorial", plant:"copy-budget", expect:"copy budget" },
+  { variant:"editorial", plant:"drawer", expect:"details drawer" },
   { plant: "outside-card", expect: "labels" },
   { variant:"editorial", plant:"composition", expect:"composition" },
   { variant:"editorial", plant:"semantics", expect:"semantics" },
@@ -289,6 +314,7 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
       if (shown.caption !== norm(s.caption)) capProblems.push(`step ${k}: caption "${shown.caption}" ≠ model "${norm(s.caption)}"`);
       if (shown.readout !== norm(s.readout)) capProblems.push(`step ${k}: readout "${shown.readout}" ≠ model "${norm(s.readout)}"`);
       if (shown.trust !== s.trust) capProblems.push(`step ${k}: trust "${shown.trust}" ≠ "${s.trust}"`);
+      if (s.teaching && shown.action !== norm(s.teaching.heading)) capProblems.push(`step ${k}: action differs from the teaching beat`);
     }
     report.add("observations", `${obsCount} declared across ${steps.length} steps`, obsProblems);
     if (obsCount === 0) report.rows.at(-1).problems.push("the scene declares no observations, so nothing ties the picture to the model");
@@ -356,6 +382,60 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
       await page.emulateMediaFeatures([{name:"prefers-color-scheme",value:"light"}]);
       await settle(page);
       for (const [name,problems] of Object.entries(issues)) report.add(name,"every step at desktop and phone widths, both themes",[...problems]);
+
+      const viewportProblems = new Set(), copyProblems = new Set(), drawerProblems = [];
+      for (const theme of ["light", "dark"]) for (const [width, height] of [[1440, 900], [1920, 1080]]) {
+        await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: theme }]);
+        await page.setViewport({ width, height, deviceScaleFactor: 1 });
+        await settle(page);
+        for (let k = 0; k <= last; k++) {
+          await page.evaluate(k => window.__viz.seekStep(k), k);
+          const result = await page.evaluate(() => window.__vzCheck.desktop());
+          result.viewport.forEach(p => viewportProblems.add(`${theme} ${width}×${height} step ${k}: ${p}`));
+          result.copy.forEach(p => copyProblems.add(`step ${k}: ${p}`));
+          if (steps[k].teaching?.prediction) {
+            await page.click(".vz-predict-options button");
+            const answered = await page.evaluate(() => window.__vzCheck.desktop());
+            answered.viewport.forEach(p => viewportProblems.add(`${theme} ${width}×${height} feedback: ${p}`));
+            answered.copy.forEach(p => copyProblems.add(`feedback: ${p}`));
+          }
+        }
+        for (let k = 1; k <= last; k++) for (const p of [.2, .4, .6, .8]) {
+          await page.evaluate(t => window.__viz.seek(t), tl.start[k] + tl.duration[k] * p);
+          const result = await page.evaluate(() => window.__vzCheck.desktop());
+          result.viewport.forEach(problem => viewportProblems.add(`${theme} ${width}×${height} move ${k} at ${p}: ${problem}`));
+        }
+      }
+      report.add("desktop viewport", "1440×900 and 1920×1080, both themes: no page scroll; stage, controls, prediction and feedback fit; 4 samples per move", [...viewportProblems]);
+      report.add("copy budget", "short title, action, prediction and feedback; paragraphs confined to Details", [...copyProblems]);
+
+      await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+      await settle(page);
+      await page.evaluate(() => window.__viz.seekStep(1));
+      const beforeDetails = await page.evaluate(() => ({ width: document.scrollingElement.scrollWidth, height: document.scrollingElement.scrollHeight, step: window.__viz.shownIndex() }));
+      await page.click('[aria-haspopup="dialog"]');
+      const opened = await page.$eval(".vz-drawer", e => e.open);
+      if (!opened) drawerProblems.push("Details did not open");
+      else {
+        const focus = await page.evaluate(() => document.querySelector(".vz-drawer").contains(document.activeElement));
+        if (!focus) drawerProblems.push("focus did not enter the dialog");
+        await page.keyboard.press("End");
+        if (await page.evaluate(() => window.__viz.shownIndex()) !== beforeDetails.step) drawerProblems.push("dialog keyboard input changed the underlying scene");
+        await page.evaluate(() => document.querySelectorAll(".vz-drawer details").forEach(e => e.open = true));
+        const expanded = await page.evaluate(() => {
+          const body = document.querySelector(".vz-drawer-body"), r = body.getBoundingClientRect();
+          return { width: document.scrollingElement.scrollWidth, height: document.scrollingElement.scrollHeight, internal: body.scrollHeight > body.clientHeight, fits: r.bottom <= innerHeight && r.top >= 0 };
+        });
+        if (expanded.width !== beforeDetails.width || expanded.height !== beforeDetails.height) drawerProblems.push("opening Details resized the main page");
+        if (!expanded.internal || !expanded.fits) drawerProblems.push("expanded transcript does not fit in an internally scrolling drawer");
+        await page.keyboard.press("Escape");
+        if (await page.$eval(".vz-drawer", e => e.open)) drawerProblems.push("Escape did not close Details");
+        if (!await page.evaluate(() => document.activeElement?.getAttribute("aria-haspopup") === "dialog")) drawerProblems.push("closing Details did not restore focus to its button");
+      }
+      report.add("details drawer", "contained transcript, modal focus, Escape, focus restoration; underlying timeline stays fixed", drawerProblems);
+      await page.setViewport({ width: 1280, height: 1000, deviceScaleFactor: 1 });
+      await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }]);
+      await settle(page);
     }
 
     // Linked highlighting: pointing at a linked element lights exactly the

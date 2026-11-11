@@ -88,6 +88,7 @@ mount(document.getElementById("app"), scene);`;
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
 <title>${escapeHtml(variant.title)}</title>
 <meta name="description" content="${escapeHtml(variant.question)}">
 <style>${css}</style>
@@ -123,7 +124,7 @@ if (all.length > 1 || (all.length && outDir === join(ROOT, "dist"))) {
     .join("");
   writeFileSync(
     join(outDir, "index.html"),
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Visualize examples</title><style>${css}
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="data:,"><title>Visualize examples</title><style>${css}
 .gallery{max-width:760px;margin:0 auto}.gallery h1{font-size:22px;font-weight:600}.gallery ul{list-style:none;padding:0;display:grid;gap:12px}
 .gallery a{display:grid;gap:4px;padding:16px 18px;border:1px solid var(--hair);border-radius:12px;background:var(--card);color:var(--ink);text-decoration:none}
 .gallery a:hover{border-color:var(--ink-2)}.gallery span{color:var(--ink-2);font-size:14px}</style></head>

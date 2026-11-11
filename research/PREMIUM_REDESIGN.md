@@ -46,3 +46,17 @@ The original prototype findings remain a record of the prototype, rather than a 
 - `pnpm verify`: all four pages passed, with desktop/phone screenshots in both themes and step/motion contact sheets.
 - `pnpm verify:controls`: all 27 planted faults caught; the original and editorial clean fixtures passed.
 - The local comparison includes the original LRU, the redesigned step 4, a close-up, dark and phone renders, the first eviction, the recap, and the local Anatomy push-button reference. The reference is not included in the project source.
+
+## Desktop composition and minimal-copy checkpoint
+
+The default editorial view now fits in one desktop viewport. Its header is compact; the stage uses the remaining height; the current action sits beside the figure; and the request strip and playback controls stay visible. The duplicate floating change label and default explanatory paragraphs have been removed. Prediction feedback is one short sentence.
+
+Details opens a contained native dialog for the full current caption, model assumptions, legend, provenance and transcript. Opening it pauses playback. Escape closes it and restores focus; its keyboard input does not control the underlying timeline. Expanded content scrolls inside the drawer, without extending the main page.
+
+New verification checks cover all resting steps, prediction answers and four samples per transition at 1440×900 and 1920×1080, in both themes. They reject page overflow and clipped solids or controls. Copy budgets cover the title, action, prediction and feedback. Three additional controls plant desktop scrolling, excessive copy and a non-opening drawer.
+
+Small or unusually short windows retain a readable scrolling fallback. Existing phone checks remain in place; phone-specific layout work is deferred. The rail geometry and motion are unchanged in this checkpoint. Finished reusable parts and stronger focus/reveal behavior remain subsequent review checkpoints.
+
+Review images are in `shots/desktop-review/`: the prior layout, both desktop sizes and themes, prediction feedback, the expanded drawer, start/eviction/recap views, a short-window fallback, and complete step and motion sheets.
+
+Validation for the desktop checkpoint: 51 unit tests, typecheck and build passed; rendered-page verification passed on all four pages; all 30 planted faults were caught and both clean fixtures passed. The served localhost LRU preview was also checked at 1440×900: step link, current action, caption/model agreement, viewport fit and copy budget passed with no browser console errors.

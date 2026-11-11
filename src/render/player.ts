@@ -76,6 +76,15 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   head.append(h("span", { class: "vz-kicker" }, escapeHtml(scene.title)));
   const themeBtn = h("button", { class: "vz-theme", type: "button" });
   head.append(themeBtn);
+  const detailsBtn = h("button", {
+    class: "vz-info", type: "button", "aria-haspopup": "dialog",
+    "aria-controls": `${scene.id}-details`,
+  }, "Details");
+  const details = h("dialog", { class: "vz-drawer", id: `${scene.id}-details`, "aria-labelledby": `${scene.id}-details-title` });
+  const detailsHead = h("div", { class: "vz-drawer-head" });
+  const detailsClose = h("button", { class: "vz-info", type: "button", "aria-label": "Close details" }, "Close ×");
+  detailsHead.append(h("h2", { id: `${scene.id}-details-title` }, "Behind the figure"), detailsClose);
+  details.append(detailsHead);
   const question = h("h1", { class: "vz-question" }, escapeHtml(scene.question));
   const setup = h("p", {class:"vz-setup"},escapeHtml(scene.setup ?? ""));
   const chapters = h("nav",{class:"vz-chapters","aria-label":"Chapters"});
@@ -115,7 +124,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   const source = h("span", { class: "vz-source", "data-role": "source" });
   meta.append(trust, readout, source);
   caption.append(count, text, meta);
-  const stepHeading = h("h2",{class:"vz-step-heading"});
+  const stepHeading = h("h2",{class:"vz-step-heading", "data-role":"action"});
   const prediction = h("section",{class:"vz-predict","aria-label":"Predict the next step"});
   prediction.hidden = true;
   if (editorial) {
@@ -176,11 +185,32 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   foot.append(all);
 
   if (editorial) {
-    body.insertBefore(caption,panelsBox);
-    card.append(head,question,setup,chapters,body,controls,foot);
+    const heading = h("div", { class: "vz-heading" });
+    heading.append(head.firstElementChild!, question);
+    const utilities = h("div", { class: "vz-utilities" });
+    utilities.append(detailsBtn, themeBtn);
+    head.append(heading, chapters, utilities);
+
+    // The primary view has one action. Longer evidence stays available in a
+    // contained native dialog, with keyboard focus and Escape handled natively.
+    const detailsBody = h("div", { class: "vz-drawer-body" });
+    detailsBody.append(setup, h("h3", {}, "This step"), text, meta, foot);
+    details.append(detailsBody);
+    stageBox.append(caption);
+    controls.insertBefore(count, scrub);
+    card.append(head, body, controls, details);
   } else card.append(head, question, body, caption, controls, foot);
   root.append(card);
   host.append(root);
+  detailsBtn.addEventListener("click", () => {
+    api.pause();
+    details.showModal();
+  });
+  detailsClose.addEventListener("click", () => details.close());
+  details.addEventListener("click", (event) => {
+    const r = details.getBoundingClientRect();
+    if (event.target === details && (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom)) details.close();
+  });
 
   // ---- Theme -----------------------------------------------------------
   const docEl = document.documentElement;
@@ -307,7 +337,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
     shown = k;
     predictionAnswered = false;
     root.dataset.step = String(k);
-    count.textContent = k === 0 ? `Start · ${last} steps` : `Step ${k} of ${last}`;
+    count.textContent = editorial ? `${String(k).padStart(2, "0")} / ${String(last).padStart(2, "0")}` : k === 0 ? `Start · ${last} steps` : `Step ${k} of ${last}`;
     text.textContent = info.caption;
     trust.textContent = TRUST_LABEL[info.trust];
     trust.dataset.trust = info.trust;
@@ -329,7 +359,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
     const prompt = info.teaching?.prediction;
     prediction.hidden = !prompt;
     if (prompt) {
-      prediction.append(h("span",{class:"vz-predict-kicker"},"Before you continue"),h("p",{},escapeHtml(prompt.question)));
+      prediction.append(h("span",{class:"vz-predict-kicker"},"Predict"),h("p",{},escapeHtml(prompt.question)));
       const options = h("div",{class:"vz-predict-options"});
       const feedback = h("p",{class:"vz-predict-feedback","aria-live":"polite"});
       for (const choice of prompt.choices) {
@@ -340,7 +370,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
             other.setAttribute("aria-pressed",String(other === b));
             other.dataset.correct = String(other.textContent === prompt.answer);
           }
-          feedback.textContent = `${choice === prompt.answer ? "Exactly." : `It’s ${prompt.answer}.`} ${prompt.explanation} Continue to see it happen.`;
+          feedback.textContent = prompt.explanation;
         });
         options.append(b);
       }
@@ -502,6 +532,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   range.addEventListener("change", writeHash);
 
   root.addEventListener("keydown", (e) => {
+    if (details.open) return;
     const k = e.key;
     if (e.target === themeBtn || (e.target instanceof HTMLButtonElement && (k === " " || k === "Enter"))) return;
     if (k === "ArrowRight") next();

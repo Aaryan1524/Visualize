@@ -5,6 +5,8 @@ Architecture checkpoint after the first LRU redesign. This is the proposed next 
 ## Product constraints
 
 - Optimize composition for desktop first: review at 1440×900 and 1920×1080. Defer phone composition work; preserve existing accessibility and reduced-motion behavior.
+- Fit the default desktop explanation into one viewport without page scrolling: title, diagram, current action, essential values and playback controls remain visible together. The information needed to understand the current step must be present; other steps are reached through time rather than a longer page.
+- Open the transcript, provenance, assumptions and detailed metrics in an optional contained drawer or overlay. Opening details must not increase the main page height. Keep necessary labels readable; allow a scrolling fallback for high browser zoom or unusually short windows rather than clipping content or shrinking text below readable sizes.
 - Motion and the figure carry the explanation. Keep visible words to short object labels, one current action, and essential values.
 - No visible explanatory paragraphs in the default figure. Put the transcript, provenance, assumptions, extended explanation and detailed metrics in an optional details surface.
 - One consistent visual language across scenes. Authors choose meaningful parts and behavior; the kit supplies their finish.
@@ -68,7 +70,7 @@ The representation must match the subject: a physical mechanism, the concept's o
 
 Centralize camera angle, scale conventions, four restrained tone roles, edge treatment, bevel proportions, contact shadows, typography and spacing. Derive shading from surface orientation and a fixed light direction. Use one active accent at a time; retain explicit semantic colour only when distinguishing outcomes or values matters to the explanation.
 
-The figure shell should be figure-dominant within the first desktop viewport, with a short title, one adjacent action and compact controls. Place detail drawers outside the primary visual hierarchy. Avoid a tall article header above the object and permanently visible dashboard panels below it.
+The figure shell should be figure-dominant within a single desktop viewport, with a short title, one adjacent action and compact controls. Allocate a compact header and control strip around a flexible stage that uses the remaining height. Place detail drawers outside the primary visual hierarchy. Avoid a tall article header above the object and permanently visible dashboard panels below it. Verification must check horizontal and vertical page overflow at 1440×900 and 1920×1080 for every resting step, including prediction and feedback states; separately inspect intermediate motion for clipping.
 
 Visual rules belong in the kit and shell, with documented exceptions, rather than in repeated scene-specific CSS.
 

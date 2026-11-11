@@ -447,10 +447,46 @@
   function shown() {
     const r = viz().root;
     return {
+      action: norm(r.querySelector('[data-role="action"]')?.textContent),
       caption: norm(r.querySelector('[data-role="caption"]').textContent),
       readout: norm(r.querySelector('[data-role="readout"]').textContent),
       trust: r.querySelector('[data-role="trust"]').dataset.trust,
     };
+  }
+
+  /** The default desktop page must fit, without hiding content to do so. */
+  function desktop() {
+    const root = viz().root;
+    const viewport = [], copy = [];
+    const page = document.scrollingElement;
+    if (page.scrollWidth > innerWidth + 1 || page.scrollHeight > innerHeight + 1) {
+      viewport.push(`page exceeds ${innerWidth}×${innerHeight}: ${page.scrollWidth}×${page.scrollHeight}`);
+    }
+    for (const selector of [".vz-head", ".vz-stage", ".vz-panels", ".vz-controls", ".vz-caption"]) {
+      const e = root.querySelector(selector);
+      if (!isShown(e)) { viewport.push(`${selector} is not visible`); continue; }
+      const r = e.getBoundingClientRect();
+      if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) viewport.push(`${selector} falls outside the viewport`);
+    }
+    const stage = root.querySelector(".vz-stage").getBoundingClientRect();
+    const card = root.querySelector(".vz-card").getBoundingClientRect();
+    if (stage.height < card.height * .55) viewport.push("diagram stage uses less than 55% of the card height");
+    for (const solid of svg().querySelectorAll(".vz-solid")) {
+      if (!isShown(solid) || Number(solid.getAttribute("opacity") ?? 1) < .3) continue;
+      const r = solid.getBoundingClientRect();
+      if (r.left < stage.left - 1 || r.right > stage.right + 1 || r.top < stage.top - 1 || r.bottom > stage.bottom + 1) viewport.push(`${solid.dataset.key} is clipped by the stage`);
+    }
+    // A budget is a review guard, not an instruction to truncate meaningful text.
+    for (const [selector, budget] of [[".vz-question", 8], [".vz-step-heading", 12], [".vz-predict > p:not(.vz-predict-feedback)", 12], [".vz-predict-feedback", 12]]) {
+      const e = root.querySelector(selector);
+      if (!isShown(e)) continue;
+      const words = norm(e.textContent).split(/\s+/).filter(Boolean).length;
+      if (words > budget) copy.push(`${selector} has ${words} words (budget ${budget})`);
+    }
+    for (const selector of [".vz-text", ".vz-setup", ".vz-meta", ".vz-foot"]) {
+      if (isShown(root.querySelector(selector))) copy.push(`${selector} is visible outside Details`);
+    }
+    return { viewport, copy };
   }
 
   function design() {
@@ -492,5 +528,5 @@
     return {composition,semantics,callouts};
   }
 
-  window.__vzCheck = { observe, depth, text, labels, snapshot, shown, design };
+  window.__vzCheck = { observe, depth, text, labels, snapshot, shown, design, desktop };
 })();

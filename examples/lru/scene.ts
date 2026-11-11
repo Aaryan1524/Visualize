@@ -64,10 +64,7 @@ function viewFor(flat: boolean) {
       {kind:"label",key:"cold",at:flat ? [-8,0,12] : [-12,24,13],text:"Least recent",anchor:"end",size:"small",target:{key:"tray-0",at:[0,24,3]}},
       {kind:"label",key:"fresh",at:flat ? [railEnd+8,0,12] : [railEnd+20,25,3],text:"Most recent",anchor:"start",size:"small",target:{key:"tray-2",at:[railEnd,24,3]}},
     );
-    if (e) {
-      const index=s.order.indexOf(e.key),x=index*PITCH+BLOCK[0]/2;
-      marks.push({kind:"label",key:"change",at:flat ? [x,0,42] : [x+10,-14,43],text:e.result==="hit" ? `${e.key} is fresh again` : `${e.key} joins the cache`,anchor:"middle",target:{key:`entry-${e.key}`,at:[x+7,5,TRAY_Z+BLOCK[2]]}});
-    }
+
     return marks;
   };
 }
@@ -93,19 +90,19 @@ function panels(s: LruState) {
     const status=result ?? (i===s.served ? "next" : "waiting");
     return `<li data-status="${status}" data-link="key-${key}"><b>${key}</b><span>${status}</span></li>`;
   }).join("");
-  return [{key:"requests",title:"The request sequence",html:`<ol class="lru-requests">${chips}</ol><div class="lru-totals"><span><b data-key="hits">${s.hits}</b> hits</span><span><b data-key="misses">${s.misses}</b> misses</span><span><b data-key="evictions">${s.evictions}</b> evictions</span></div>`}];
+  return [{key:"requests",title:"Requests",html:`<ol class="lru-requests">${chips}</ol><div class="lru-totals"><span><b data-key="hits">${s.hits}</b> ${s.hits === 1 ? "hit" : "hits"}</span><span><b data-key="misses">${s.misses}</b> ${s.misses === 1 ? "miss" : "misses"}</span><span><b data-key="evictions">${s.evictions}</b> ${s.evictions === 1 ? "eviction" : "evictions"}</span></div>`}];
 }
 
 function teaching(s: LruState, e: GetEvent | null, index: number) {
-  if (index===0) return {chapter:"Fill",heading:"Three slots. Which keys deserve to stay?"};
-  if (index===REQUESTS.length) return {chapter:"Remember",heading:"Keep what was used most recently."};
-  if (index===4) return {chapter:"Refresh",heading:"A read changes the order.",prediction:{
-    question:"D is next, and the cache is full. Which key leaves?",
+  if (index===0) return {chapter:"Fill",heading:"Fill the three slots."};
+  if (index===REQUESTS.length) return {chapter:"Remember",heading:"Keep the most recently used."};
+  if (index===4) return {chapter:"Refresh",heading:"A moves to most recent.",prediction:{
+    question:"D is next. Which key leaves?",
     choices:["A","B","C"],answer:s.order[0]!,
-    explanation:"B was read least recently. A arrived first, but its latest read just moved it to the fresh end.",
+    explanation:`${s.order[0]} was read least recently.`,
   }};
-  if (index<4) return {chapter:"Fill",heading:e?.key ? `${e.key} takes an empty slot.` : "Start with an empty cache."};
-  return {chapter:"Evict",heading:e?.evicted ? `${e.evicted} makes room for ${e.key}.` : `${e?.key} stays useful.`};
+  if (index<4) return {chapter:"Fill",heading:index === 3 ? "Cache full. Read A again." : e?.key ? `${e.key} takes an empty slot.` : "Fill the three slots."};
+  return {chapter:"Evict",heading:e?.evicted ? `${e.evicted} leaves. ${e.key} enters.` : `${e?.key} moves to most recent.`};
 }
 
 function observe(s: LruState, e: GetEvent | null): Observation[] {
@@ -130,7 +127,7 @@ function makeScene(flat: boolean): Scene<LruState, GetEvent> {
   return defineScene<LruState, GetEvent>({
     id: flat ? "lru-flat" : "lru",
     title: flat ? "LRU cache (flat)" : "LRU cache",
-    question: "Why not just drop the oldest?",
+    question: "Why not drop the oldest?",
     presentation: "editorial",
     setup: "The first key stored can still be the one you need. Follow a read, then decide what deserves to stay.",
     teaching,

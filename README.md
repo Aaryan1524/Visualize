@@ -14,7 +14,7 @@ The engine handles the rest:
 - a single standalone HTML file per scene;
 - **checks that the rendered page shows what the model computed**, at every step.
 
-Status: a working prototype with three example scenes. The LRU premium redesign is ready for review on `feat/premium-redesign`; see [the review notes](research/PREMIUM_REDESIGN.md).
+Status: a working prototype with three example scenes. The LRU desktop layout with minimal copy is ready for review on `feat/premium-redesign`; see [the review notes](research/PREMIUM_REDESIGN.md).
 
 ![Attention, pointing at one weight lights the vectors it came from](research/images/attention-linked.png)
  See [Plan.md](Plan.md) for the plan and [research/PROTOTYPE_FINDINGS.md](research/PROTOTYPE_FINDINGS.md) for what the prototypes showed, including what doesn't work yet.
@@ -79,7 +79,7 @@ The model runs in Node, separately from the page. Its observations, captions and
 | Layout | No sideways scroll at 1280 and 390 px |
 | Interaction | Arrow keys, Home, End and Space; reduced motion shows no in-between frames; `#step=` links |
 | Linking | Pointing at a linked element, in the stage or a panel, lights exactly the related elements |
-| Editorial presentation | Figure scale, semantic colours, pinned callouts, and a keyboard-accessible prediction pause (LRU reference) |
+| Editorial presentation | Figure scale, semantic colours, pinned callouts, a prediction pause, desktop viewport fit, copy budgets and a contained details drawer (LRU reference) |
 | Console | No errors or uncaught exceptions |
 
 It also writes screenshots and two contact sheets per scene to `shots/`: every step at rest, and every transition at five instants. Passing checks do not prove the result explains well or looks good, so read the sheets. [PROTOTYPE_FINDINGS.md](research/PROTOTYPE_FINDINGS.md) lists what the checks cannot see.
