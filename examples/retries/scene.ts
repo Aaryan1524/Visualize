@@ -1,5 +1,7 @@
 import { defineScene } from "../../src/core/scene.ts";
-import type { Mark, Observation, Panel, Vec3 } from "../../src/core/types.ts";
+import type { Mark, Observation, Panel, Teaching, Tone, Vec3 } from "../../src/core/types.ts";
+import { cable, keyStore, ledger, message, plate, server, terminal } from "../../src/parts/network.ts";
+import { strip, totals, type StripItem } from "../../src/render/components.ts";
 import { simulate, totalCharged, type Config, type Ev, type Message, type Snapshot } from "./model.ts";
 
 /** One payment, one lost response, one retry. */
@@ -17,6 +19,7 @@ export const SCENARIO: Config = {
 type World = "unsafe" | "safe";
 const WORLDS: World[] = ["unsafe", "safe"];
 const NAME: Record<World, string> = { unsafe: "without a key", safe: "with an idempotency key" };
+const LANE_TITLE: Record<World, string> = { unsafe: "No key", safe: "Idempotency key" };
 
 export interface Joint {
   t: number;
@@ -46,116 +49,77 @@ export function twin() {
 }
 
 // ---- Stage --------------------------------------------------------------------------
-const LANE = 136;
+// ---- Stage --------------------------------------------------------------------------
+// Two identical systems on two plates, one behind the other. Every position
+// comes from a part's anchors; nothing below is placed by eye except the parts.
+const LANE = 112;
 const laneY = (w: World) => (w === "unsafe" ? 0 : LANE);
-const CLIENT_X = 0;
-const SERVER_X = 100;
-const LEDGER_X = 190;
-const MSG: Vec3 = [12, 12, 8];
-
-/** Messages travel along a network path in front of the actors, where nothing hides them. */
-const WIRE_Y = 44;
-function wire(w: World, end: "client" | "server" | "middle"): Vec3 {
-  const y = laneY(w) + WIRE_Y;
-  const x = end === "client" ? CLIENT_X + 24 : end === "server" ? SERVER_X + 4 : (CLIENT_X + 24 + SERVER_X + 4) / 2;
-  return [x, y, 0];
-}
-
-function messageMark(w: World, m: Message, at: Vec3, extra: Partial<Mark> = {}): Mark {
-  return {
-    kind: "box",
-    key: `msg-${w}-${m.id}`,
-    at,
-    size: MSG,
-    tone: m.kind === "request" ? "cold" : "good",
-    link: `${w}-${m.id}`,
-    ...extra,
-  } as Mark;
-}
+const TERMINAL_X = 0;
+const SERVER_X = 96;
+const STORE_X = 146;
+const LEDGER_X = 214;
 
 const STATUS: Record<Snapshot["client"]["status"], string> = {
-  idle: "ready to pay",
-  waiting: "waiting for a response",
-  retrying: "retrying",
+  idle: "ready",
+  waiting: "waiting",
+  retrying: "retry",
   paid: "paid",
-  failed: "gave up",
+  failed: "failed",
 };
+
+/** The world's parts, built once per state so cables and messages use their anchors. */
+function rig(w: World, snap: Snapshot, evs: Ev[]) {
+  const y = laneY(w);
+  const has = (type: Ev["type"]) => evs.some((x) => x.type === type);
+  const term = terminal(`${w}/terminal`, [TERMINAL_X, y + 2, 0], { status: STATUS[snap.client.status], lit: has("paid") || has("timeout") });
+  const lamp: Tone = has("charge") ? "accent" : has("replay") ? "cold" : "good";
+  const srv = server(`${w}/server`, [SERVER_X, y - 2.5, 0], { lamp, lit: has("replay") });
+  const coins = snap.ledger.map((c, k) => ({ id: String(c.id), tone: (k === 0 ? "good" : "bad") as Tone, lit: evs.some((x) => x.type === "charge" && x.charge.id === c.id) }));
+  const led = ledger(`${w}/ledger`, [LEDGER_X, y + 14.5, 0], coins);
+  const store = w === "safe" ? keyStore(`${w}/store`, [STORE_X, y - 14, 0], { stored: snap.store !== null, lit: has("replay"), pulse: has("replay") }) : null;
+  return { y, term, srv, led, store };
+}
 
 function view(s: Joint, e: JointEvent | null): Mark[] {
   const marks: Mark[] = [];
   for (const w of WORLDS) {
-    const y = laneY(w);
     const snap = s.worlds[w];
     const evs = e?.events[w] ?? [];
-    const name = (key: string, x: number, text: string): Mark => ({ kind: "label", key: `${key}-name-${w}`, at: [x, y + 66, 0], text, size: "small" });
-    marks.push({
-      kind: "link",
-      key: `wire-${w}`,
-      from: [CLIENT_X + 18, y + WIRE_Y + 6, 0],
-      to: [SERVER_X + 20, y + WIRE_Y + 6, 0],
-      dashed: true,
-      tone: "muted",
-      width: 1.5,
-      layer: "floor",
-    });
-    marks.push(
-      { kind: "box", key: `plate-${w}`, at: [-26, y - 26, -4], size: [LEDGER_X + 72, 112, 4], tone: "base" },
-      { kind: "box", key: `client-${w}`, at: [CLIENT_X, y, 0], size: [36, 36, 28], tone: "structure" },
-      { kind: "box", key: `server-${w}`, at: [SERVER_X, y - 2, 0], size: [40, 40, 40], tone: "structure", lit: evs.some((x) => x.type === "replay") },
-      { kind: "box", key: `ledger-${w}`, at: [LEDGER_X, y, 0], size: [40, 40, 12], tone: "structure" },
-      name("client", CLIENT_X + 18, "client"),
-      name("server", SERVER_X + 20, "server"),
-      name("ledger", LEDGER_X + 20, "ledger"),
-      // At the plate's back-right corner, which no other lane's labels rise into.
-      { kind: "label", key: `title-${w}`, at: [LEDGER_X + 50, y - 22, 0], text: NAME[w], anchor: "start" },
-      { kind: "label", key: `status-${w}`, at: [CLIENT_X + 18, y + 18, 54], text: STATUS[snap.client.status], size: "small" },
-      { kind: "label", key: `ledger-total-${w}`, at: [LEDGER_X + 20, y + 20, 26 + snap.ledger.length * 9], text: `$${totalCharged(snap)}`, size: "large" },
-    );
+    const { y, term, srv, led, store } = rig(w, snap, evs);
+    marks.push(...plate(`${w}/plate`, [-18, y - 18, 0], [LEDGER_X + 40, 80]).marks);
+    marks.push(cable(`${w}/wire`, term.anchor.port!, srv.anchor.inPort!));
+    marks.push(cable(`${w}/db-wire`, srv.anchor.outPort!, led.anchor.inPort!));
+    marks.push(...term.marks, ...srv.marks, ...led.marks, ...(store?.marks ?? []));
 
-    // Charges recorded in the ledger, stacked.
-    snap.ledger.forEach((c, k) => {
-      marks.push({
-        kind: "box",
-        key: `charge-${w}-${c.id}`,
-        at: [LEDGER_X + 5, y + 5, 12 + k * 9],
-        size: [30, 30, 8],
-        tone: k === 0 ? "good" : "bad",
-        enter: "drop",
-        lit: evs.some((x) => x.type === "charge" && x.charge.id === c.id),
-      });
-    });
-
-    // The idempotency key store, only on the server that has one.
-    if (w === "safe") {
-      // Between the server and its ledger: the server's own storage, off the message path.
-      marks.push({ kind: "box", key: "store", at: [SERVER_X + 48, y + 6, 0], size: [30, 28, 6], tone: "muted" });
-      marks.push({ kind: "label", key: "store-label", at: [SERVER_X + 63, y + 50, 0], text: "key store", size: "small" });
-      if (snap.store) {
-        marks.push({
-          kind: "box",
-          key: "stored-key",
-          at: [SERVER_X + 52, y + 10, 6],
-          size: [22, 20, 6],
-          tone: "cold",
-          enter: "drop",
-          lit: evs.some((x) => x.type === "replay"),
-          effect: evs.some((x) => x.type === "replay") ? "pulse" : undefined,
-          link: "key",
-        } as Mark);
-      }
-    }
-
-    // Messages on the wire wait at their sender until they arrive or are lost.
-    for (const m of snap.inflight) marks.push(messageMark(w, m, wire(w, m.from)));
+    // Messages wait at their sender, then ride the cable to where they arrive or are lost.
+    const at = (m: Message) => (m.from === "client" ? term.anchor.outbox! : srv.anchor.inbox!);
+    const dest = (m: Message) => (m.to === "server" ? srv.anchor.inbox! : term.anchor.outbox!);
+    const middle: Vec3 = [(term.anchor.outbox![0] + srv.anchor.inbox![0]) / 2, term.anchor.outbox![1], 0.6];
+    for (const m of snap.inflight) marks.push(message(`${w}/msg-${m.id}`, at(m), m.kind, { link: `${w}-${m.id}` }));
     for (const ev of evs) {
-      if (ev.type === "arrive") marks.push(messageMark(w, ev.message, wire(w, ev.message.to), { leaving: true }));
-      if (ev.type === "lost") marks.push(messageMark(w, ev.message, wire(w, "middle"), { leaving: true, tone: "bad" }));
+      if (ev.type === "arrive") marks.push(message(`${w}/msg-${ev.message.id}`, dest(ev.message), ev.message.kind, { leaving: true }));
+      if (ev.type === "lost") marks.push(message(`${w}/msg-${ev.message.id}`, middle, ev.message.kind, { leaving: true, tone: "bad" }));
     }
+
+    // Lane title just outside the plate's far-left corner, and the running total above each ledger.
+    // Each lane is named beyond its plate's outer front-right corner, next to its outcome.
+    marks.push({ kind: "label", key: `${w}/title`, at: [LEDGER_X + 30, y + 70, -5], text: LANE_TITLE[w], anchor: "start" });
+    // The total floats at a fixed height that clears the tallest stack in the run.
+    marks.push({ kind: "label", key: `${w}/total`, at: [LEDGER_X + 4, y + 14.5, 8 + 3 * 4.2 + 24], text: `$${totalCharged(snap)}`, size: "large" });
   }
+  // Part names once, in a row in front of the front plate, each pinned to its part.
+  const front = rig("safe", s.worlds.safe, e?.events.safe ?? []);
+  const rowY = LANE + 72;
+  const name = (key: string, text: string, x: number, target: { key: string; at: Vec3 }): Mark => ({ kind: "label", key, at: [x, rowY, -5], text, size: "small", target });
+  marks.push(
+    name("name-terminal", "Terminal", 19, { key: "safe/terminal/base", at: [19, LANE + 28, 2.5] }),
+    name("name-server", "Server", SERVER_X + 20, { key: "safe/server/plinth", at: [SERVER_X + 20, LANE + 31.5, 2] }),
+    name("name-ledger", "Ledger", LEDGER_X, { key: "safe/ledger/base", at: front.led.anchor.front! }),
+  );
+  marks.push(name("name-store", "Key store", STORE_X + 16, { key: "safe/store/tray", at: [STORE_X + 14, LANE + 8, 2.5] }));
   return marks;
 }
 
-// ---- Words --------------------------------------------------------------------------
 function describe(ev: Ev): string {
   switch (ev.type) {
     case "send":
@@ -198,75 +162,102 @@ function caption(s: Joint, e: JointEvent): string {
     return `${t}: both clients see success and mark the order paid. The customer was charged ${cu} times without a key, and ${ck === 1 ? "once" : `${ck} times`} with one.`;
   }
   if (has(u, "send") && u[0]?.type === "send" && u[0].message.attempt === 1 && u[0].message.kind === "request") {
-    return `${t}: the client sends a $${SCENARIO.amount} payment. In the lower world the request carries the idempotency key ${SCENARIO.key}.`;
+    return `${t}: the client sends a $${SCENARIO.amount} payment. In the front system the request carries the idempotency key ${SCENARIO.key}.`;
   }
   return `${t}: ${u.map(describe).join("; ")}.`;
 }
 
+// ---- Teaching ---------------------------------------------------------------------------
+const STEP_HEADING: string[] = [
+  "Two identical payment systems.",
+  "Terminal sends $20.",
+  "Server receives the payment.",
+  "Ledger records $20.",
+  "Server replies: paid.",
+  "The reply is lost.",
+  "No reply. The terminal retries.",
+  "The retry reaches the server.",
+  "No key: charged again. Key: replayed.",
+  "Both servers reply: paid.",
+  "Same faults. $40 versus $20.",
+];
+const CHAPTER = (i: number) => (i <= 4 ? "Pay" : i <= 6 ? "Lose" : i <= 8 ? "Retry" : "Settle");
+
+function teaching(_s: Joint, _e: JointEvent | null, index: number): Teaching {
+  const t: Teaching = { chapter: CHAPTER(index), heading: STEP_HEADING[index] ?? "" };
+  if (index === 7) {
+    t.prediction = {
+      question: "Without a key, how many charges now?",
+      choices: ["1", "2"],
+      answer: "2",
+      explanation: "2: without a key, the retry looks like a new payment.",
+    };
+  }
+  return t;
+}
+
 function panels(s: Joint, e: JointEvent | null): Panel[] {
-  const rows = WORLDS.map((w) => {
-    const snap = s.worlds[w];
-    const bad = snap.ledger.length > 1;
-    return `<tr><th scope="row" style="text-align:left">${NAME[w]}</th><td data-key="charges-${w}" class="${bad ? "vz-bad" : ""}">${snap.ledger.length}</td><td data-key="total-${w}" class="${bad ? "vz-bad" : ""}">$${totalCharged(snap)}</td></tr>`;
-  }).join("");
-
-  // The event log so far, both worlds side by side, newest last.
-  const all = twin().steps.filter((x) => x.event.t <= s.t && (e !== null || s.t > 0));
-  const shown = all.slice(-6);
-  const log = shown
-    .map((x) => {
-      const now = e !== null && x.event.t === e.t;
-      const cell = (w: World) => x.event.events[w].map(describe).join("; ") || "·";
-      return `<tr class="${now ? "vz-hot" : ""}"><td>${x.event.t}</td><td style="text-align:left">${cell("unsafe")}</td><td style="text-align:left">${cell("safe")}</td></tr>`;
-    })
-    .join("");
-
+  // One chip per moment; where the worlds disagree the chip shows the keyless outcome.
+  const steps = twin().steps;
+  const note = (evs: Ev[]): string => {
+    if (evs.some((x) => x.type === "lost")) return "lost";
+    if (evs.some((x) => x.type === "charge")) return "charge";
+    if (evs.some((x) => x.type === "replay")) return "replay";
+    if (evs.some((x) => x.type === "timeout")) return "retry";
+    if (evs.some((x) => x.type === "paid")) return "paid";
+    if (evs.some((x) => x.type === "arrive")) return "arrive";
+    return "send";
+  };
+  const items: StripItem[] = steps.map((x) => {
+    const done = x.event.t < s.t || (e !== null && x.event.t === e.t);
+    const split = note(x.event.events.unsafe) !== note(x.event.events.safe);
+    const n = note(x.event.events.unsafe);
+    const status = !done ? (x === steps.find((y) => y.event.t > s.t) ? "next" : "waiting") : split || n === "lost" ? "bad" : n === "charge" ? "accent" : "good";
+    return { label: String(x.event.t), note: done ? (split ? "split" : n) : "", status } as StripItem;
+  });
+  const [u, k] = [s.worlds.unsafe, s.worlds.safe];
   return [
     {
-      key: "rule",
-      title: "The rule",
-      html: `<p>A client that times out cannot tell a lost request from a lost response, so it must retry. The server makes retries safe by storing each <span data-link="key">idempotency key</span> with its response, and replaying that response when the key comes back.</p>`,
-    },
-    {
-      key: "ledger",
-      title: "What the customer was charged",
-      html: `<table><tr><th></th><th>charges</th><th>total</th></tr>${rows}</table>`,
-    },
-    {
-      key: "log",
-      title: "Event log (ms)",
-      html: shown.length
-        ? `<table style="font-size:12px"><tr><th>t</th><th style="text-align:left">without a key</th><th style="text-align:left">with a key</th></tr>${log}</table>`
-        : `<p class="vz-dim">Nothing has happened yet.</p>`,
+      key: "timeline",
+      title: "Events (ms)",
+      html:
+        strip(items) +
+        totals([
+          { value: `$${totalCharged(u)}`, label: "no key", key: "total-unsafe", status: u.ledger.length > 1 ? "bad" : "neutral" },
+          { value: `$${totalCharged(k)}`, label: "with key", key: "total-safe", status: "neutral" },
+        ]),
     },
   ];
 }
 
-function observe(s: Joint): Observation[] {
+function observe(s: Joint, e: JointEvent | null): Observation[] {
   const obs: Observation[] = [];
   for (const w of WORLDS) {
     const snap = s.worlds[w];
-    obs.push({ type: "text", key: `charges-${w}`, equals: String(snap.ledger.length) });
     obs.push({ type: "text", key: `total-${w}`, equals: `$${totalCharged(snap)}` });
-    obs.push({ type: "text", key: `status-${w}`, equals: STATUS[snap.client.status] });
-    obs.push({ type: "text", key: `ledger-total-${w}`, equals: `$${totalCharged(snap)}` });
-    for (const c of snap.ledger) {
-      obs.push({ type: "visible", key: `charge-${w}-${c.id}`, visible: true });
-      obs.push({ type: "extent", key: `charge-${w}-${c.id}`, size: [30, 30, 8] });
-    }
-    for (const m of snap.inflight) obs.push({ type: "visible", key: `msg-${w}-${m.id}`, visible: true });
+    obs.push({ type: "text", key: `${w}/total`, equals: `$${totalCharged(snap)}` });
+    obs.push({ type: "text", key: `${w}/terminal/body`, equals: STATUS[snap.client.status] });
+    snap.ledger.forEach((c, k) => {
+      obs.push({ type: "visible", key: `${w}/ledger/coin-${c.id}`, visible: true });
+      obs.push({ type: "extent", key: `${w}/ledger/coin-${c.id}`, size: [24, 24, 3.6] });
+      obs.push({ type: "tone", key: `${w}/ledger/coin-${c.id}`, equals: k === 0 ? "good" : "bad" });
+    });
+    for (const m of snap.inflight) obs.push({ type: "visible", key: `${w}/msg-${m.id}`, visible: true });
   }
-  obs.push({ type: "visible", key: "stored-key", visible: s.worlds.safe.store !== null });
-  // The two ledgers' stacks must look as different as the counts are.
-  obs.push({ type: "visible", key: "charge-unsafe-2", visible: s.worlds.unsafe.ledger.length >= 2 });
-  obs.push({ type: "visible", key: "charge-safe-2", visible: false });
+  obs.push({ type: "visible", key: "safe/store/key", visible: s.worlds.safe.store !== null });
+  obs.push({ type: "visible", key: "unsafe/ledger/coin-2", visible: s.worlds.unsafe.ledger.length >= 2 });
+  obs.push({ type: "visible", key: "safe/ledger/coin-2", visible: false });
+  if (e?.events.safe.some((x) => x.type === "replay")) obs.push({ type: "lit", key: "safe/store/key" });
   return obs;
 }
 
 export default defineScene<Joint, JointEvent>({
   id: "retries",
   title: "Retries and idempotency keys",
-  question: "Why can retrying a payment charge the customer twice, and how does an idempotency key stop it?",
+  question: "Why can a retry charge twice?",
+  presentation: "editorial",
+  setup: "Two identical payment systems run the same script. Only one stores idempotency keys.",
+  teaching,
   trust: "model",
   assumptions: [
     "One network fault is scripted: the first success response is lost. Both worlds see exactly the same faults and timings.",
@@ -278,7 +269,7 @@ export default defineScene<Joint, JointEvent>({
     const { initial, steps } = twin();
     return {
       initial,
-      intro: `Two identical payment systems run the same script side by side. The upper one has no idempotency keys; the lower one stores each key with its response. Watch the ledgers on the right.`,
+      intro: `Two identical payment systems run the same script side by side. The back one has no idempotency keys; the front one stores each key with its response.`,
       steps: steps.map(({ event, state }) => ({ event, state, caption: caption(state, event) })),
     };
   },
@@ -294,6 +285,6 @@ export default defineScene<Joint, JointEvent>({
     { tone: "cold", label: "Payment request / stored key" },
     { tone: "good", label: "Success response / first charge" },
     { tone: "bad", label: "Lost message / duplicate charge" },
-    { tone: "structure", label: "Client, server, ledger" },
+    { tone: "accent", label: "Server writing to the ledger" },
   ],
 });

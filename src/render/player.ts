@@ -35,6 +35,19 @@ export interface PlayerApi {
   /** The step whose caption and panels are on screen. */
   shownIndex(): number;
   viewBox: [number, number, number, number];
+  /** Stop playback, disconnect every listener and remove the figure. */
+  destroy(): void;
+}
+
+export interface MountOptions {
+  /**
+   * Standalone page: read and write #step= in the URL, publish window.__viz
+   * for checks, and theme the page body. Off by default, so several figures
+   * can share a page or live inside an app.
+   */
+  page?: boolean;
+  /** Force a theme instead of following the reader's preference. */
+  theme?: "light" | "dark";
 }
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, html = ""): HTMLElementTagNameMap[K] {
@@ -53,7 +66,9 @@ function readHashStep(): number | null {
   return m ? Number(m[1]) : null;
 }
 
-export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
+export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: MountOptions = {}): PlayerApi {
+  const page = options.page ?? false;
+  const cleanup: (() => void)[] = [];
   const compiled = compile(scene);
   const { steps, timeline } = compiled;
   const projection = scene.projection ?? "iso";
@@ -213,23 +228,27 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   });
 
   // ---- Theme -----------------------------------------------------------
-  const docEl = document.documentElement;
+  // The theme belongs to the figure; a standalone page mirrors it on its body.
   const media = matchMedia("(prefers-color-scheme: dark)");
-  const currentTheme = () => (docEl.dataset.theme as "light" | "dark" | undefined) ?? (media.matches ? "dark" : "light");
+  if (options.theme) root.dataset.theme = options.theme;
+  const currentTheme = () => (root.dataset.theme as "light" | "dark" | undefined) ?? (media.matches ? "dark" : "light");
   const syncThemeBtn = () => {
     const next = currentTheme() === "dark" ? "light" : "dark";
     themeBtn.textContent = next === "dark" ? "Dark" : "Light";
     themeBtn.setAttribute("aria-label", `Switch to ${next} theme`);
   };
   themeBtn.addEventListener("click", () => {
-    docEl.dataset.theme = currentTheme() === "dark" ? "light" : "dark";
+    root.dataset.theme = currentTheme() === "dark" ? "light" : "dark";
+    if (page) document.body.dataset.theme = root.dataset.theme;
     syncThemeBtn();
     stage.refreshInk();
   });
-  media.addEventListener("change", () => {
+  const onScheme = () => {
     syncThemeBtn();
     stage.refreshInk();
-  });
+  };
+  media.addEventListener("change", onScheme);
+  cleanup.push(() => media.removeEventListener("change", onScheme));
   syncThemeBtn();
 
   // ---- Camera fit including labels ----------------------------------------------
@@ -262,7 +281,9 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
     }
     viewBox = vb;
   };
-  new ResizeObserver(fit).observe(stage.svg);
+  const resize = new ResizeObserver(fit);
+  resize.observe(stage.svg);
+  cleanup.push(() => resize.disconnect());
   fit();
 
   // ---- Linked highlighting --------------------------------------------------
@@ -406,6 +427,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   };
 
   const writeHash = () => {
+    if (!page) return;
     try {
       history.replaceState(null, "", `#step=${shown}`);
     } catch {
@@ -544,7 +566,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
     e.preventDefault();
   });
 
-  const fromHash = readHashStep();
+  const fromHash = page ? readHashStep() : null;
   if (fromHash !== null) t = compiled.restTime(fromHash);
   draw();
 
@@ -565,7 +587,16 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
     time: () => t,
     frame: () => current,
     shownIndex: () => shown,
+    destroy: () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+      playing = false;
+      for (const undo of cleanup.splice(0)) undo();
+      root.remove();
+      const w = window as unknown as { __viz?: PlayerApi };
+      if (w.__viz === api) delete w.__viz;
+    },
   };
-  (window as unknown as { __viz?: PlayerApi }).__viz = api;
+  if (page) (window as unknown as { __viz?: PlayerApi }).__viz = api;
   return api;
 }

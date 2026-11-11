@@ -27,6 +27,25 @@ Status: a working prototype with three example scenes. The LRU desktop layout an
 | `examples/attention` | Scaled dot-product attention (Vaswani et al. 2017, Eq. 1): scores, scaling and softmax as gauges that morph, linked to the equation and grids |
 | `examples/retries` | A payment retried after a lost response, run in two synced worlds, without and with an idempotency key |
 
+## Use it as a skill
+
+This repository is an Agent Skill (`SKILL.md` at the root). Install it into a coding agent's skills folder and install its dependencies once:
+
+```sh
+git clone <this repo> ~/.claude/skills/visualize
+cd ~/.claude/skills/visualize && npm install
+```
+
+Then ask for an explanation ("explain a token bucket visually"). The skill's workflow is: write and test the model, scaffold with `npm run new-scene <name>`, assemble the view from kit parts, declare observations, then build, verify and read the screenshots. `references/` holds the kit API, craft rules and every check.
+
+## Outputs
+
+| Output | Command | Checked by |
+|---|---|---|
+| Standalone HTML page | `node scripts/build.mjs <dir>` | `node scripts/verify.mjs <dir>` |
+| SVG of one step | `node scripts/export-svg.mjs dist/<id>.html --step k --out f.svg` | structural and pixel comparison with the live stage |
+| React component | `<Figure scene={scene} />` from `src/react/Figure.tsx` | `pnpm check:embed` |
+
 ## Requirements
 
 - Node.js 24 or newer (TypeScript runs through type stripping)

@@ -1,6 +1,7 @@
 import { defineScene } from "../../src/core/scene.ts";
 import type { Mark, Observation, Scene, Vec3 } from "../../src/core/types.ts";
 import { railAssembly, cartridge, RAIL_CELL, RAIL_PITCH } from "../../src/parts/rail.ts";
+import { strip, totals, type StripItem } from "../../src/render/components.ts";
 import { fifoContrast, initial, run, type GetEvent, type LruState } from "./model.ts";
 
 export const CAPACITY = 3;
@@ -70,12 +71,24 @@ function caption(prev: LruState, s: LruState, e: GetEvent, fifo: Map<number, str
 }
 
 function panels(s: LruState) {
-  const chips=s.requests.map((key,i) => {
-    const result=s.results[i];
-    const status=result ?? (i===s.served ? "next" : "waiting");
-    return `<li data-status="${status}" data-link="key-${key}"><b>${key}</b><span>${status}</span></li>`;
-  }).join("");
-  return [{key:"requests",title:"Requests",html:`<ol class="lru-requests">${chips}</ol><div class="lru-totals"><span><b data-key="hits">${s.hits}</b> ${s.hits === 1 ? "hit" : "hits"}</span><span><b data-key="misses">${s.misses}</b> ${s.misses === 1 ? "miss" : "misses"}</span><span><b data-key="evictions">${s.evictions}</b> ${s.evictions === 1 ? "eviction" : "evictions"}</span></div>`}];
+  const items: StripItem[] = s.requests.map((key, i) => {
+    const result = s.results[i];
+    return {
+      label: key,
+      link: `key-${key}`,
+      ...(result ? { note: result, status: result === "hit" ? "good" : "accent" } : i === s.served ? { note: "next", status: "next" } : { status: "waiting" }),
+    } as StripItem;
+  });
+  const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+  return [{
+    key: "requests",
+    title: "Requests",
+    html: strip(items) + totals([
+      { value: String(s.hits), label: plural(s.hits, "hit", "hits"), key: "hits" },
+      { value: String(s.misses), label: plural(s.misses, "miss", "misses"), key: "misses" },
+      { value: String(s.evictions), label: plural(s.evictions, "eviction", "evictions"), key: "evictions" },
+    ]),
+  }];
 }
 
 function teaching(s: LruState, e: GetEvent | null, index: number) {

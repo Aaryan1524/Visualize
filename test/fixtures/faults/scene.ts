@@ -99,6 +99,13 @@ const coveredLabel = defineScene({
   view: (s, e) => stack.view(s, e).map((m) => (m.kind === "box" && m.label ? { ...m, labelFace: "top" as const } : m)),
 });
 
+/** A free label drawn across a standing part it does not point to. */
+const labelOnPart = defineScene({
+  ...stack,
+  id: "label-on-part",
+  view: (s, e) => [...stack.view(s, e), { kind: "label", key: "stray", at: [12, 12, 30], text: "stray label" }],
+});
+
 export const variants = {
   clean,
   editorial,
@@ -112,6 +119,7 @@ export const variants = {
   unlit,
   "wide-label": wideLabel,
   "covered-label": coveredLabel,
+  "label-on-part": labelOnPart,
 };
 
 export default clean;

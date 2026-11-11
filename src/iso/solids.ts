@@ -61,8 +61,10 @@ function boxGeometry(m: BoxMark, projection: Projection): SolidGeometry {
   const left = [P(x0, y1, z1), P(x1, y1, z1), P(x1, y1, z0), P(x0, y1, z0)];
   const right = [P(x1, y0, z1), P(x1, y1, z1), P(x1, y1, z0), P(x1, y0, z0)];
   const outline = [P(x0, y0, z1), P(x1, y0, z1), P(x1, y0, z0), P(x1, y1, z0), P(x0, y1, z0), P(x0, y1, z1)];
-  const zm = (z0 + z1) / 2;
   const face = m.labelFace ?? "top";
+  // A label on a face that carries a panel (a screen) is centred on the panel.
+  const panel = m.surface?.panel;
+  const zm = panel && panel.face === face ? z0 + m.size[2] * (panel.from + panel.to) / 2 : (z0 + z1) / 2;
   const C30 = Math.cos(Math.PI / 6);
   const label: { at: Pt; width: number } =
     face === "left"
@@ -71,6 +73,12 @@ function boxGeometry(m: BoxMark, projection: Projection): SolidGeometry {
         ? { at: P(x1, (y0 + y1) / 2, zm), width: m.size[1] * C30 * 0.8 }
         : // The top face spans (w + d)·cos30° at its widest row; leave margin for the slanted edges.
           { at: P((x0 + x1) / 2, (y0 + y1) / 2, z1), width: (m.size[0] + m.size[1]) * C30 * 0.55 };
+  // On a panel, the room is the panel's own width, not the face's.
+  if (panel && panel.face === face) {
+    const len = face === "left" ? m.size[0] : m.size[1];
+    const inner = len - 2 * Math.max(m.radius ?? 0, panel.inset);
+    label.width = Math.max(0, inner) * C30 * 0.9;
+  }
   const basic: SolidGeometry = {
     faces: [
       { shade: "left", points: left },
@@ -137,31 +145,39 @@ function cylinderGeometry(m: CylinderMark, projection: Projection): SolidGeometr
     return { faces: [{ shade: "front", points: face }], outline: face, labelAt: [t[0], (t[1] + b[1]) / 2], labelWidth: 2 * rx, labelShade: "front" };
   }
 
-  // Side: the near half of the bottom ellipse joined to the top ellipse's extremes.
-  const steps = 24;
+  // A turned body: the visible half of the side is cut into facets lit by
+  // their normal (the same light as rounded boxes), with a full top disc.
+  // The silhouette is the near half of the bottom ellipse joined to the top.
+  const P3 = (a: number, z: number) => project([cx + m.radius * Math.cos(a), cy + m.radius * Math.sin(a), z], projection);
+  const N = 24;
+  const from = -Math.PI / 4, to = (3 * Math.PI) / 4;
+  const facets: Face[] = [];
+  const rim: Pt[] = [];
+  for (let i = 0; i < N; i++) {
+    const a0 = from + ((to - from) * i) / N, a1 = from + ((to - from) * (i + 1)) / N;
+    const am = (a0 + a1) / 2;
+    const [nx, ny] = [Math.cos(am), Math.sin(am)];
+    facets.push({ shade: nx > ny ? "right" : "left", light: 0.72 + 0.22 * nx - 0.1 * ny, points: [P3(a0, z1), P3(a1, z1), P3(a1, z0), P3(a0, z0)] });
+    if (!rim.length) rim.push(P3(a0, z1));
+    rim.push(P3(a1, z1));
+  }
+  const top: Pt[] = Array.from({ length: N * 2 }, (_, i) => P3((2 * Math.PI * i) / (N * 2), z1));
   const side: Pt[] = [[t[0] - rx, t[1]]];
-  for (let i = 0; i <= steps; i++) {
-    const a = Math.PI - (Math.PI * i) / steps;
+  for (let i = 0; i <= N; i++) {
+    const a = Math.PI - (Math.PI * i) / N;
     side.push([b[0] + rx * Math.cos(a), b[1] + ry * Math.sin(a)]);
   }
   side.push([t[0] + rx, t[1]]);
   const topArc: Pt[] = [];
-  for (let i = 0; i <= steps; i++) {
-    const a = -(Math.PI * i) / steps;
+  for (let i = 0; i <= N; i++) {
+    const a = -(Math.PI * i) / N;
     topArc.push([t[0] + rx * Math.cos(a), t[1] + ry * Math.sin(a)]);
   }
   const outline: Pt[] = [...side, ...topArc.slice(1, -1)];
-  const top: Pt[] = [];
-  for (let i = 0; i < steps * 2; i++) {
-    const a = (Math.PI * i) / steps;
-    top.push([t[0] + rx * Math.cos(a), t[1] + ry * Math.sin(a)]);
-  }
   return {
-    faces: [
-      { shade: "right", points: side },
-      { shade: "top", points: top },
-    ],
+    faces: [...facets, { shade: "top", points: top }],
     outline,
+    rim,
     ...(m.labelFace && m.labelFace !== "top"
       ? { labelAt: [b[0], (b[1] + t[1]) / 2 + ry / 2] as Pt, labelWidth: rx * 1.6, labelShade: "right" as Shade }
       : { labelAt: t, labelWidth: rx * 1.6, labelShade: "top" as Shade }),
