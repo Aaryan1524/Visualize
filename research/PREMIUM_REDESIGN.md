@@ -80,3 +80,24 @@ The output is SVG path strings, while this engine carries polygon faces and mode
 Review: `node scripts/review-rail.mjs` builds `shots/rail-review/index.html`, with LRU, three capacities, and the saved previous version. It captures light/dark desktop views, both requested desktop sizes for LRU, 4× assembly close-ups, every resting step and ten samples across the hit and first eviction.
 
 Observed results for this checkpoint: 58 unit tests, typecheck and build passed. All four existing pages and all three rail fixtures passed rendered-page verification. All 32 planted faults were caught; both clean fixtures passed. The served 1440×900 LRU preview passed its step-link, copy/viewport and surface checks with no console errors, and its review gallery loaded. A 120-seek browser probe measured 1.8 ms median and 3.5 ms p95 synchronous seek work on this machine; this is not a frame-rate measurement. Both desktop sizes/themes, all capacity specimens, assembly close-ups and the step/motion sheet were visually inspected. The reference remains subject to the user's visual review before broader rollout.
+
+## Retries reference, network parts and toolkit checkpoint
+
+Retries is rebuilt as the second editorial reference from new finished parts (`src/parts/network.ts`): a terminal with a lit status screen, a rack server with rack-unit seams, vents and an activity lamp, a ledger that stacks one coin per charge, a key store, fastened plates, cased cables and message capsules. Each part returns named anchors, and every placement in the scene derives from them. The result is a candidate reference awaiting visual review.
+
+The kit gained turned (faceted) cylinders; side-face panels, vents, seams and lamps; routed cased cables; strip and totals components, which replace LRU-only CSS; and four label rules. A label that does not fit its face is not drawn, optional labels drop where they would sit on a part, leaders leave from the text's nearest edge, and strip chips keep one height.
+
+New checks, each with a planted fault:
+
+- a free label may not lie on a part other than its target;
+- the stage keeps one size at every step;
+- a hidden face label fails a `text` observation;
+- cable ends must sit on a standing part.
+
+That makes 36 planted faults in `verify:controls`, plus the separate plants for the export check (`--plant drop-text`) and the embed check (`--plant-page`). Building the network part tests found floating ledger coins and a server anchor in mid-air, both fixed.
+
+Outputs: `scripts/export-svg.mjs` writes a standalone SVG of any step and compares it with the live stage, by structure and by antialiasing-tolerant pixels; `--plant drop-text` must fail. `src/react/Figure.tsx` wraps `mount()`. Figures are scoped to their root and `mount()` returns `destroy()`. `scripts/check-embed.mjs` embeds three figures, one with maths, in a React app, and fails a planted page-mode figure.
+
+Packaging: `SKILL.md` at the root, `references/` (kit, authoring, craft, verify), `evals/` (five held-out prompts) and `scripts/new-scene.mjs`. A clean copy installed with npm, and a separate project driving the skill by path, both scaffolded, tested, built and verified a new scene.
+
+Still open: attention in the editorial style and parts vocabulary; focus and de-emphasis; the two known LRU issues and back-porting the new finish to the rail; held-out generation runs and the with/without benchmark; and the official `skills-ref` validator, which was not run.

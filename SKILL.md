@@ -9,7 +9,7 @@ metadata:
 
 # Visualize
 
-A figure here is a model you can watch. You write a small executable model of the idea and a view that maps each of its states to parts. The engine moves the parts between states, and `verify` proves the page shows what the model computed, at every step, in both themes, on desktop and phone.
+A figure here is a model you can watch. You write a small executable model of the idea and a view that maps each of its states to parts. The engine moves the parts between states. `verify` proves that the page shows what the model computed, at every step (checked at 1280 px in the light theme), and that it stays readable and tidy in both themes on desktop and phone.
 
 Three reference explanations ship in `examples/`. Open the closest one before starting:
 
@@ -33,13 +33,16 @@ Do not draw boxes-and-arrows diagrams. Do not invent a decorative machine whose 
 
 ## Workflow
 
+`<skill>` is this folder. Scenes can live in any project: the scripts take paths, and scene files import the kit from `<skill>/src`, which the scaffold sets up.
+
+
 1. **Write the model** (`model.ts`): pure functions returning the state after every event. Test it against a separately written reference implementation and edge cases (`model.test.ts`). Choose the input sequence so the interesting cases happen: a hit, a full-cache miss, a lost message, a divergence.
-2. **Scaffold the scene**: `node scripts/new-scene.mjs <name>` writes a model, a test and an editorial scene that build and verify as generated. Replace the model first, then the view.
+2. **Scaffold the scene**: `node <skill>/scripts/new-scene.mjs <name> --dir <folder>` writes a model, a test and an editorial scene that build and verify as generated. Replace the model first, then the view.
 3. **Assemble the view from parts.** Use `src/parts/`. Every mark's `key` is a model entity id: keys carry identity across steps, so motion, linking and checks follow them. Position things with the parts' anchors, not by eye.
 4. **Teach in beats** (`teaching`). Use 3–5 chapters and one short action per step (12 words at most). Add one prediction just before the causal moment, such as "D is next. Which key leaves?". The longer caption, assumptions and transcript go in the Details drawer automatically.
 5. **Declare observations** (`observe`): every value shown, every order that matters, every size that encodes a number (`extent`), what must be visible and what must be gone, semantic tones, and what is lit.
-6. **Build, verify and look.** Run `node scripts/build.mjs <dir>` and then `node scripts/verify.mjs <dir>`, and fix until it prints `passed`. Then open the screenshots and the two contact sheets in `shots/` and look at them, at 1× and with `scripts/shoot.mjs` at 4×. A passing verify proves correctness and mechanical tidiness, not beauty.
-7. **Export** if needed: `node scripts/export-svg.mjs <page> --step k --out f.svg` (checked against the live stage), or `<Figure scene={…} />` from `src/react/Figure.tsx`.
+6. **Build, verify and look.** Run `node <skill>/scripts/build.mjs <dir> --out <folder>` and then `node <skill>/scripts/verify.mjs <dir>`, and fix until it prints `passed`. Screenshots go to `<parent of dir>/shots/<name>/`. Then open the screenshots and the two contact sheets in `shots/` and look at them, at 1× and with `scripts/shoot.mjs` at 4×. A passing verify proves correctness and mechanical tidiness, not beauty.
+7. **Export** if needed: `node <skill>/scripts/export-svg.mjs <built page> --step k --out f.svg` (checked against the live stage), or `<Figure scene={…} />` from `<skill>/src/react/Figure.tsx` (see `references/authoring.md`).
 
 ## Parts
 
