@@ -131,3 +131,15 @@ Close-up review then found that upright screen text could exceed the slanted ope
 
 
 Final screen-placement results: the retries page passed its full resting/motion, layout and typography checks after the correction; all 38 fault controls were caught and both clean fixtures passed. The other three pages had already passed the new font/role checks and have no side-panel text affected by the projection change. React embedding passed. Light/dark SVG differences were 0.10% / 0.11%, within the unchanged tolerance. All 80 unit tests and typecheck passed, including a regression for importing the public kit and compiling a model in Node: the label-ink luminance constant no longer accesses the DOM at module import. Final review captures and the served preview cover the face-aligned status text, consistent values, names and identifiers.
+
+## Quiet page backgrounds
+
+The shared page surface is now warm cream with a near-white card/stage in light mode, and near-black with charcoal surfaces in dark mode. Text and borders follow a warm neutral scale. Materials and semantic colours retain their meanings. The review wrapper and style guide switch their outer backgrounds with the figure theme.
+
+Build, rendered verification of all four pages (including layout, contrast and typography), and the three-figure React embed check passed. Light/dark captures were inspected at normal desktop size. This CSS-only checkpoint did not rerun the unit suite or fault controls from the preceding typography checkpoint.
+
+### Proposed direct interaction checkpoint
+
+Retries is the first candidate: send a payment from the terminal, lose its reply, then retry and observe the ledger. A key toggle selects a new run; selecting the key store reveals its saved response. Each action should dispatch a validated event into the existing pure model, animate the resulting transition, and record an action history for undo, reset, deterministic replay and sharing. The current scripted explanation remains available as a guided example.
+
+LRU can expose clickable requests and capacity changes; attention can expose query selection and vector inputs. Each requires its own domain actions rather than generic dragging. Diagram controls need visible affordances, keyboard equivalents, short model-derived feedback and a single desktop viewport. These interactions are proposals, not implemented in this background checkpoint.

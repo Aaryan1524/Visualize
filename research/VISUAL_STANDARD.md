@@ -69,6 +69,8 @@ Identifiers stay upright and centred on their faces; screen statuses follow the 
 
 ## Composition
 
+Page surfaces use warm cream (`#f7f5ef`) around a near-white card and stage (`#fffefa`). Dark mode uses near-black (`#090909`) around charcoal surfaces (`#121212`). Warm neutral text and borders keep the page quiet; material and semantic signal colours retain their existing meanings. Standalone pages and review tools use the same backgrounds; embeds leave their host page untouched.
+
 The default explanation fits 1440×900 and 1920×1080 desktop windows, with the diagram, one current action, essential outcomes and playback together. A readable fallback remains for short windows and high zoom.
 
 The reference tightens lane spacing and plate depth, reduces terminal/server height, and places the money annotations clear of the key store. Existing model counts, outcomes and the seekable timeline remain the same. Light/dark rendering uses identical geometry.

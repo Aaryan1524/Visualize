@@ -3,8 +3,8 @@
 /* Visualize player. Paper-first; every colour is a token so both themes share one sheet. */
 
 .vz {
-  --paper: #f3f0e8;
-  --card: #fbfaf6;
+  --paper: #f7f5ef;
+  --card: #fffefa;
   --ink: #1b1d22;
   --ink-2: #555a63;
   --hair: #d9d4c7;
@@ -35,8 +35,8 @@
 
 @media (prefers-color-scheme: dark) {
   .vz:not([data-theme="light"]) {
-    --paper: #121418;
-    --card: #1a1d22;
+    --paper: #090909;
+    --card: #121212;
     --ink: #ecebe6;
     --ink-2: #a2a7b0;
     --hair: #2e323a;
@@ -59,8 +59,8 @@
 }
 
 .vz[data-theme="dark"] {
-  --paper: #121418;
-  --card: #1a1d22;
+  --paper: #090909;
+  --card: #121212;
   --ink: #ecebe6;
   --ink-2: #a2a7b0;
   --hair: #2e323a;
