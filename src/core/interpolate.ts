@@ -129,7 +129,12 @@ function travelling(m: Mark, u: number): Resolved | null {
 }
 
 export function isStatic(m: Mark): boolean {
-  return !m.transient;
+  return !m.transient && !m.leaving;
+}
+
+/** The hop belongs to the destination, so it applies over the whole move. */
+function hop(m: Mark, moveU: number, arc: number | undefined): Mark {
+  return arc ? offset(m, 0, arc * bump(moveU)) : m;
 }
 
 /**
@@ -157,9 +162,11 @@ export function resolveFrame(
   const nextKeys = new Set(after.map((m) => m.key));
   const out: Resolved[] = [];
 
+  const leaving = new Map(next.filter((m) => m.leaving && !m.transient).map((m) => [m.key, m]));
+
   for (const m of after) {
     const p = byKey.get(m.key);
-    if (p) out.push({ ...withEffect(between(p, m, moveE), moveU), opacity: 1 });
+    if (p) out.push({ ...withEffect(hop(between(p, m, moveE), moveU, m.arc), moveU), opacity: 1 });
     else {
       const r = entering(m, enterU);
       if (r.opacity > 0) out.push(r);
@@ -167,6 +174,13 @@ export function resolveFrame(
   }
   for (const m of before) {
     if (nextKeys.has(m.key)) continue;
+    const goal = leaving.get(m.key);
+    if (goal) {
+      // Follow the move to where the next state says it goes, fading over the last part.
+      const fade = 1 - local(moveU, [0.55, 1]);
+      if (moveU < 1 && fade > 0) out.push({ ...hop(between(m, goal, moveE), moveU, goal.arc), opacity: fade });
+      continue;
+    }
     const r = exiting(m, exitU);
     if (r.opacity > 0) out.push(r);
   }
