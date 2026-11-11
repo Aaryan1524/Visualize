@@ -7,3 +7,5 @@ export { TRUST_LEVELS, TRUST_LABEL, TRUST_MEANING } from "./core/trust.ts";
 export { project, depth, viewVector, ellipseAxes, type Pt } from "./iso/project.ts";
 export { geometryOf, boundsOf, screenExtent, type Bounds, type Face, type Shade, type SolidGeometry } from "./iso/solids.ts";
 export { depthSort, paintOrder, screenOverlap, type SortResult } from "./iso/sort.ts";
+export { mount, type PlayerApi } from "./render/player.ts";
+export { createStage, fitViewBox, type StageRenderer } from "./render/svg.ts";
