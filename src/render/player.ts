@@ -1,0 +1,425 @@
+import { compile, type Compiled, type Frame, type StepInfo } from "../core/scene.ts";
+import { frameIndexAt } from "../core/timeline.ts";
+import { TRUST_LABEL, TRUST_MEANING } from "../core/trust.ts";
+import type { Panel, Resolved, Scene } from "../core/types.ts";
+import { createStage, fitViewBox, type StageRenderer } from "./svg.ts";
+
+/** Rendered label size in CSS px, independent of how large the stage is drawn. */
+const LABEL_PX = 13;
+
+const ICONS = {
+  prev: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg>',
+  next: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg>',
+  play: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2v12l10-6z"/></svg>',
+  pause: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h3.5v12H3zM9.5 2H13v12H9.5z"/></svg>',
+  restart: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3a5 5 0 1 1-4.9 6h1.7A3.4 3.4 0 1 0 8 4.6V7L4.5 3.8 8 .6z"/></svg>',
+};
+
+export interface PlayerApi {
+  compiled: Compiled;
+  stage: StageRenderer;
+  root: HTMLElement;
+  /** Show the frame at time t (ms). Pauses playback. */
+  seek(t: number): void;
+  /** Show step k at rest. Pauses playback. */
+  seekStep(k: number): void;
+  play(): void;
+  pause(): void;
+  time(): number;
+  frame(): Frame;
+  /** The step whose caption and panels are on screen. */
+  shownIndex(): number;
+  viewBox: [number, number, number, number];
+}
+
+function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, html = ""): HTMLElementTagNameMap[K] {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (html) e.innerHTML = html;
+  return e;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+function readHashStep(): number | null {
+  const m = /(?:^|[#&])step=(\d+)/.exec(location.hash);
+  return m ? Number(m[1]) : null;
+}
+
+export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
+  const compiled = compile(scene);
+  const { steps, timeline } = compiled;
+  const projection = scene.projection ?? "iso";
+  const last = steps.length - 1;
+
+  const viewBox = fitViewBox(
+    steps.map((s) => s.marks),
+    projection,
+  );
+  const stage = createStage(viewBox, projection, `${scene.title}. ${scene.question} Use the step controls or the arrow keys.`);
+
+  // ---- DOM -------------------------------------------------------------
+  const root = h("div", { class: "vz", "data-scene": scene.id });
+  const card = h("article", { class: "vz-card" });
+  const head = h("header", { class: "vz-head" });
+  head.append(h("span", { class: "vz-kicker" }, escapeHtml(scene.title)));
+  const themeBtn = h("button", { class: "vz-theme", type: "button" });
+  head.append(themeBtn);
+  const question = h("h1", { class: "vz-question" }, escapeHtml(scene.question));
+
+  const anyPanels = steps.some((s) => s.panels.length > 0);
+  const body = h("div", { class: "vz-body", "data-panels": anyPanels ? "1" : "0" });
+  const stageBox = h("div", {
+    class: "vz-stage",
+    tabindex: "0",
+    role: "group",
+    "aria-roledescription": "step-through figure",
+    "aria-label": `${scene.title}. Left and right arrows step through the explanation; space plays and pauses.`,
+  });
+  stageBox.append(stage.svg);
+  const panelsBox = h("aside", { class: "vz-panels", "aria-label": "Details for the current step" });
+  body.append(stageBox);
+  if (anyPanels) body.append(panelsBox);
+
+  const caption = h("section", { class: "vz-caption", "aria-live": "polite", "aria-atomic": "true" });
+  const count = h("span", { class: "vz-count", "data-role": "count" });
+  const text = h("p", { class: "vz-text", "data-role": "caption" });
+  const meta = h("div", { class: "vz-meta" });
+  const trust = h("span", { class: "vz-trust", "data-role": "trust" });
+  const readout = h("span", { class: "vz-readout", "data-role": "readout" });
+  const source = h("span", { class: "vz-source", "data-role": "source" });
+  meta.append(trust, readout, source);
+  caption.append(count, text, meta);
+
+  const controls = h("div", { class: "vz-controls", role: "toolbar", "aria-label": "Playback" });
+  const btn = (name: keyof typeof ICONS, label: string, primary = false) => {
+    const b = h("button", { class: "vz-btn", type: "button", "aria-label": label, "data-action": name }, ICONS[name]);
+    if (primary) b.setAttribute("data-primary", "");
+    return b;
+  };
+  const prevBtn = btn("prev", "Previous step");
+  const playBtn = btn("play", "Play", true);
+  const nextBtn = btn("next", "Next step");
+  const restartBtn = btn("restart", "Restart");
+  const scrub = h("div", { class: "vz-scrub" });
+  const range = h("input", {
+    class: "vz-range",
+    type: "range",
+    min: "0",
+    max: String(timeline.total),
+    step: "1",
+    value: "0",
+    "aria-label": "Timeline",
+  });
+  scrub.append(range);
+  controls.append(prevBtn, playBtn, nextBtn, scrub, restartBtn);
+
+  const foot = h("footer", { class: "vz-foot" });
+  if (scene.legend?.length) {
+    const ul = h("ul", { class: "vz-legend", "aria-label": "Legend" });
+    for (const item of scene.legend) {
+      const li = h("li");
+      li.append(h("span", { class: "vz-swatch", style: `--tone: var(--t-${item.tone})`, "aria-hidden": "true" }), document.createTextNode(item.label));
+      ul.append(li);
+    }
+    foot.append(ul);
+  }
+  if (scene.assumptions?.length) {
+    const d = h("details", { class: "vz-details" });
+    d.append(h("summary", {}, "What this model simplifies"));
+    const ul = h("ul");
+    for (const a of scene.assumptions) ul.append(h("li", {}, escapeHtml(a)));
+    d.append(ul);
+    foot.append(d);
+  }
+  const all = h("details", { class: "vz-details" });
+  all.append(h("summary", {}, "All steps as text"));
+  const ol = h("ol", { start: "0" });
+  const items = steps.map((s) => {
+    const li = h("li", {}, escapeHtml(s.caption) + (s.readout ? ` <span class="vz-dim">(${escapeHtml(s.readout)})</span>` : ""));
+    ol.append(li);
+    return li;
+  });
+  all.append(ol);
+  foot.append(all);
+
+  card.append(head, question, body, caption, controls, foot);
+  root.append(card);
+  host.append(root);
+
+  // ---- Theme -----------------------------------------------------------
+  const docEl = document.documentElement;
+  const media = matchMedia("(prefers-color-scheme: dark)");
+  const currentTheme = () => (docEl.dataset.theme as "light" | "dark" | undefined) ?? (media.matches ? "dark" : "light");
+  const syncThemeBtn = () => {
+    const next = currentTheme() === "dark" ? "light" : "dark";
+    themeBtn.textContent = next === "dark" ? "Dark" : "Light";
+    themeBtn.setAttribute("aria-label", `Switch to ${next} theme`);
+  };
+  themeBtn.addEventListener("click", () => {
+    docEl.dataset.theme = currentTheme() === "dark" ? "light" : "dark";
+    syncThemeBtn();
+  });
+  media.addEventListener("change", syncThemeBtn);
+  syncThemeBtn();
+
+  // ---- Label size stays constant on screen --------------------------------
+  const sizeLabels = () => {
+    // The viewBox is fitted with "meet", so the drawn scale is the smaller of the two fits.
+    const r = stage.svg.getBoundingClientRect();
+    const scale = Math.min(r.width / viewBox[2], r.height / viewBox[3]);
+    if (scale > 0) stage.svg.style.setProperty("--label-size", `${LABEL_PX / scale}px`);
+  };
+  new ResizeObserver(sizeLabels).observe(stage.svg);
+  sizeLabels();
+
+  // ---- Linked highlighting --------------------------------------------------
+  let activeLink: string | null = null;
+  const applyLink = () => {
+    if (activeLink === null) {
+      delete root.dataset.linking;
+      for (const e of root.querySelectorAll(".is-linked")) e.classList.remove("is-linked");
+      return;
+    }
+    root.dataset.linking = activeLink;
+    for (const e of root.querySelectorAll<HTMLElement | SVGElement>("[data-link]")) {
+      e.classList.toggle("is-linked", e.getAttribute("data-link") === activeLink);
+    }
+  };
+  const linkOf = (t: EventTarget | null) => (t instanceof Element ? t.closest("[data-link]")?.getAttribute("data-link") ?? null : null);
+  root.addEventListener("pointerover", (e) => {
+    const id = linkOf(e.target);
+    if (id !== activeLink) {
+      activeLink = id;
+      applyLink();
+    }
+  });
+  root.addEventListener("pointerleave", () => {
+    activeLink = null;
+    applyLink();
+  });
+  root.addEventListener("focusin", (e) => {
+    activeLink = linkOf(e.target);
+    applyLink();
+  });
+
+  // ---- Panels -------------------------------------------------------------
+  const panelNodes = new Map<string, { section: HTMLElement; title: HTMLElement; body: HTMLElement; html: string }>();
+  const renderPanels = (panels: Panel[]) => {
+    const live = new Set(panels.map((p) => p.key));
+    for (const [k, n] of panelNodes) if (!live.has(k)) (n.section.remove(), panelNodes.delete(k));
+    for (const p of panels) {
+      let n = panelNodes.get(p.key);
+      if (!n) {
+        const section = h("section", { class: "vz-panel", "data-key": p.key });
+        const title = h("h3");
+        const pbody = h("div", { class: "vz-panel-body" });
+        section.append(title, pbody);
+        n = { section, title, body: pbody, html: "" };
+        panelNodes.set(p.key, n);
+      }
+      panelsBox.append(n.section); // keeps declared order
+      n.title.textContent = p.title ?? "";
+      n.title.hidden = !p.title;
+      if (n.html !== p.html) {
+        n.body.innerHTML = p.html;
+        n.html = p.html;
+        for (const e of n.body.querySelectorAll("[data-link]")) if (!e.hasAttribute("tabindex")) e.setAttribute("tabindex", "0");
+      }
+    }
+  };
+
+  // ---- Step info ------------------------------------------------------------
+  let shown = -1;
+  const showStep = (k: number, info: StepInfo) => {
+    if (k === shown) return;
+    shown = k;
+    count.textContent = k === 0 ? `Start · ${last} steps` : `Step ${k} of ${last}`;
+    text.textContent = info.caption;
+    trust.textContent = TRUST_LABEL[info.trust];
+    trust.dataset.trust = info.trust;
+    trust.title = TRUST_MEANING[info.trust];
+    readout.textContent = info.readout;
+    source.innerHTML = info.source
+      ? info.source.url
+        ? `<a href="${escapeHtml(info.source.url)}" rel="noopener" target="_blank">${escapeHtml(info.source.label)}</a>`
+        : escapeHtml(info.source.label)
+      : "";
+    renderPanels(info.panels);
+    items.forEach((li, i) => (i === k ? li.setAttribute("aria-current", "step") : li.removeAttribute("aria-current")));
+    range.setAttribute("aria-valuetext", `${count.textContent}: ${info.caption}`);
+  };
+
+  // ---- Time -------------------------------------------------------------------
+  const still = matchMedia("(prefers-reduced-motion: reduce)");
+  let t = 0;
+  let playing = false;
+  let target: number | null = null;
+  let raf = 0;
+  let lastNow = 0;
+  let current: Frame = compiled.frameAt(0);
+
+  /** Under reduced motion every instant shows a step at rest. */
+  const displayTime = (time: number) => {
+    if (!still.matches) return time;
+    const { index, progress } = frameIndexAt(timeline, time);
+    return progress >= 1 ? time : compiled.restTime(progress >= 0.5 ? index : index - 1);
+  };
+
+  const draw = () => {
+    current = compiled.frameAt(displayTime(t));
+    stage.render(current.marks as Resolved[]);
+    const k = current.index === 0 || current.progress >= 0.5 ? current.index : current.index - 1;
+    showStep(k, current.shown);
+    range.value = String(Math.round(t));
+    if (activeLink !== null) applyLink();
+  };
+
+  const writeHash = () => {
+    try {
+      history.replaceState(null, "", `#step=${shown}`);
+    } catch {
+      /* file:// in some browsers */
+    }
+  };
+
+  const setPlaying = (on: boolean) => {
+    playing = on;
+    playBtn.innerHTML = on ? ICONS.pause : ICONS.play;
+    playBtn.setAttribute("aria-label", on ? "Pause" : "Play");
+    root.toggleAttribute("data-playing", on);
+    if (on && !raf) {
+      lastNow = 0;
+      raf = requestAnimationFrame(tick);
+    }
+    if (!on) writeHash();
+  };
+
+  function tick(now: number) {
+    raf = 0;
+    const dt = lastNow ? Math.min(now - lastNow, 64) : 16;
+    lastNow = now;
+    if (target !== null) {
+      const dir = Math.sign(target - t);
+      t += dir * dt;
+      // Stepping skips the holds between transitions, in either direction.
+      const at = frameIndexAt(timeline, t);
+      if (at.progress >= 1) {
+        if (dir > 0) {
+          const ns = timeline.start[at.index + 1];
+          if (ns !== undefined && t < ns) t = Math.min(ns, target);
+        } else {
+          const r = timeline.rest[at.index]!;
+          if (t > r) t = Math.max(r, target);
+        }
+      }
+      if ((dir >= 0 && t >= target) || (dir < 0 && t <= target)) {
+        t = target;
+        target = null;
+        draw();
+        setPlaying(false);
+        return;
+      }
+    } else if (playing) {
+      t += dt;
+      if (t >= timeline.total) {
+        t = timeline.total;
+        draw();
+        setPlaying(false);
+        return;
+      }
+    }
+    draw();
+    if (playing) raf = requestAnimationFrame(tick);
+  }
+
+  const seek = (time: number) => {
+    target = null;
+    if (playing) setPlaying(false);
+    t = Math.min(Math.max(time, 0), timeline.total);
+    draw();
+  };
+
+  /**
+   * Go to step k at rest. One step away animates the transition (backwards
+   * when rewinding); further jumps, and reduced motion, cut straight there.
+   */
+  const goTo = (k: number) => {
+    const kk = Math.min(Math.max(k, 0), last);
+    const goal = compiled.restTime(kk);
+    const { index } = frameIndexAt(timeline, t);
+    if (still.matches || Math.abs(kk - index) > 1 || goal === t) {
+      seek(goal);
+      writeHash();
+      return;
+    }
+    target = goal;
+    setPlaying(true);
+  };
+
+  const stepNow = () => {
+    const { index, progress } = frameIndexAt(timeline, t);
+    return { index, settled: progress >= 1 };
+  };
+  const next = () => {
+    const { index, settled } = stepNow();
+    goTo(settled ? index + 1 : index);
+  };
+  const prev = () => {
+    const { index } = stepNow();
+    goTo(index - 1);
+  };
+
+  prevBtn.addEventListener("click", prev);
+  nextBtn.addEventListener("click", next);
+  restartBtn.addEventListener("click", () => seek(0));
+  playBtn.addEventListener("click", () => {
+    if (playing) {
+      target = null;
+      setPlaying(false);
+      return;
+    }
+    if (t >= timeline.total) t = 0;
+    target = null;
+    setPlaying(true);
+  });
+  range.addEventListener("input", () => seek(Number(range.value)));
+  range.addEventListener("change", writeHash);
+
+  root.addEventListener("keydown", (e) => {
+    const k = e.key;
+    if (e.target === themeBtn || (e.target instanceof HTMLButtonElement && (k === " " || k === "Enter"))) return;
+    if (k === "ArrowRight") next();
+    else if (k === "ArrowLeft") prev();
+    else if (k === "Home") seek(0);
+    else if (k === "End") seek(timeline.total);
+    else if (k === " ") playBtn.click();
+    else return;
+    e.preventDefault();
+  });
+
+  const fromHash = readHashStep();
+  if (fromHash !== null) t = compiled.restTime(fromHash);
+  draw();
+
+  const api: PlayerApi = {
+    compiled,
+    stage,
+    root,
+    viewBox,
+    seek,
+    seekStep: (k) => seek(compiled.restTime(k)),
+    play: () => setPlaying(true),
+    pause: () => {
+      target = null;
+      setPlaying(false);
+    },
+    time: () => t,
+    frame: () => current,
+    shownIndex: () => shown,
+  };
+  (window as unknown as { __viz?: PlayerApi }).__viz = api;
+  return api;
+}

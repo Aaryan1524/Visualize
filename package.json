@@ -12,7 +12,8 @@
     "test": "node --test \"src/**/*.test.ts\" \"examples/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "shoot": "node scripts/shoot.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
