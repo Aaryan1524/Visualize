@@ -33,7 +33,7 @@ const { compile } = await import(pathToFileURL(join(ROOT, "src/core/scene.ts")).
 
 // ---- Planted faults ------------------------------------------------------------
 // Each one breaks the page in a specific way after it loads. Used by --controls
-// to prove every check can fail.
+// to prove the checks can fail (see the coverage note at the top).
 const PLANTS = {
   // Paint solids in reverse depth order after every seek.
   depth: () => {

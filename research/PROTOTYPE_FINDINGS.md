@@ -5,11 +5,19 @@ What three prototypes on one shared core showed, measured against the hypotheses
 ## Summary
 
 - **The shared-substrate hypothesis held for these three scenes, with a caveat.** LRU eviction, scaled dot-product attention and payment retries all run on one core: a trace of steps, keyed marks per state, a pure `frameAt(t)`, an isometric SVG stage and flat panels. None needed a private renderer or hand-written tweens. But the views were not pure state-to-picture functions: each one supplies motion hints (`arc`, `leaving`, enter and exit styles, per-event timing). Motion derived purely from state differences was not enough.
-- **The distinctive claim works.** `verify` checks the rendered page against an independent run of the model at every step: values, sizes, visibility, depth order, determinism, text and layout. Each of its 13 failure modes has a planted fault that it catches, while a clean fixture passes.
+- **The distinctive claim works.** `verify` checks the rendered page against an independent run of the model at every step: values, sizes, visibility, depth order, determinism, text and layout. 21 planted faults, at least one per check, are each caught while a clean fixture passes. The one untested branch is the labels check's outside-the-card test.
 - **Checks did not replace looking.** The most serious defect found, a false claim in a caption, was caught by reading a contact sheet, not by any check. So were three rendering problems that later got checks of their own.
 - **The craft gap to Anatomy is large.** Our figures are clear, correct and distinct from Anatomy's look, but they have a few chunky parts where Anatomy has dozens of fine ones. That is a judgment from side-by-side screenshots, not a measured result.
 
 ## What was built
+
+![LRU cache, step 4](images/lru.png)
+
+![Attention, step 6, pointing at the weight for (sat, cat)](images/attention-linked.png)
+
+![Retries, step 8: the worlds split](images/retries.png)
+
+More in [images/](images/): the LRU motion sheet, the flat LRU variant step by step, and retries at 390 px.
 
 | Part | Lines (excluding tests) | Role |
 |---|---:|---|
@@ -21,7 +29,7 @@ What three prototypes on one shared core showed, measured against the hypotheses
 | `examples/attention` | 97 model + 370 scene | Gauges that morph score → scaled → weight; linked equation and grids |
 | `examples/retries` | 145 model + 299 scene | Discrete-event simulation run as two synced worlds |
 
-Each example is 300–470 lines of model and scene for a 9–11 step explanation with linked panels. Built pages are 45–49 KB, except attention at 688 KB, which inlines KaTeX and all of its fonts. Subsetting the fonts is an open task. There are 49 unit tests.
+Each example is 300–470 lines of model and scene for an 8–10 step explanation with linked panels. Built pages are 45–49 KB, except attention at 688 KB, which inlines KaTeX and all of its fonts. Subsetting the fonts is an open task. There are 49 unit tests.
 
 ## Verdicts on the falsifiers
 
@@ -84,12 +92,13 @@ It **cannot** show:
 - that motion between the sampled instants is smooth;
 - anything about craft or beauty.
 
-A planted fault for each check proves the check can fail. It does not prove the check catches every fault of that kind.
+A planted fault per check proves the check can fail (except the outside-the-card test). It does not prove the check catches every fault of that kind.
 
 ## Process notes
 
 - One commit, `e330280` ("add leaving and arc motions"), landed on `main` with a failing test, because the commit command was gated on `grep` output rather than the test exit code. `72fc9e0` fixed it, and every later commit was gated on the exit code.
 - The retries commits were briefly made on `main` without a branch; they were moved onto `feat/example-retries` and merged before anything was pushed.
+- An early claim that every check had a planted fault was not true: reduced motion, step links, layout, dark-theme contrast, order and lit observations, and parts of the labels check had none. Eight controls were added; one gap remains, as noted above.
 
 ## Recommended next steps
 
