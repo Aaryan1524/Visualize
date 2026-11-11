@@ -116,9 +116,10 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
         tone: "subject",
         lit: weighted && v === max,
         enter: "grow",
+        label: fmt(v),
         link: `q-${f} k-${j}`,
       });
-      marks.push({ kind: "label", key: `gauge-label-${j}`, at: [cx, cy, h + 10], text: fmt(v), size: "small" });
+
       // The query reaching each key, on the floor; thickness shows the weight once there is one.
       marks.push({
         kind: "link",
@@ -141,7 +142,7 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
     A.output[i]!.forEach((value, d) => {
       marks.push({ kind: "box", key: `z-${i}-${d}`, at: [x + 17 + d * 8, OUT_Y + 6, 6], size: [6, 8, barH(value)], tone: "good", enter: "grow", link: `z-${i}` });
     });
-    marks.push({ kind: "label", key: `out-label-${i}`, at: [x + PLINTH[0] / 2, OUT_Y + 30, 0], text: `output for “${tok(i)}”`, size: "small" });
+    marks.push({ kind: "label", key: `out-label-${i}`, at: [x + PLINTH[0] / 2, OUT_Y + 36, -4], text: `output for “${tok(i)}”`, size: "small", target: { key: `out-${i}`, at: [x + PLINTH[0] / 2, OUT_Y + 20, 3] } });
   }
   // On the mix step, a piece of each value, sized by its weight, travels to the output.
   if (e?.type === "mix") {
@@ -303,7 +304,7 @@ function observe(s: AttnState): Observation[] {
   if (g) {
     const weighted = s.phase === "softmax" || s.phase === "mix" || s.phase === "all";
     g.values.forEach((v, j) => {
-      obs.push({ type: "text", key: `gauge-label-${j}`, equals: fmt(v) });
+      obs.push({ type: "text", key: `gauge-${j}`, equals: fmt(v) });
       obs.push({ type: "visible", key: `gauge-${j}`, visible: true });
       obs.push({ type: "extent", key: `gauge-${j}`, size: [16, 16, Math.max(0.6, v * g.unit)] });
       if (weighted) obs.push({ type: "visible", key: `reach-${j}`, visible: true });
