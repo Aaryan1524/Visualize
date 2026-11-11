@@ -67,8 +67,11 @@ export default defineScene<State, Op>({
       html: `<p data-key="contents">${s.items.map((i) => `<span data-link="item-${i.id}">${i.value}</span>`).join(" · ") || "empty"}</p>`,
     },
   ],
-  observe: (s) => [
+  observe: (s, e) => [
     { type: "text", key: "contents", equals: s.items.map((i) => i.value).join(" · ") || "empty" },
+    // Screen y grows downward, so top-to-bottom is the order of increasing y.
+    ...(s.items.length > 1 ? [{ type: "order" as const, keys: [...s.items].reverse().map((i) => i.id), axis: "y" as const }] : []),
+    ...(e?.type === "push" ? [{ type: "lit" as const, key: s.items.at(-1)!.id }] : []),
     ...s.items.map((it) => ({ type: "visible" as const, key: it.id, visible: true })),
     ...s.items.map((it) => ({ type: "extent" as const, key: it.id, size: [24, 24, 10] as const })),
   ],

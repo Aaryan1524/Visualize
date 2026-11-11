@@ -6,6 +6,10 @@
 //   node scripts/verify.mjs --quick           skip screenshots and contact sheets
 //   node scripts/verify.mjs --controls        planted faults: each must be caught
 //
+// Every check below has at least one planted fault in --controls, except the
+// "outside the card" part of the labels check, which the label-aware camera
+// fit makes hard to trigger and which has no control yet.
+//
 // The model is run here, in Node, independently of the page. Observations,
 // captions and readouts from that run are compared with what the browser
 // actually draws. Exits non-zero on any problem.
@@ -92,6 +96,31 @@ const PLANTS = {
       throw new Error("planted failure");
     }));
   },
+  // The page ignores #step= and always opens at the start.
+  "step-link": () => {
+    window.addEventListener("load", () => window.__viz.seek(0));
+  },
+  // The page never learns that the reader asked for reduced motion.
+  "reduced-motion": () => {
+    const real = window.matchMedia.bind(window);
+    window.matchMedia = (q) => (q.includes("reduced-motion") ? { ...real("(min-width: 0px)"), matches: false, media: q, addEventListener() {}, removeEventListener() {} } : real(q));
+  },
+  // Something wider than a phone.
+  layout: () => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s = document.createElement("style");
+      s.textContent = ".vz-card::after{content:'';display:block;width:900px;height:1px}";
+      document.head.append(s);
+    });
+  },
+  // Caption nearly the colour of the card, in the dark theme only.
+  "contrast-dark": () => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s = document.createElement("style");
+      s.textContent = "@media (prefers-color-scheme: dark){.vz-text{color:#2a2d33!important}}";
+      document.head.append(s);
+    });
+  },
   // Pointing at a linked element lights nothing.
   linking: () => {
     window.addEventListener("pointerover", (e) => e.stopImmediatePropagation(), true);
@@ -116,6 +145,14 @@ const CONTROLS = [
   { variant: "intersecting", expect: "depth order" },
   { variant: "hidden-behind", expect: "observations" },
   { variant: "wrong-size", expect: "observations" },
+  { variant: "wrong-order", expect: "observations" },
+  { variant: "unlit", expect: "observations" },
+  { variant: "wide-label", expect: "labels" },
+  { variant: "covered-label", expect: "labels" },
+  { plant: "step-link", expect: "step link" },
+  { plant: "reduced-motion", expect: "reduced motion" },
+  { plant: "layout", expect: "layout" },
+  { plant: "contrast-dark", expect: "contrast dark" },
 ];
 
 // ---- Helpers ------------------------------------------------------------------
