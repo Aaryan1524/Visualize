@@ -188,6 +188,30 @@ const PLANTS = {
       document.head.append(s);
     });
   },
+  // Content under the stage grows with the step, so the stage shrinks.
+  "layout-shift": () => {
+    window.addEventListener("load", () => {
+      const v = window.__viz;
+      const seek = v.seek;
+      v.seek = (t) => {
+        seek(t);
+        v.stage.svg.style.maxHeight = `${420 - v.shownIndex() * 12}px`;
+      };
+      v.seekStep = (k) => v.seek(v.compiled.restTime(k));
+    });
+  },
+  // The renderer stops hiding labels that do not fit their face.
+  "show-unfit-labels": () => {
+    window.addEventListener("load", () => {
+      const v = window.__viz;
+      const seek = v.seek;
+      v.seek = (t) => {
+        seek(t);
+        for (const l of v.stage.svg.querySelectorAll(".vz-solid-label[display]")) l.removeAttribute("display");
+      };
+      v.seekStep = (k) => v.seek(v.compiled.restTime(k));
+    });
+  },
   // Pointing at a linked element lights nothing.
   linking: () => {
     window.addEventListener("pointerover", (e) => e.stopImmediatePropagation(), true);
@@ -218,6 +242,8 @@ const CONTROLS = [
   { plant: "console", expect: "console" },
   { plant: "keyboard", expect: "keyboard" },
   { plant: "linking", expect: "linking" },
+  { plant: "layout-shift", expect: "layout shift" },
+  { variant: "label-on-part", expect: "labels" },
   { variant: "wrong-value", expect: "observations" },
   { variant: "crowded-labels", expect: "labels" },
   { variant: "intersecting", expect: "depth order" },
@@ -225,7 +251,7 @@ const CONTROLS = [
   { variant: "wrong-size", expect: "observations" },
   { variant: "wrong-order", expect: "observations" },
   { variant: "unlit", expect: "observations" },
-  { variant: "wide-label", expect: "labels" },
+  { variant: "wide-label", plant: "show-unfit-labels", expect: "labels" },
   { variant: "covered-label", expect: "labels" },
   { plant: "step-link", expect: "step link" },
   { plant: "reduced-motion", expect: "reduced motion" },
@@ -336,6 +362,20 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
     if (obsCount === 0) report.rows.at(-1).problems.push("the scene declares no observations, so nothing ties the picture to the model");
     report.add("captions", `caption, readout and trust at ${steps.length} steps`, capProblems);
 
+    // Layout stability: the stage keeps one size at every step, so nothing
+    // jumps and the camera fit never depends on what was seen before.
+    {
+      const sizes = [];
+      for (let k = 0; k <= last; k++) {
+        await page.evaluate((k) => window.__viz.seekStep(k), k);
+        await settle(page);
+        sizes.push(await page.evaluate(() => { const r = window.__viz.stage.svg.getBoundingClientRect(); return [r.width, r.height]; }));
+      }
+      const [w0, h0] = sizes[0];
+      const shifts = sizes.map(([w, h], k) => (Math.abs(w - w0) > 0.5 || Math.abs(h - h0) > 0.5 ? `step ${k}: stage ${w.toFixed(1)}×${h.toFixed(1)}, step 0 ${w0.toFixed(1)}×${h0.toFixed(1)}` : null)).filter(Boolean);
+      report.add("layout shift", "the stage keeps one size at every step", shifts);
+    }
+
     // Depth: every rest state and four instants inside every transition.
     const instants = [];
     for (let k = 0; k <= last; k++) {
@@ -381,7 +421,7 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
       tx.small.forEach((s) => small.add(`step ${k}: ${s}`));
       tx.faint.forEach((s) => faint.add(s));
       const lb = await page.evaluate(() => window.__vzCheck.labels());
-      for (const list of [lb.overlaps, lb.spill, lb.hidden, lb.clipped, lb.panels]) list.forEach((s) => labelProblems.add(`step ${k}: ${s}`));
+      for (const list of [lb.overlaps, lb.spill, lb.hidden, lb.clipped, lb.panels, lb.onParts]) list.forEach((s) => labelProblems.add(`step ${k}: ${s}`));
     }
     report.add("text size", "every visible text node, at every step (11 px minimum)", [...small]);
     report.add("contrast", "WCAG ratio against the face or card behind each text, light theme", [...faint]);
@@ -610,7 +650,7 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
           for (let k = 0; k <= last; k++) {
             await page.evaluate((k) => window.__viz.seekStep(k), k);
             const lb = await page.evaluate(() => window.__vzCheck.labels());
-            for (const list of [lb.overlaps, lb.spill, lb.hidden, lb.clipped, lb.panels]) list.forEach((s) => layoutProblems.push(`390px step ${k}: ${s}`));
+            for (const list of [lb.overlaps, lb.spill, lb.hidden, lb.clipped, lb.panels, lb.onParts]) list.forEach((s) => layoutProblems.push(`390px step ${k}: ${s}`));
             const tx = await page.evaluate(() => window.__vzCheck.text());
             tx.small.forEach((s) => layoutProblems.push(`390px step ${k}: ${s}`));
           }

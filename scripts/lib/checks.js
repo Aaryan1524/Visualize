@@ -91,7 +91,7 @@
     try {
       const pts = [];
       const edge = el.querySelector && el.querySelector(".vz-edge");
-      const line = el.querySelector && el.querySelector("line.vz-link");
+      const line = el.querySelector && el.querySelector(".vz-link");
       if (edge) {
         const poly = parsePoints(edge.getAttribute("points"));
         const ctm = edge.getScreenCTM();
@@ -105,10 +105,14 @@
           }
       } else if (line) {
         const ctm = line.getScreenCTM();
-        const [x1, y1, x2, y2] = ["x1", "y1", "x2", "y2"].map((a) => Number(line.getAttribute(a)));
-        for (let i = 1; i < 12; i++) {
-          const x = x1 + ((x2 - x1) * i) / 12, y = y1 + ((y2 - y1) * i) / 12;
-          pts.push([ctm.a * x + ctm.c * y + ctm.e, ctm.b * x + ctm.d * y + ctm.f]);
+        // Sample along every segment of the (possibly routed) link.
+        const route = parsePoints(line.getAttribute("points"));
+        for (let s = 1; s < route.length; s++) {
+          const [x1, y1] = route[s - 1], [x2, y2] = route[s];
+          for (let i = 1; i < 12; i++) {
+            const x = x1 + ((x2 - x1) * i) / 12, y = y1 + ((y2 - y1) * i) / 12;
+            pts.push([ctm.a * x + ctm.c * y + ctm.e, ctm.b * x + ctm.d * y + ctm.f]);
+          }
         }
       } else {
         if (el instanceof SVGElement && el.closest('[data-layer="labels"]')) return 1; // labels are drawn above everything
@@ -337,6 +341,8 @@
   /** The face a solid's label is drawn on. */
   function labelFace(label) {
     const g = label.closest("[data-key]");
+    // A label on a screen panel is read against the panel, not the face around it.
+    if (label.hasAttribute("data-on-panel")) return g.querySelector('[data-detail="panel"]');
     const shade = label.getAttribute("data-face") || "top";
     return g.querySelector(`.vz-face[data-shade="${shade}"]:not([display="none"])`) || g.querySelector(".vz-face:not([display=\"none\"])");
   }
@@ -418,7 +424,39 @@
       guard.remove();
     }
     const panels = [...viz().root.querySelectorAll(".vz-panel-body")].filter((p) => p.scrollWidth > p.clientWidth + 1).map((p) => `panel ${p.parentElement.getAttribute("data-key")} overflows by ${p.scrollWidth - p.clientWidth}px`);
-    return { overlaps, spill, hidden, clipped, panels };
+    return { overlaps, spill, hidden, clipped, panels, onParts: onParts(els) };
+  }
+
+  /**
+   * A free label may lie on a ground plate, but not on a part standing on it,
+   * except the part its leader points to. Samples the text box on a grid and
+   * asks the browser what is underneath.
+   */
+  function onParts(els) {
+    const out = [];
+    const guard = document.createElement("style");
+    guard.textContent = NO_HIT;
+    document.head.append(guard);
+    try {
+      for (const e of els) {
+        if (e.classList.contains("vz-solid-label")) continue;
+        const own = e.closest("[data-key]")?.getAttribute("data-target");
+        const r = e.getBoundingClientRect();
+        const hits = new Set();
+        for (let i = 0; i < 5; i++)
+          for (let j = 0; j < 3; j++) {
+            const under = document.elementFromPoint(r.left + ((i + 0.5) / 5) * r.width, r.top + ((j + 0.5) / 3) * r.height);
+            const solid = under && under.closest(".vz-solid");
+            if (!solid || solid.closest('[data-layer="ground"]')) continue;
+            const key = solid.getAttribute("data-key");
+            if (key !== own) hits.add(key);
+          }
+        if (hits.size) out.push(`"${norm(e.textContent)}" lies on ${[...hits].join(", ")}`);
+      }
+    } finally {
+      guard.remove();
+    }
+    return out;
   }
 
   /**
@@ -538,7 +576,10 @@
       const owner=byKey(m.key), edge=owner?.querySelector(".vz-edge");
       if (!edge) { problems.push(`${m.key}: missing surface owner`); continue; }
       const paths=[...owner.querySelectorAll(".vz-surface path")];
-      const required=projection()==="front" ? (m.surface.seam ? ["seam"] : []) : Object.keys(m.surface).map(k=>({fasteners:"fastener",ticks:"tick"}[k]??k));
+      // Each declared finish must produce at least one rendered detail of its kind.
+      const kindOf={fasteners:"fastener",ticks:"tick",seams:"seam",vents:"vent"};
+      const front=projection()==="front" ? (m.surface.seam!==undefined||m.surface.seams?.length ? ["seam"] : []) : null;
+      const required=front ?? [...new Set(Object.keys(m.surface).filter(k=>m.surface[k]!==undefined).map(k=>kindOf[k]??k))];
       for(const kind of required) if(!paths.some(p=>p.dataset.detail===kind)) problems.push(`${m.key}: missing ${kind} finish`);
       const poly=parsePoints(edge.getAttribute("points"));
       const nearEdge=(p)=>poly.some((a,i)=>{
