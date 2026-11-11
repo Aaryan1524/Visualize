@@ -9,3 +9,4 @@ export { geometryOf, boundsOf, screenExtent, type Bounds, type Face, type Shade,
 export { depthSort, paintOrder, screenOverlap, type SortResult } from "./iso/sort.ts";
 export { mount, type PlayerApi } from "./render/player.ts";
 export { createStage, fitViewBox, type StageRenderer } from "./render/svg.ts";
+export { tex, linked, grid, formatNumber, type GridOptions } from "./render/math.ts";
