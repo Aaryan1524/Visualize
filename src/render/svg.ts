@@ -81,11 +81,12 @@ interface Node {
   root: SVGGElement;
   kind: Mark["kind"];
   faces?: SVGPolygonElement[];
-  top?: SVGEllipseElement;
   edge?: SVGPolygonElement;
   crease?: SVGPolylineElement;
   text?: SVGTextElement;
   line?: SVGLineElement;
+  route?: SVGPolylineElement;
+  casing?: SVGPolylineElement;
   inset?: SVGPolygonElement;
   terminal?: SVGCircleElement;
   surface?: SVGGElement;
@@ -145,18 +146,13 @@ function common(node: Node, m: Resolved): void {
 function makeSolid(m: SolidMark): Node {
   const root = el("g", { class: "vz-solid", "data-key": m.key, "data-kind": m.kind });
   const node: Node = { root, kind: m.kind };
-  if (m.kind === "box") {
-    node.faces = ["left", "right", "top", "front"].map((s) => el("polygon", { class: "vz-face", "data-shade": s }));
-    root.append(...node.faces);
-    node.crease = el("polyline", { class: "vz-crease" });
-    root.append(node.crease);
-    node.inset = el("polygon", { class: "vz-inset" });
-    root.append(node.inset);
-  } else {
-    node.faces = [el("polygon", { class: "vz-face", "data-shade": "right" }), el("polygon", { class: "vz-face", "data-shade": "front" })];
-    node.top = el("ellipse", { class: "vz-face", "data-shade": "top" });
-    root.append(...node.faces, node.top);
-  }
+  // Faces are created to match the geometry on each update (rounded boxes and
+  // turned cylinders have many facets).
+  node.faces = [];
+  node.crease = el("polyline", { class: "vz-crease" });
+  root.append(node.crease);
+  node.inset = el("polygon", { class: "vz-inset" });
+  root.append(node.inset);
   node.edge = el("polygon", { class: "vz-edge" });
   node.surface = el("g", { class: "vz-surface", "aria-hidden": "true" });
   root.append(node.surface);
@@ -170,38 +166,21 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
   common(node, m);
   const g = geometryOf(m, projection);
   const byShade = new Map(g.faces.map((face) => [face.shade, face.points]));
-  if (m.kind === "box") {
-    while (node.faces!.length > g.faces.length) node.faces!.pop()!.remove();
-    while (node.faces!.length < g.faces.length) {
-      const face = el("polygon", {class:"vz-face"});
-      node.root.insertBefore(face, node.crease!);
-      node.faces!.push(face);
-    }
+  while (node.faces!.length > g.faces.length) node.faces!.pop()!.remove();
+  while (node.faces!.length < g.faces.length) {
+    const face = el("polygon", { class: "vz-face" });
+    node.root.insertBefore(face, node.crease!);
+    node.faces!.push(face);
   }
   for (const [i, face] of node.faces!.entries()) {
-    if (m.kind === "box") {
-      const surface = g.faces[i]!;
-      setAttr(face,"data-shade",surface.shade);
-      setAttr(face,"points",pts(surface.points));
-      setAttr(face,"style",surface.light === undefined ? null : `fill:color-mix(in oklab,var(--tone) ${surface.light*100}%,var(--shade-side));stroke:color-mix(in oklab,var(--tone) ${surface.light*100}%,var(--shade-side));stroke-width:0.15`);
-      setAttr(face,"display",null);
-      continue;
-    }
-    const p = byShade.get(face.getAttribute("data-shade") as never);
-    if (p) {
-      setAttr(face, "points", pts(p));
-      setAttr(face, "display", null);
-    } else setAttr(face, "display", "none");
+    const surface = g.faces[i]!;
+    setAttr(face, "data-shade", surface.shade);
+    setAttr(face, "points", pts(surface.points));
+    // Facets of curved bodies carry their own light; the hairline stroke in the same
+    // colour closes the seams between neighbouring facets.
+    setAttr(face, "style", surface.light === undefined ? null : `fill:color-mix(in oklab,var(--tone) ${f(surface.light * 100)}%,var(--shade-side));stroke:color-mix(in oklab,var(--tone) ${f(surface.light * 100)}%,var(--shade-side));stroke-width:0.15`);
   }
-  if (node.top && g.ellipse) {
-    const e = g.ellipse;
-    setAttr(node.top, "cx", f(e.cx));
-    setAttr(node.top, "cy", f(e.cy));
-    setAttr(node.top, "rx", f(e.rx));
-    setAttr(node.top, "ry", f(Math.max(e.ry, 0.01)));
-    setAttr(node.top, "display", projection === "front" ? "none" : null);
-  }
-  if (node.crease && m.kind === "box" && projection === "iso") {
+  if (node.crease && projection === "iso" && (m.kind === "box" || g.rim)) {
     // The two top edges nearest the viewer, where the top meets the sides.
     const top = byShade.get("top")!;
     setAttr(node.crease, "points", pts(g.rim ?? [top[3]!, top[2]!, top[1]!]));
@@ -215,11 +194,13 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
   setAttr(node.root,"data-rounded",m.kind === "box" && m.radius ? "" : null);
   setAttr(node.root,"data-role",m.kind === "box" ? m.role ?? null : null);
   const details = m.kind === "box" ? surfaceGeometry(m, projection) : [];
+  setAttr(node.root, "data-turned", m.kind === "cylinder" ? "" : null);
   while (node.surface!.children.length > details.length) node.surface!.lastElementChild!.remove();
   details.forEach((detail, i) => {
     let path = node.surface!.children[i];
     if (!path) { path = el("path"); node.surface!.append(path); }
     setAttr(path,"data-detail",detail.kind);
+    setAttr(path,"data-tone",detail.tone ?? null);
     setAttr(path,"d",detail.points.map(([x,y],j)=>`${j ? "L" : "M"}${f(x)} ${f(y)}`).join("") + (detail.closed ? "Z" : ""));
   });
   const label = m.label ?? "";
@@ -227,6 +208,8 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
   setAttr(node.text!, "x", f(g.labelAt[0]));
   setAttr(node.text!, "y", f(g.labelAt[1]));
   setAttr(node.text!, "data-face", g.labelShade);
+  setAttr(node.text!, "data-on-panel", m.kind === "box" && m.surface?.panel?.face === g.labelShade && m.label ? "" : null);
+  setAttr(node.text!, "data-room", f(g.labelWidth));
 }
 
 function makeLabel(m: LabelMark): Node {
@@ -250,8 +233,11 @@ function updateLabel(node: Node, m: Resolved<LabelMark>, projection: Projection)
   setAttr(node.root,"data-target",m.target?.key ?? null);
   node.line!.style.display = node.terminal!.style.display = m.target ? "" : "none";
   if (m.target) {
+    // The end sits on the model anchor; the start is placed after labels are
+    // separated (attachLeaders), so it leaves from the text's nearest edge.
     const [tx,ty] = project(m.target.at,projection);
-    for (const [attr,v] of Object.entries({x1:x,y1:y+4,x2:tx,y2:ty})) setAttr(node.line!,attr,f(v));
+    setAttr(node.line!,"x2",f(tx));
+    setAttr(node.line!,"y2",f(ty));
     setAttr(node.terminal!,"cx",f(tx));
     setAttr(node.terminal!,"cy",f(ty));
   }
@@ -259,21 +245,24 @@ function updateLabel(node: Node, m: Resolved<LabelMark>, projection: Projection)
 
 function makeLink(m: LinkMark): Node {
   const root = el("g", { class: "vz-link-g", "data-key": m.key, "data-kind": "link" });
-  const line = el("line", { class: "vz-link" });
-  root.append(line);
-  return { root, kind: "link", line };
+  // A cable is a casing under a core, so it reads as a round conductor lying on the plate.
+  const casing = el("polyline", { class: "vz-cable-casing" });
+  const line = el("polyline", { class: "vz-link" });
+  root.append(casing, line);
+  return { root, kind: "link", route: line, casing };
 }
 
 function updateLink(node: Node, m: Resolved<LinkMark>, projection: Projection): void {
   common(node, m);
-  const a = project(m.from, projection);
-  const b = project(m.to, projection);
-  const l = node.line!;
-  setAttr(l, "x1", f(a[0]));
-  setAttr(l, "y1", f(a[1]));
-  setAttr(l, "x2", f(b[0]));
-  setAttr(l, "y2", f(b[1]));
+  const route = [m.from, ...(m.via ?? []), m.to].map((p) => project(p, projection));
+  const l = node.route!;
+  const d = pts(route);
+  setAttr(l, "points", d);
   setAttr(l, "stroke-width", f(m.width ?? 1.25));
+  setAttr(node.root, "data-cable", m.cable ? "" : null);
+  setAttr(node.casing!, "points", m.cable ? d : "");
+  setAttr(node.casing!, "stroke-width", m.cable ? f((m.width ?? 1.25) + 1.4) : "0");
+  setAttr(node.casing!, "display", m.cable ? null : "none");
   setAttr(l, "data-tone", m.tone ?? null);
   setAttr(l, "data-dashed", m.dashed ? "" : null);
 }
@@ -308,7 +297,7 @@ export function createStage(viewBox: [number, number, number, number], projectio
   function pickInk(n: Node): void {
     const t = n.text;
     // A detached element has no computed fill yet; measuring it would cache a wrong answer.
-    if (!t || !t.textContent || !n.root.isConnected) return;
+    if (!t || !t.textContent || !n.root.isConnected || t.hasAttribute("data-on-panel")) return;
     const id = `${n.root.getAttribute("data-tone") ?? ""}|${t.getAttribute("data-face") ?? ""}`;
     let ink = inkCache.get(id);
     if (!ink) {
@@ -371,7 +360,71 @@ export function createStage(viewBox: [number, number, number, number], projectio
       order = next;
     }
     for (const m of solids) pickInk(nodes.get(m.key)!);
+    for (const m of solids) fitLabel(nodes.get(m.key)!);
+    dropOptionalLabels(marks, solids);
     separateLabels(marks);
+    attachLeaders(marks);
+  }
+
+  /** Drop optional labels whose text box would lie on a standing part or a required label. */
+  function dropOptionalLabels(marks: readonly Resolved[], solids: readonly Resolved<SolidMark>[]): void {
+    const labels = marks.filter((m): m is Resolved<LabelMark> => m.kind === "label");
+    if (!labels.some((m) => m.optional)) return;
+    const standing = solids
+      .filter((m) => boundsOf(m).max[2] > 1e-6)
+      .map((m) => nodes.get(m.key)!.edge!.getAttribute("points")!.trim().split(/\s+/).map((p) => p.split(",").map(Number) as [number, number]));
+    const inside = (poly: [number, number][], x: number, y: number) => {
+      let c = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const [xi, yi] = poly[i]!, [xj, yj] = poly[j]!;
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
+      }
+      return c;
+    };
+    const required = labels.filter((m) => !m.optional).map((m) => nodes.get(m.key)!.text!.getBBox());
+    for (const m of labels) {
+      if (!m.optional) continue;
+      const t = nodes.get(m.key)!.text!;
+      setAttr(t, "display", null);
+      const b = t.getBBox();
+      if (!b.width) continue;
+      let blocked = required.some((r) => b.x < r.x + r.width && r.x < b.x + b.width && b.y < r.y + r.height && r.y < b.y + b.height);
+      for (let i = 0; i < 5 && !blocked; i++)
+        for (let j = 0; j < 3 && !blocked; j++) {
+          const x = b.x + ((i + 0.5) / 5) * b.width, y = b.y + ((j + 0.5) / 3) * b.height;
+          if (standing.some((poly) => inside(poly, x, y))) blocked = true;
+        }
+      if (blocked) setAttr(t, "display", "none");
+    }
+  }
+
+  /**
+   * A label that does not fit the room on its face at the current size is not
+   * drawn, rather than spilling off the part. The transcript keeps the words.
+   */
+  function fitLabel(n: Node): void {
+    const t = n.text;
+    if (!t || !t.textContent || !t.isConnected) return;
+    setAttr(t, "display", null);
+    const room = Number(t.getAttribute("data-room"));
+    if (room > 0 && t.getComputedTextLength() > room) setAttr(t, "display", "none");
+  }
+
+  /** Start each leader at the point of its text box nearest the target, outside the text. */
+  function attachLeaders(marks: readonly Resolved[]): void {
+    for (const m of marks) {
+      if (m.kind !== "label" || !m.target) continue;
+      const n = nodes.get(m.key)!;
+      const b = n.text!.getBBox();
+      if (!b.width) continue;
+      const dy = Number(/translate\(0 (-?[\d.]+)\)/.exec(n.text!.getAttribute("transform") ?? "")?.[1] ?? 0);
+      const tx = Number(n.line!.getAttribute("x2")), ty = Number(n.line!.getAttribute("y2"));
+      const gap = 1.5;
+      const [x0, x1, y0, y1] = [b.x - gap, b.x + b.width + gap, b.y + dy - gap, b.y + dy + b.height + gap];
+      const x = Math.min(Math.max(tx, x0), x1), y = Math.min(Math.max(ty, y0), y1);
+      setAttr(n.line!, "x1", f(x));
+      setAttr(n.line!, "y1", f(y));
+    }
   }
 
   /**

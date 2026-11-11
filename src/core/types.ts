@@ -110,6 +110,18 @@ export interface BoxMark extends MarkBase {
   surface?: {
     /** Height of a housing seam as a fraction of the solid's height. */
     seam?: number;
+    /** Several seams, as fractions of the height: rack units, drawer lines. */
+    seams?: readonly number[];
+    /**
+     * A recessed panel on a side face (a screen, a bezel), between heights
+     * `from` and `to` (fractions) and inset from the face's ends. A label on
+     * the same face is centred on it.
+     */
+    panel?: { face: "left" | "right"; from: number; to: number; inset: number };
+    /** Horizontal vent slots on a side face, between two height fractions. */
+    vents?: { face: "left" | "right"; from: number; to: number; count: number; length: number };
+    /** A small status lamp on a side face at (u along the face, height fraction). */
+    lamp?: { face: "left" | "right"; u: number; at: number; radius: number; tone: Tone };
     fasteners?: { inset: number; radius: number };
     ticks?: { step: number; majorEvery: number };
     /** Inset of the socket's recessed floor treatment. */
@@ -145,6 +157,12 @@ export interface LabelMark extends MarkBase {
   size?: "small" | "normal" | "large";
   /** A leader ending on the named solid, in world coordinates. */
   target?: { key: string; at: Vec3 };
+  /**
+   * A label the explanation does not depend on (slot numbers, scale marks).
+   * The renderer drops it whenever it would sit on a standing part or another
+   * label, for example at small sizes.
+   */
+  optional?: boolean;
 }
 
 /** A straight line between two world points. */
@@ -152,6 +170,10 @@ export interface LinkMark extends MarkBase {
   kind: "link";
   from: Vec3;
   to: Vec3;
+  /** Intermediate points for a routed link, in order. */
+  via?: readonly Vec3[];
+  /** Draw as a cased cable lying on the ground rather than a hairline. */
+  cable?: boolean;
   width?: number;
   dashed?: boolean;
   /** floor: under every solid; overlay: above every solid. */

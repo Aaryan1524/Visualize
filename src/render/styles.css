@@ -431,16 +431,20 @@ body { padding: 32px 16px 48px; }
 .vz[data-presentation="editorial"] .vz-panel { display: flex; align-items: center; gap: 20px; border: 0; padding: 0; }
 .vz[data-presentation="editorial"] .vz-panel h3 { flex: 0 0 auto; font: 500 11px var(--sans); text-transform: none; letter-spacing: 0; margin: 0; }
 .vz[data-presentation="editorial"] .vz-panel-body { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex: 1; min-width: 0; }
-.lru-requests { display: grid; grid-template-columns: repeat(9,minmax(32px,42px)); gap: 6px; padding: 0; margin: 0; list-style: none; }
-.lru-requests li { min-width: 0; text-align: center; min-height: 46px; padding: 5px 0 4px; border: 1px solid var(--hair); border-radius: 7px; background: var(--card); }
-.lru-requests b { display: block; font-size: 15px; font-weight: 600; }
-.lru-requests span { display: block; font-size: 11px; color: var(--ink-2); margin-top: 3px; }
-.lru-requests [data-status="waiting"] span { display: none; }
-.lru-requests [data-status="hit"] { border-color: color-mix(in oklab,var(--t-good) 45%,var(--hair)); background: color-mix(in oklab,var(--t-good) 9%,var(--card)); }
-.lru-requests [data-status="miss"] { border-color: color-mix(in oklab,var(--t-accent) 40%,var(--hair)); background: color-mix(in oklab,var(--t-accent) 8%,var(--card)); }
-.lru-requests [data-status="next"] { border-color: var(--ink-2); box-shadow: 0 0 0 1px var(--ink-2); }
-.lru-totals { display: flex; flex-wrap: wrap; gap: 18px; margin: 0; color: var(--ink-2); font-size: 12px; }
-.lru-totals b { color: var(--ink); font: 500 19px var(--mono); margin-right: 3px; }
+/* Kit strip and totals (src/render/components.ts): no scene-specific CSS. */
+.vz-strip { display: grid; grid-template-columns: repeat(var(--vz-strip-count, 9), minmax(32px, 46px)); gap: 6px; padding: 0; margin: 0; list-style: none; }
+.vz-strip li { min-width: 0; text-align: center; height: 52px; padding: 5px 0 4px; border: 1px solid var(--hair); border-radius: 7px; background: var(--card); overflow: hidden; }
+.vz-strip b { display: block; font-size: 15px; font-weight: 600; }
+.vz-strip span { display: block; font-size: 11px; color: var(--ink-2); margin-top: 3px; }
+.vz-strip [data-status="waiting"] span { visibility: hidden; }
+.vz-strip [data-status="good"] { border-color: color-mix(in oklab,var(--t-good) 45%,var(--hair)); background: color-mix(in oklab,var(--t-good) 9%,var(--card)); }
+.vz-strip [data-status="accent"] { border-color: color-mix(in oklab,var(--t-accent) 40%,var(--hair)); background: color-mix(in oklab,var(--t-accent) 8%,var(--card)); }
+.vz-strip [data-status="bad"] { border-color: color-mix(in oklab,var(--t-bad) 45%,var(--hair)); background: color-mix(in oklab,var(--t-bad) 9%,var(--card)); }
+.vz-strip [data-status="next"] { border-color: var(--ink-2); box-shadow: 0 0 0 1px var(--ink-2); }
+.vz-totals { display: flex; flex-wrap: wrap; gap: 18px; margin: 0; color: var(--ink-2); font-size: 12px; }
+.vz-totals b { color: var(--ink); font: 500 19px var(--mono); margin-right: 3px; }
+.vz-totals [data-status="bad"] b { color: color-mix(in oklab, var(--t-bad) 80%, var(--ink)); }
+.vz-totals [data-status="good"] b { color: color-mix(in oklab, var(--t-good) 80%, var(--ink)); }
 .vz-predict { margin-top: 16px; padding: 13px 15px; border: 1px solid color-mix(in oklab,var(--t-good) 35%,var(--hair)); border-radius: 10px; background: color-mix(in oklab,var(--t-good) 5%,var(--card)); }
 .vz-predict[hidden] { display: none; }
 .vz-predict-kicker { font-size: 11px; color: var(--ink-2); }
@@ -492,8 +496,8 @@ body { padding: 32px 16px 48px; }
   .vz[data-presentation="editorial"] .vz-panel { display: block; }
   .vz[data-presentation="editorial"] .vz-panel h3 { margin-bottom: 12px; }
   .vz[data-presentation="editorial"] .vz-panel-body { display: block; }
-  .lru-requests { grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 3px; }
-  .lru-totals { margin-top: 16px; gap: 14px; }
+  .vz-strip { grid-template-columns: repeat(var(--vz-strip-count, 9), minmax(0, 1fr)); gap: 3px; }
+  .vz-totals { margin-top: 16px; gap: 14px; }
   .vz[data-presentation="editorial"] .vz-solid[data-role="subject"] .vz-solid-label { font-size: calc(var(--label-size) * 1.15); }
   .vz[data-presentation="editorial"] .vz-count { margin: 0 2px; white-space: nowrap; }
   .vz[data-presentation="editorial"] .vz-controls { gap: 5px; }
@@ -508,3 +512,19 @@ body { padding: 32px 16px 48px; }
 .vz-surface [data-detail="slot"] { stroke-width: .22; stroke-opacity: .8; }
 .vz-surface [data-detail="tick"] { stroke-width: .2; stroke-opacity: .65; }
 .vz-surface [data-detail="well"] { fill: color-mix(in oklab, var(--tone) 82%, var(--shade-side)); stroke: color-mix(in oklab, var(--tone) 65%, var(--shade-side)); stroke-width: .45; }
+
+/* Side-face details: a recessed glass panel, vent slots and a status lamp. */
+.vz-surface [data-detail="panel"] { fill: color-mix(in oklab, #1c2622 88%, var(--tone)); stroke: color-mix(in oklab, var(--tone) 55%, var(--shade-side)); stroke-width: .5; vector-effect: non-scaling-stroke; }
+.vz-surface [data-detail="vent"] { stroke: color-mix(in oklab, var(--tone) 55%, var(--shade-side)); stroke-width: 1.1; stroke-linecap: round; stroke-opacity: .55; vector-effect: non-scaling-stroke; }
+.vz-surface [data-detail="lamp"] { fill: var(--t-muted); stroke: color-mix(in oklab, var(--tone) 50%, var(--shade-side)); stroke-width: .35; }
+.vz-surface [data-detail="lamp"][data-tone="good"] { fill: var(--t-good); }
+.vz-surface [data-detail="lamp"][data-tone="accent"] { fill: var(--t-accent); }
+.vz-surface [data-detail="lamp"][data-tone="bad"] { fill: var(--t-bad); }
+.vz-surface [data-detail="lamp"][data-tone="cold"] { fill: var(--t-cold); }
+/* Labels on a panel are lit text on glass. */
+.vz-solid-label[data-on-panel] { fill: #e8f1ec !important; font-family: var(--mono) !important; font-weight: 500 !important; font-size: var(--label-size) !important; letter-spacing: .02em; }
+
+/* Cables: a darker casing under a lighter core. */
+.vz-link-g[data-cable] .vz-link { stroke: color-mix(in oklab, var(--t-structure) 70%, white); stroke-linecap: round; stroke-linejoin: round; }
+.vz-cable-casing { fill: none; stroke: color-mix(in oklab, var(--t-structure) 55%, var(--shade-side)); stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+polyline.vz-link { fill: none; }

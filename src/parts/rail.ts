@@ -45,7 +45,8 @@ export function railAssembly({ key, slots, at = [0, 0, 0], cell = RAIL_CELL, pit
     // Open-ended trays let entries slide along recency; lips only border the sides.
     box(`tray-${i}-back`, [x - 1, -1, 3], [w + 2, 1, 1.3], { radius: .4 });
     box(`tray-${i}-front`, [x - 1, d, 3], [w + 2, 1, 1.3], { radius: .4 });
-    marks.push({ kind: "label", key: id(`slot-${i}`), at: flat ? point(x + w/2, 0, -13) : point(x + w/2, d + 7, -2), text: String(i+1).padStart(2,"0"), size: "small" });
+    // Slot numbers are optional: shown where there is room, dropped where they would sit on a part.
+    marks.push({ kind: "label", key: id(`slot-${i}`), at: flat ? point(x + w/2, 0, -13) : point(x + w/2, d + 7, -2), text: String(i+1).padStart(2,"0"), size: "small", optional: true });
   }
   const slot = (i: number): Vec3 => {
     if (!Number.isInteger(i) || i < 0 || i >= slots) throw new RangeError("Slot index outside the rail");
