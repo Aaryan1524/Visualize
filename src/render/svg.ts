@@ -242,13 +242,16 @@ export function createStage(viewBox: [number, number, number, number], projectio
     "aria-label": label,
     "data-projection": projection,
   });
+  // ground: solids lying at or below z = 0 (base plates). floor: links drawn on
+  // the ground, so they sit on the plates but under everything standing on them.
   const layers = {
+    ground: el("g", { class: "vz-layer", "data-layer": "ground" }),
     floor: el("g", { class: "vz-layer", "data-layer": "floor" }),
     solids: el("g", { class: "vz-layer", "data-layer": "solids" }),
     overlay: el("g", { class: "vz-layer", "data-layer": "overlay" }),
     labels: el("g", { class: "vz-layer", "data-layer": "labels" }),
   };
-  svg.append(layers.floor, layers.solids, layers.overlay, layers.labels);
+  svg.append(layers.ground, layers.floor, layers.solids, layers.overlay, layers.labels);
 
   const nodes = new Map<string, Node>();
   const inkCache = new Map<string, "light" | "dark">();
@@ -312,9 +315,11 @@ export function createStage(viewBox: [number, number, number, number], projectio
     lastConflicts = sorted.conflicts;
     const next = sorted.order.map((m) => m.key);
     if (next.length !== order.length || next.some((k, i) => k !== order[i])) {
-      const frag = document.createDocumentFragment();
-      for (const k of next) frag.append(nodes.get(k)!.root);
-      layers.solids.append(frag);
+      const ground = document.createDocumentFragment();
+      const standing = document.createDocumentFragment();
+      for (const m of sorted.order) (boundsOf(m).max[2] <= 1e-6 ? ground : standing).append(nodes.get(m.key)!.root);
+      layers.ground.append(ground);
+      layers.solids.append(standing);
       order = next;
     }
     for (const m of solids) pickInk(nodes.get(m.key)!);

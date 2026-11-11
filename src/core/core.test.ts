@@ -146,3 +146,9 @@ test("arc: a hop lifts the mark mid-move and lands it exactly", () => {
   assert.equal(end.at[2], 0);
   assert.equal(end.at[0], 60);
 });
+
+test("arc: transient marks hop along their travel path too", () => {
+  const msg: BoxMark = { ...box("m", 0), transient: true, arc: 30, travel: { from: [0, 0, 0], to: [100, 0, 0] } };
+  const mid = resolveFrame([], [msg], 0.5, DEFAULT_PHASES).find((m) => m.key === "m") as BoxMark;
+  assert.ok(mid.at[2] > 25, `lifted, z=${mid.at[2]}`);
+});

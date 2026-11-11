@@ -243,7 +243,8 @@
     const out = [];
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      if (!norm(n.textContent)) continue;
+      // Zero-width characters (KaTeX layout struts) are not text anyone reads.
+      if (!norm(n.textContent.replace(/[\u200b-\u200d\u2060\ufeff]/g, ""))) continue;
       const el = n.parentElement;
       if (!el || el.closest("details:not([open]) > :not(summary)") || el.closest("title") || el.closest(".vz-sr") || el.closest(".katex-mathml")) continue;
       if (!isShown(el)) continue;

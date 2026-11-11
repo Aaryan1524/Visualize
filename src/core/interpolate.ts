@@ -125,7 +125,8 @@ function travelling(m: Mark, u: number): Resolved | null {
   if (!m.travel) return { ...m, opacity: fade };
   const at = lerp3(m.travel.from, m.travel.to, easeInOut(u));
   if (m.kind === "link") return { ...m, opacity: fade };
-  return { ...(m as Exclude<Mark, { kind: "link" }>), at, opacity: fade } as Resolved;
+  const moved = { ...(m as Exclude<Mark, { kind: "link" }>), at } as Mark;
+  return { ...hop(moved, u, m.arc), opacity: fade } as Resolved;
 }
 
 export function isStatic(m: Mark): boolean {
