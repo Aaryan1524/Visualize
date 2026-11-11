@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs",
     "verify": "node scripts/verify.mjs",
-    "shoot": "node scripts/shoot.mjs"
+    "shoot": "node scripts/shoot.mjs",
+    "verify:controls": "node scripts/verify.mjs --controls --quick"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

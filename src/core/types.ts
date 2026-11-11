@@ -90,9 +90,13 @@ export interface BoxMark extends MarkBase {
   kind: "box";
   at: Vec3;
   size: Vec3;
-  /** Short text drawn upright on the top face. */
+  /** Short text drawn upright on a face. */
   label?: string;
+  /** Which visible face carries the label. Use a side when something sits on top. */
+  labelFace?: LabelFace;
 }
+
+export type LabelFace = "top" | "left" | "right";
 
 /** Vertical cylinder. `at` is the centre of the bottom face. */
 export interface CylinderMark extends MarkBase {
@@ -101,6 +105,8 @@ export interface CylinderMark extends MarkBase {
   radius: number;
   height: number;
   label?: string;
+  /** "top", or a side ("left" and "right" both mean the near side). */
+  labelFace?: LabelFace;
 }
 
 /** Text anchored to a world point, drawn above all solids. */

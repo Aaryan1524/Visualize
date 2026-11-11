@@ -1,0 +1,480 @@
+#!/usr/bin/env node
+// Check that a built scene shows what its model computed, at every step.
+//
+//   node scripts/verify.mjs                   every examples/* scene
+//   node scripts/verify.mjs examples/lru      one scene directory (all its variants)
+//   node scripts/verify.mjs --quick           skip screenshots and contact sheets
+//   node scripts/verify.mjs --controls        planted faults: each must be caught
+//
+// The model is run here, in Node, independently of the page. Observations,
+// captions and readouts from that run are compared with what the browser
+// actually draws. Exits non-zero on any problem.
+
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { launch, settle } from "./lib/browser.mjs";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const CHECKS = readFileSync(join(ROOT, "scripts/lib/checks.js"), "utf8");
+
+const argv = process.argv.slice(2);
+const flags = new Set(argv.filter((a) => a.startsWith("--")));
+const quick = flags.has("--quick");
+const plantArg = argv.find((a, i) => argv[i - 1] === "--plant");
+let dirs = argv.filter((a, i) => !a.startsWith("--") && argv[i - 1] !== "--plant").map((d) => resolve(d));
+
+const { compile } = await import(pathToFileURL(join(ROOT, "src/core/scene.ts")).href);
+
+// ---- Planted faults ------------------------------------------------------------
+// Each one breaks the page in a specific way after it loads. Used by --controls
+// to prove every check can fail.
+const PLANTS = {
+  // Paint solids in reverse depth order after every seek.
+  depth: () => {
+    const wrap = () => {
+      const v = window.__viz;
+      const seek = v.seek;
+      v.seek = (t) => {
+        seek(t);
+        const layer = v.stage.svg.querySelector('[data-layer="solids"]');
+        [...layer.children].reverse().forEach((c) => layer.append(c));
+      };
+      v.seekStep = (k) => v.seek(v.compiled.restTime(k));
+    };
+    window.addEventListener("load", wrap);
+  },
+  // Leave history-dependent state behind after a seek.
+  determinism: () => {
+    window.addEventListener("load", () => {
+      const v = window.__viz;
+      const seek = v.seek;
+      let n = 0;
+      v.seek = (t) => {
+        seek(t);
+        v.stage.svg.setAttribute("data-seeks", String(++n));
+      };
+      v.seekStep = (k) => v.seek(v.compiled.restTime(k));
+    });
+  },
+  // Text too small to read.
+  "text-size": () => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s = document.createElement("style");
+      s.textContent = ".vz-readout{font-size:8px!important}";
+      document.head.append(s);
+    });
+  },
+  // Caption nearly the colour of the card.
+  contrast: () => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s = document.createElement("style");
+      s.textContent = ".vz-text{color:#e9e6df!important}";
+      document.head.append(s);
+    });
+  },
+  // Caption drawn from somewhere other than the model.
+  caption: () => {
+    window.addEventListener("load", () => {
+      const v = window.__viz;
+      const seek = v.seek;
+      v.seek = (t) => {
+        seek(t);
+        v.root.querySelector('[data-role="caption"]').textContent = "Something else happened.";
+      };
+      v.seekStep = (k) => v.seek(v.compiled.restTime(k));
+    });
+  },
+  // An uncaught error.
+  console: () => {
+    window.addEventListener("load", () => setTimeout(() => {
+      throw new Error("planted failure");
+    }));
+  },
+  // Keyboard does nothing.
+  keyboard: () => {
+    window.addEventListener("keydown", (e) => e.stopImmediatePropagation(), true);
+  },
+};
+
+const CONTROLS = [
+  { plant: "depth", expect: "depth order" },
+  { plant: "determinism", expect: "determinism" },
+  { plant: "text-size", expect: "text size" },
+  { plant: "contrast", expect: "contrast" },
+  { plant: "caption", expect: "captions" },
+  { plant: "console", expect: "console" },
+  { plant: "keyboard", expect: "keyboard" },
+  { variant: "wrong-value", expect: "observations" },
+  { variant: "crowded-labels", expect: "labels" },
+  { variant: "intersecting", expect: "depth order" },
+];
+
+// ---- Helpers ------------------------------------------------------------------
+function rng(seed) {
+  return () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 2 ** 32;
+  };
+}
+
+function sceneDirs() {
+  const ex = join(ROOT, "examples");
+  if (!existsSync(ex)) return [];
+  return readdirSync(ex)
+    .sort()
+    .map((n) => join(ex, n))
+    .filter((d) => existsSync(join(d, "scene.ts")));
+}
+
+async function variantsOf(dir) {
+  const mod = await import(pathToFileURL(join(dir, "scene.ts")).href);
+  return mod.variants ?? { [mod.default.id]: mod.default };
+}
+
+function buildTo(dir, out) {
+  execFileSync(process.execPath, [join(ROOT, "scripts/build.mjs"), dir, "--out", out], { stdio: "pipe" });
+}
+
+const norm = (s) => String(s ?? "").replace(/\s+/g, " ").trim();
+
+class Report {
+  constructor(name) {
+    this.name = name;
+    this.rows = [];
+  }
+  add(check, detail, problems = []) {
+    this.rows.push({ check, detail, problems });
+  }
+  get failed() {
+    return this.rows.filter((r) => r.problems.length > 0);
+  }
+  print() {
+    console.log(`\n${this.name}`);
+    for (const r of this.rows) {
+      const mark = r.problems.length ? "FAIL" : "ok  ";
+      console.log(`  ${mark} ${r.check.padEnd(15)} ${r.detail}`);
+      for (const p of r.problems.slice(0, 6)) console.log(`         - ${p}`);
+      if (r.problems.length > 6) console.log(`         … ${r.problems.length - 6} more`);
+    }
+    const n = this.failed.reduce((s, r) => s + r.problems.length, 0);
+    console.log(n ? `  ${this.name}: FAILED (${n} problems in ${this.failed.length} checks)` : `  ${this.name}: passed`);
+  }
+}
+
+// ---- One page -------------------------------------------------------------------
+async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
+  const report = new Report(name);
+  const compiled = compile(scene);
+  const steps = compiled.steps;
+  const last = steps.length - 1;
+  const tl = compiled.timeline;
+
+  const openWithPlant = async (opts) => {
+    const page = await browser.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(`exception: ${e.message ?? e}`));
+    page.on("console", (m) => m.type() === "error" && errors.push(`console: ${m.text()}`));
+    if (plant) await page.evaluateOnNewDocument(PLANTS[plant]);
+    await page.setViewport({ width: opts.width ?? 1280, height: opts.height ?? 1000, deviceScaleFactor: opts.scale ?? 1 });
+    await page.emulateMediaFeatures([
+      { name: "prefers-color-scheme", value: opts.theme ?? "light" },
+      { name: "prefers-reduced-motion", value: opts.reduced ? "reduce" : "no-preference" },
+    ]);
+    await page.goto(pathToFileURL(file).href + (opts.hash ?? ""), { waitUntil: "load" });
+    await page.waitForFunction(() => Boolean(window.__viz), { timeout: 5000 });
+    await page.evaluate(CHECKS);
+    await settle(page);
+    return { page, errors };
+  };
+
+  const allErrors = [];
+
+  // -- Desktop, light: model agreement, depth, determinism, text ---------------
+  {
+    const { page, errors } = await openWithPlant({ width: 1280, height: 1000 });
+
+    const obsProblems = [];
+    const capProblems = [];
+    let obsCount = 0;
+    for (let k = 0; k <= last; k++) {
+      await page.evaluate((k) => window.__viz.seekStep(k), k);
+      const s = steps[k];
+      obsCount += s.observations.length;
+      const fails = await page.evaluate((list) => window.__vzCheck.observe(list), s.observations);
+      for (const f of fails) obsProblems.push(`step ${k}: ${f}`);
+      const shown = await page.evaluate(() => window.__vzCheck.shown());
+      if (shown.caption !== norm(s.caption)) capProblems.push(`step ${k}: caption "${shown.caption}" ≠ model "${norm(s.caption)}"`);
+      if (shown.readout !== norm(s.readout)) capProblems.push(`step ${k}: readout "${shown.readout}" ≠ model "${norm(s.readout)}"`);
+      if (shown.trust !== s.trust) capProblems.push(`step ${k}: trust "${shown.trust}" ≠ "${s.trust}"`);
+    }
+    report.add("observations", `${obsCount} declared across ${steps.length} steps`, obsProblems);
+    if (obsCount === 0) report.rows.at(-1).problems.push("the scene declares no observations, so nothing ties the picture to the model");
+    report.add("captions", `caption, readout and trust at ${steps.length} steps`, capProblems);
+
+    // Depth: every rest state and four instants inside every transition.
+    const instants = [];
+    for (let k = 0; k <= last; k++) {
+      instants.push({ label: `step ${k}`, t: compiled.restTime(k) });
+      if (k > 0) for (const p of [0.2, 0.4, 0.6, 0.8]) instants.push({ label: `step ${k - 1}→${k} at ${p}`, t: tl.start[k] + tl.duration[k] * p });
+    }
+    let samples = 0;
+    const depthProblems = [];
+    const conflictSet = new Set();
+    for (const { label, t } of instants) {
+      await page.evaluate((t) => window.__viz.seek(t), t);
+      const d = await page.evaluate(() => window.__vzCheck.depth());
+      samples += d.samples;
+      for (const w of d.wrong.slice(0, 2)) depthProblems.push(`${label}: at ${w.at} ${w.expected} is nearer but ${w.painted} is painted on top`);
+      for (const [a, b] of d.conflicts) conflictSet.add(`${a} and ${b} intersect (${label})`);
+    }
+    report.add("depth order", `${instants.length} instants · ${samples} overlap samples ray-cast`, [...depthProblems, ...[...conflictSet].slice(0, 8)]);
+
+    // Determinism: the same time shows the same page whatever was seen before.
+    const r = rng(1234);
+    const detProblems = [];
+    const trials = 12;
+    for (let i = 0; i < trials; i++) {
+      const t = r() * tl.total;
+      await page.evaluate((t) => window.__viz.seek(t), t);
+      const a = await page.evaluate(() => window.__vzCheck.snapshot());
+      for (let j = 0; j < 4; j++) await page.evaluate((t) => window.__viz.seek(t), r() * tl.total);
+      await page.evaluate((t) => window.__viz.seek(t), t);
+      const b = await page.evaluate(() => window.__vzCheck.snapshot());
+      if (a !== b) detProblems.push(`t=${t.toFixed(0)} ms differs after seeking elsewhere and back`);
+    }
+    report.add("determinism", `${trials} times, each revisited after 4 random seeks`, detProblems);
+
+    // Text and labels at every rest state.
+    const small = new Set(), faint = new Set(), labelProblems = new Set();
+    for (let k = 0; k <= last; k++) {
+      await page.evaluate((k) => window.__viz.seekStep(k), k);
+      const tx = await page.evaluate(() => window.__vzCheck.text());
+      tx.small.forEach((s) => small.add(`step ${k}: ${s}`));
+      tx.faint.forEach((s) => faint.add(s));
+      const lb = await page.evaluate(() => window.__vzCheck.labels());
+      for (const list of [lb.overlaps, lb.spill, lb.hidden, lb.clipped, lb.panels]) list.forEach((s) => labelProblems.add(`step ${k}: ${s}`));
+    }
+    report.add("text size", "every visible text node, at every step (11 px minimum)", [...small]);
+    report.add("contrast", "WCAG ratio against the face or card behind each text, light theme", [...faint]);
+    report.add("labels", "no overlaps, no spill off faces, not covered, inside the card, panels fit", [...labelProblems]);
+
+    // Keyboard.
+    const keyProblems = [];
+    await page.evaluate(() => window.__viz.seekStep(0));
+    await page.focus(".vz-stage");
+    await page.keyboard.press("ArrowRight");
+    const reached = await page
+      .waitForFunction((t) => window.__viz.time() === t, { timeout: 4000 }, compiled.restTime(1))
+      .then(() => true, () => false);
+    if (!reached) keyProblems.push("ArrowRight from the start did not arrive at step 1");
+    else {
+      await page.keyboard.press("ArrowLeft");
+      const back = await page.waitForFunction(() => window.__viz.time() === 0, { timeout: 4000 }).then(() => true, () => false);
+      if (!back) keyProblems.push("ArrowLeft from step 1 did not return to the start");
+    }
+    await page.keyboard.press("End");
+    if ((await page.evaluate(() => window.__viz.shownIndex())) !== last) keyProblems.push("End did not show the last step");
+    await page.keyboard.press("Home");
+    if ((await page.evaluate(() => window.__viz.shownIndex())) !== 0) keyProblems.push("Home did not show the first step");
+    await page.keyboard.press(" ");
+    await new Promise((r) => setTimeout(r, 250));
+    const advanced = await page.evaluate(() => window.__viz.time());
+    await page.keyboard.press(" ");
+    const paused = await page.evaluate(() => window.__viz.time());
+    await new Promise((r) => setTimeout(r, 200));
+    const stillPaused = await page.evaluate(() => window.__viz.time());
+    if (!(advanced > 0)) keyProblems.push("Space did not start playback");
+    if (paused !== stillPaused) keyProblems.push("Space did not pause playback");
+    report.add("keyboard", "arrows step and animate, Home/End, Space plays and pauses", keyProblems);
+
+    allErrors.push(...errors);
+    await page.close();
+  }
+
+  // -- Reduced motion: every instant shows a step at rest ------------------------
+  {
+    const { page, errors } = await openWithPlant({ reduced: true });
+    const problems = [];
+    const rest = [];
+    for (let k = 0; k <= last; k++) {
+      await page.evaluate((k) => window.__viz.seekStep(k), k);
+      rest.push(await page.evaluate(() => window.__vzCheck.snapshot()));
+    }
+    for (let k = 1; k <= last; k++) {
+      for (const p of [0.3, 0.7]) {
+        await page.evaluate((t) => window.__viz.seek(t), tl.start[k] + tl.duration[k] * p);
+        const s = await page.evaluate(() => window.__vzCheck.snapshot());
+        if (!rest.includes(s)) problems.push(`step ${k - 1}→${k} at ${p} shows an in-between frame`);
+      }
+    }
+    await page.evaluate(() => window.__viz.seekStep(0));
+    await page.focus(".vz-stage");
+    await page.keyboard.press("ArrowRight");
+    await settle(page);
+    if ((await page.evaluate(() => window.__viz.time())) !== compiled.restTime(1)) problems.push("ArrowRight did not cut straight to step 1");
+    report.add("reduced motion", "no in-between frames; stepping cuts", problems);
+    allErrors.push(...errors);
+    await page.close();
+  }
+
+  // -- Step links -----------------------------------------------------------------
+  {
+    const k = Math.min(2, last);
+    const { page, errors } = await openWithPlant({ hash: `#step=${k}` });
+    const got = await page.evaluate(() => window.__viz.shownIndex());
+    report.add("step link", `#step=${k} opens at step ${k}`, got === k ? [] : [`opened at step ${got}`]);
+    allErrors.push(...errors);
+    await page.close();
+  }
+
+  // -- Phone and dark: layout, contrast, screenshots ---------------------------------
+  const shots = [];
+  {
+    const layoutProblems = [];
+    const darkFaint = new Set();
+    for (const theme of ["light", "dark"]) {
+      for (const width of [1280, 390]) {
+        const { page, errors } = await openWithPlant({ width, height: width < 600 ? 860 : 1000, theme, scale: 2 });
+        await page.evaluate((k) => window.__viz.seekStep(k), last);
+        await settle(page);
+        const scroll = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
+        if (scroll > 0) layoutProblems.push(`${width}px ${theme}: page scrolls sideways by ${scroll}px`);
+        if (width < 600) {
+          for (let k = 0; k <= last; k++) {
+            await page.evaluate((k) => window.__viz.seekStep(k), k);
+            const lb = await page.evaluate(() => window.__vzCheck.labels());
+            for (const list of [lb.overlaps, lb.spill, lb.hidden, lb.clipped, lb.panels]) list.forEach((s) => layoutProblems.push(`390px step ${k}: ${s}`));
+            const tx = await page.evaluate(() => window.__vzCheck.text());
+            tx.small.forEach((s) => layoutProblems.push(`390px step ${k}: ${s}`));
+          }
+          await page.evaluate((k) => window.__viz.seekStep(k), last);
+        }
+        if (theme === "dark") {
+          for (let k = 0; k <= last; k++) {
+            await page.evaluate((k) => window.__viz.seekStep(k), k);
+            (await page.evaluate(() => window.__vzCheck.text())).faint.forEach((s) => darkFaint.add(s));
+          }
+          await page.evaluate((k) => window.__viz.seekStep(k), last);
+        }
+        if (!quick) {
+          await settle(page);
+          const out = join(shotsDir, `${width < 600 ? "phone" : "desktop"}-${theme}.png`);
+          await page.screenshot({ path: out, fullPage: true });
+          shots.push(out);
+        }
+        allErrors.push(...errors);
+        await page.close();
+      }
+    }
+    report.add("layout", "1280 and 390 px, both themes: no sideways scroll; labels and text at 390 px", [...new Set(layoutProblems)]);
+    report.add("contrast dark", "WCAG ratio, dark theme", [...darkFaint]);
+  }
+
+  // -- Contact sheets ----------------------------------------------------------------
+  if (!quick) {
+    const { page, errors } = await openWithPlant({ width: 1280, height: 1000, scale: 1 });
+    const stage = await page.$(".vz-stage");
+    const tiles = [];
+    for (let k = 0; k <= last; k++) {
+      await page.evaluate((k) => window.__viz.seekStep(k), k);
+      await settle(page);
+      tiles.push({ label: `${k}. ${norm(steps[k].caption)}`, img: await stage.screenshot({ encoding: "base64" }) });
+    }
+    const motion = [];
+    for (let k = 1; k <= last; k++) {
+      const row = [];
+      for (const p of [0, 0.25, 0.5, 0.75, 1]) {
+        await page.evaluate((t) => window.__viz.seek(t), tl.start[k] + tl.duration[k] * p);
+        await settle(page);
+        row.push({ label: `${k - 1}→${k} · ${p}`, img: await stage.screenshot({ encoding: "base64" }) });
+      }
+      motion.push(row);
+    }
+    allErrors.push(...errors);
+    await page.close();
+
+    const sheet = async (title, rows, cols, out, tileWidth) => {
+      const p = await browser.newPage();
+      await p.setViewport({ width: cols * (tileWidth + 12) + 24, height: 400, deviceScaleFactor: 1 });
+      const cells = rows
+        .flat()
+        .map((t) => `<figure><img src="data:image/png;base64,${t.img}"><figcaption>${t.label.replace(/</g, "&lt;")}</figcaption></figure>`)
+        .join("");
+      await p.setContent(`<style>body{margin:12px;font:12px/1.35 ui-sans-serif,system-ui;background:#fff;color:#222}
+        h1{font-size:14px;margin:0 0 10px}main{display:grid;grid-template-columns:repeat(${cols},${tileWidth}px);gap:12px}
+        figure{margin:0}img{width:100%;border:1px solid #ddd;border-radius:6px;background:#fbfaf6}figcaption{margin-top:4px}</style>
+        <h1>${title}</h1><main>${cells}</main>`);
+      await p.screenshot({ path: out, fullPage: true });
+      await p.close();
+      shots.push(out);
+    };
+    await sheet(`${name}: every step at rest`, [tiles], 4, join(shotsDir, "steps.png"), 300);
+    await sheet(`${name}: every transition at 0, ¼, ½, ¾, 1`, motion, 5, join(shotsDir, "motion.png"), 220);
+  }
+
+  report.add("console", "no errors or uncaught exceptions on any page", [...new Set(allErrors)]);
+  if (shots.length) report.add("screenshots", shots.map((s) => relative(ROOT, s)).join(", "));
+  return report;
+}
+
+// ---- Main ------------------------------------------------------------------------
+const browser = await launch();
+let failedReports = 0;
+try {
+  if (flags.has("--controls")) {
+    const fixture = join(ROOT, "test/fixtures/faults");
+    const variants = await variantsOf(fixture);
+    const out = join(ROOT, "shots/controls");
+    mkdirSync(out, { recursive: true });
+    buildTo(fixture, out);
+    const results = [];
+    for (const c of CONTROLS) {
+      const name = c.variant ?? "clean";
+      const scene = variants[name];
+      if (!scene) throw new Error(`fixture variant ${name} missing`);
+      const report = await verifyPage(browser, {
+        name: c.plant ? `planted ${c.plant}` : `variant ${c.variant}`,
+        scene,
+        file: join(out, `${name}.html`),
+        shotsDir: out,
+        plant: c.plant,
+      });
+      const caught = report.failed.some((r) => r.check === c.expect);
+      results.push({ control: c.plant ?? c.variant, expect: c.expect, caught, failing: report.failed.map((r) => r.check) });
+    }
+    // The clean fixture itself must pass, or the controls prove nothing.
+    const clean = await verifyPage(browser, { name: "clean fixture", scene: variants.clean, file: join(out, "clean.html"), shotsDir: out });
+    console.log("\nplanted-fault controls");
+    for (const r of results) {
+      console.log(`  ${r.caught ? "caught " : "MISSED "} ${r.control.padEnd(16)} expected "${r.expect}"; failing: ${r.failing.join(", ") || "none"}`);
+    }
+    clean.print();
+    const missed = results.filter((r) => !r.caught).length;
+    if (missed || clean.failed.length) {
+      console.log(`\ncontrols: ${missed} missed${clean.failed.length ? ", clean fixture failed" : ""}`);
+      process.exitCode = 1;
+    } else console.log(`\ncontrols: all ${results.length} planted faults caught; clean fixture passes`);
+  } else {
+    if (dirs.length === 0) dirs = sceneDirs();
+    if (dirs.length === 0) throw new Error("no scenes to verify");
+    for (const dir of dirs) {
+      const variants = await variantsOf(dir);
+      const out = join(ROOT, "shots", relative(join(ROOT, "examples"), dir).replace(/[\\/]/g, "-"));
+      mkdirSync(out, { recursive: true });
+      buildTo(dir, out);
+      for (const [name, scene] of Object.entries(variants)) {
+        const shotsDir = join(out, name);
+        mkdirSync(shotsDir, { recursive: true });
+        const report = await verifyPage(browser, { name, scene, file: join(out, `${name}.html`), shotsDir, plant: plantArg });
+        report.print();
+        writeFileSync(join(shotsDir, "report.json"), JSON.stringify(report.rows, null, 2));
+        if (report.failed.length) failedReports++;
+      }
+    }
+    if (failedReports) process.exitCode = 1;
+  }
+} finally {
+  await browser.close();
+}

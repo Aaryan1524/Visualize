@@ -87,9 +87,36 @@ interface Node {
   line?: SVGLineElement;
 }
 
+/** Relative luminance of a CSS colour, resolved through a 1×1 canvas. */
+let probe: CanvasRenderingContext2D | null = null;
+function luminanceOf(css: string): number {
+  probe ??= document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  if (!probe) return 0.5;
+  probe.clearRect(0, 0, 1, 1);
+  probe.fillStyle = "#000";
+  probe.fillStyle = css;
+  probe.fillRect(0, 0, 1, 1);
+  const d = probe.getImageData(0, 0, 1, 1).data;
+  const lin = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(d[0]!) + 0.7152 * lin(d[1]!) + 0.0722 * lin(d[2]!);
+}
+
+/** Relative luminance of the dark label ink, #15171b. */
+const INK_LUM = 0.0069;
+
+/** "light" when white text contrasts more with this fill than dark ink does. */
+function inkFor(fill: string): "light" | "dark" {
+  const l = luminanceOf(fill);
+  const onWhite = 1.05 / (l + 0.05);
+  const onInk = (l + 0.05) / (INK_LUM + 0.05);
+  return onWhite > onInk ? "light" : "dark";
+}
+
 export interface StageRenderer {
   svg: SVGSVGElement;
   render(marks: readonly Resolved[]): void;
+  /** Re-pick label colours after a theme change. */
+  refreshInk(): void;
   /** Current painter's order of solids, for checks. */
   solidOrder(): string[];
   conflicts(): [string, string][];
@@ -158,6 +185,7 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
   if (node.text!.textContent !== label) node.text!.textContent = label;
   setAttr(node.text!, "x", f(g.labelAt[0]));
   setAttr(node.text!, "y", f(g.labelAt[1]));
+  setAttr(node.text!, "data-face", g.labelShade);
 }
 
 function makeLabel(m: LabelMark): Node {
@@ -220,7 +248,23 @@ export function createStage(viewBox: [number, number, number, number], projectio
   svg.append(layers.floor, layers.solids, layers.overlay, layers.labels);
 
   const nodes = new Map<string, Node>();
+  const inkCache = new Map<string, "light" | "dark">();
   let order: string[] = [];
+
+  function pickInk(n: Node): void {
+    const t = n.text;
+    // A detached element has no computed fill yet; measuring it would cache a wrong answer.
+    if (!t || !t.textContent || !n.root.isConnected) return;
+    const id = `${n.root.getAttribute("data-tone") ?? ""}|${t.getAttribute("data-face") ?? ""}`;
+    let ink = inkCache.get(id);
+    if (!ink) {
+      const face = n.root.querySelector<SVGElement>(`.vz-face[data-shade="${t.getAttribute("data-face")}"]`);
+      if (!face) return;
+      ink = inkFor(getComputedStyle(face).fill);
+      inkCache.set(id, ink);
+    }
+    setAttr(t, "data-ink", ink);
+  }
   let lastConflicts: [string, string][] = [];
 
   function nodeFor(m: Mark): Node {
@@ -270,9 +314,15 @@ export function createStage(viewBox: [number, number, number, number], projectio
       layers.solids.append(frag);
       order = next;
     }
+    for (const m of solids) pickInk(nodes.get(m.key)!);
   }
 
-  return { svg, render, solidOrder: () => [...order], conflicts: () => lastConflicts };
+  function refreshInk(): void {
+    inkCache.clear();
+    for (const n of nodes.values()) if (n.text && n.kind !== "label" && n.kind !== "link") pickInk(n);
+  }
+
+  return { svg, render, refreshInk, solidOrder: () => [...order], conflicts: () => lastConflicts };
 }
 
 export { DROP };

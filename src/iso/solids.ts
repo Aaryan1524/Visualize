@@ -18,10 +18,12 @@ export interface SolidGeometry {
   faces: Face[];
   /** Silhouette, for the outline stroke and hit testing. */
   outline: Pt[];
-  /** Where an upright label sits: the centre of the top face. */
+  /** Where an upright label sits: the centre of its face. */
   labelAt: Pt;
-  /** Width of the top face on screen, for fitting label text. */
+  /** Width available on that face on screen, for fitting label text. */
   labelWidth: number;
+  /** The face the label sits on, as drawn. */
+  labelShade: Shade;
   /** Elliptical top for cylinders, drawn as an ellipse instead of a polygon. */
   ellipse?: { cx: number; cy: number; rx: number; ry: number };
 }
@@ -47,6 +49,7 @@ function boxGeometry(m: BoxMark, projection: Projection): SolidGeometry {
       outline: face,
       labelAt: [(a[0] + b[0]) / 2, (a[1] + face[3]![1]) / 2],
       labelWidth: b[0] - a[0],
+      labelShade: "front",
     };
   }
 
@@ -55,9 +58,16 @@ function boxGeometry(m: BoxMark, projection: Projection): SolidGeometry {
   const left = [P(x0, y1, z1), P(x1, y1, z1), P(x1, y1, z0), P(x0, y1, z0)];
   const right = [P(x1, y0, z1), P(x1, y1, z1), P(x1, y1, z0), P(x1, y0, z0)];
   const outline = [P(x0, y0, z1), P(x1, y0, z1), P(x1, y0, z0), P(x1, y1, z0), P(x0, y1, z0), P(x0, y1, z1)];
-  const c = P((x0 + x1) / 2, (y0 + y1) / 2, z1);
-  // The top face spans (w + d)·cos30° at its widest row; leave margin for the slanted edges.
-  const labelWidth = (m.size[0] + m.size[1]) * Math.cos(Math.PI / 6) * 0.55;
+  const zm = (z0 + z1) / 2;
+  const face = m.labelFace ?? "top";
+  const C30 = Math.cos(Math.PI / 6);
+  const label: { at: Pt; width: number } =
+    face === "left"
+      ? { at: P((x0 + x1) / 2, y1, zm), width: m.size[0] * C30 * 0.8 }
+      : face === "right"
+        ? { at: P(x1, (y0 + y1) / 2, zm), width: m.size[1] * C30 * 0.8 }
+        : // The top face spans (w + d)·cos30° at its widest row; leave margin for the slanted edges.
+          { at: P((x0 + x1) / 2, (y0 + y1) / 2, z1), width: (m.size[0] + m.size[1]) * C30 * 0.55 };
   return {
     faces: [
       { shade: "left", points: left },
@@ -65,8 +75,9 @@ function boxGeometry(m: BoxMark, projection: Projection): SolidGeometry {
       { shade: "top", points: top },
     ],
     outline,
-    labelAt: c,
-    labelWidth,
+    labelAt: label.at,
+    labelWidth: label.width,
+    labelShade: face,
   };
 }
 
@@ -84,7 +95,7 @@ function cylinderGeometry(m: CylinderMark, projection: Projection): SolidGeometr
       [b[0] + rx, b[1]],
       [b[0] - rx, b[1]],
     ];
-    return { faces: [{ shade: "front", points: face }], outline: face, labelAt: [t[0], (t[1] + b[1]) / 2], labelWidth: 2 * rx };
+    return { faces: [{ shade: "front", points: face }], outline: face, labelAt: [t[0], (t[1] + b[1]) / 2], labelWidth: 2 * rx, labelShade: "front" };
   }
 
   // Side: the near half of the bottom ellipse joined to the top ellipse's extremes.
@@ -112,8 +123,9 @@ function cylinderGeometry(m: CylinderMark, projection: Projection): SolidGeometr
       { shade: "top", points: top },
     ],
     outline,
-    labelAt: t,
-    labelWidth: rx * 1.6,
+    ...(m.labelFace && m.labelFace !== "top"
+      ? { labelAt: [b[0], (b[1] + t[1]) / 2 + ry / 2] as Pt, labelWidth: rx * 1.6, labelShade: "right" as Shade }
+      : { labelAt: t, labelWidth: rx * 1.6, labelShade: "top" as Shade }),
     ellipse: { cx: t[0], cy: t[1], rx, ry },
   };
 }
