@@ -410,7 +410,7 @@ body { padding: 32px 16px 48px; }
 .vz-chapters button[aria-current] { color: var(--ink); border-bottom-color: var(--t-good); }
 .vz-chapters button:focus-visible, .vz-predict button:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 .vz[data-presentation="editorial"] .vz-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; align-items: stretch; gap: 0; min-height: 0; }
-.vz[data-presentation="editorial"] .vz-stage { padding: 0; min-height: 0; border: 1px solid var(--hair); border-radius: 12px; background: radial-gradient(ellipse at 52% 53%, color-mix(in oklab, var(--t-base) 12%, transparent), transparent 68%); }
+.vz[data-presentation="editorial"] .vz-stage { padding: 0; min-height: 0; border: 1px solid var(--hair); border-radius: 12px; background: var(--card); }
 .vz[data-presentation="editorial"] .vz-svg { height: 560px; max-height: none; }
 .vz[data-presentation="editorial"] .vz-edge { stroke: color-mix(in oklab, var(--tone) 80%, var(--shade-side)); stroke-opacity: .24; stroke-width: .65; }
 .vz[data-presentation="editorial"] .vz-solid[data-lit] .vz-edge { stroke: var(--tone); stroke-opacity: .65; stroke-width: 1; }
