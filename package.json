@@ -1,0 +1,26 @@
+{
+  "name": "visualize",
+  "version": "0.0.1",
+  "description": "An engine for model-driven, step-through visual explanations: isometric stages, linked math panels, and checks that the picture matches the model.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test \"src/**/*.test.ts\" \"examples/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "puppeteer-core": "^25.17.0",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "katex": "^0.19.1"
+  }
+}
