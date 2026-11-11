@@ -227,7 +227,7 @@ body { padding: 32px 16px 48px; }
 /* Chosen at runtime by contrast with the face behind the label. */
 .vz-solid-label[data-ink="light"] { fill: #ffffff; }
 
-.vz-label[data-size="small"] { font-size: calc(var(--label-size) * 0.88); font-weight: 500; fill: var(--ink-2); }
+.vz-label[data-size="small"] { font-weight: 500; fill: var(--ink-2); }
 .vz-label[data-size="large"] { font-size: calc(var(--label-size) * 1.25); }
 
 .vz-link {
@@ -319,9 +319,11 @@ body { padding: 32px 16px 48px; }
 .vz-scrub { flex: 1; min-width: 0; position: relative; height: 36px; display: flex; align-items: center; }
 .vz-range { width: 100%; accent-color: var(--ink); margin: 0; }
 
-/* Panels */
-.vz-panels { display: grid; gap: 14px; }
+/* Panels never widen the page; content that does not fit scrolls inside (and fails verify). */
+.vz-panels { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.vz-panel-body { overflow-x: auto; }
 .vz-panel {
+  min-width: 0;
   border: 1px solid var(--hair);
   border-radius: 10px;
   padding: 12px 14px;
@@ -339,10 +341,11 @@ body { padding: 32px 16px 48px; }
 .vz-panel td, .vz-panel th { padding: 4px 7px; text-align: right; }
 .vz-panel th { color: var(--ink-2); font-weight: 500; }
 .vz-panel .vz-dim { color: var(--ink-2); }
-.vz-panel .vz-hot { color: var(--t-hot); font-weight: 700; }
-.vz-panel .vz-good { color: var(--t-good); font-weight: 700; }
-.vz-panel .vz-bad { color: var(--t-bad); font-weight: 700; }
-.vz-panel .vz-cold { color: var(--t-cold); font-weight: 700; }
+/* Tone text is pulled toward the ink so it stays readable on the card in both themes. */
+.vz-panel .vz-hot { color: color-mix(in oklab, var(--t-hot) 72%, var(--ink)); font-weight: 700; }
+.vz-panel .vz-good { color: color-mix(in oklab, var(--t-good) 72%, var(--ink)); font-weight: 700; }
+.vz-panel .vz-bad { color: color-mix(in oklab, var(--t-bad) 72%, var(--ink)); font-weight: 700; }
+.vz-panel .vz-cold { color: color-mix(in oklab, var(--t-cold) 72%, var(--ink)); font-weight: 700; }
 .vz-panel .katex { font-size: 1.12em; }
 .vz-panel .katex-display { margin: 4px 0; overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
 

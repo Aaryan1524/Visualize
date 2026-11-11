@@ -159,6 +159,7 @@
     let samples = 0;
     try {
       const keys = [...outlines.keys()];
+      const all = [...outlines.values()];
       for (let i = 0; i < keys.length; i++) {
         for (let j = i + 1; j < keys.length; j++) {
           const A = outlines.get(keys[i]), B = outlines.get(keys[j]);
@@ -172,7 +173,9 @@
               const x = x0 + ((gx + 0.5) / N) * (x1 - x0);
               const y = y0 + ((gy + 0.5) / N) * (y1 - y0);
               if (!inside(A, x, y) || !inside(B, x, y)) continue;
-              if (edgeDistance(A, x, y) < margin || edgeDistance(B, x, y) < margin) continue;
+              // Keep clear of every outline, not just this pair's: a third solid's
+              // stroke would otherwise win the hit test a hair outside its shape.
+              if (all.some((poly) => edgeDistance(poly, x, y) < margin)) continue;
               // The truly nearest surface among every solid on the line of sight.
               let best = null, bestT = -Infinity, secondT = -Infinity;
               for (const m of solids) {
@@ -187,7 +190,7 @@
               const shown = el && el.closest("[data-key]");
               const got = shown && shown.getAttribute("data-key");
               samples++;
-              if (got !== best) wrong.push({ at: [Math.round(cx), Math.round(cy)], expected: best, painted: got });
+              if (got !== best) wrong.push({ at: [Math.round(cx), Math.round(cy)], vb: [x, y], pair: [keys[i], keys[j]], expected: best, painted: got });
             }
           }
         }
@@ -299,7 +302,8 @@
         if (!e.classList.contains("vz-solid-label")) return;
         const g = e.closest("[data-key]");
         const fr = labelFace(e).getBoundingClientRect();
-        if (r.width > fr.width * 0.92 || r.height > fr.height * 1.05) spill.push(`"${norm(e.textContent)}" is wider than its face (${r.width.toFixed(0)} > ${fr.width.toFixed(0)} px)`);
+        if (r.width > fr.width * 0.92) spill.push(`"${norm(e.textContent)}" is wider than its face (${r.width.toFixed(0)} > ${fr.width.toFixed(0)} px)`);
+        else if (r.height > fr.height * 1.05) spill.push(`"${norm(e.textContent)}" is taller than its face (${r.height.toFixed(0)} > ${fr.height.toFixed(0)} px)`);
         const [cx, cy] = [r.left + r.width / 2, r.top + r.height / 2];
         const under = document.elementFromPoint(cx, cy);
         const owner = under && under.closest("[data-key]");
@@ -312,15 +316,26 @@
     return { overlaps, spill, hidden, clipped, panels };
   }
 
+  /**
+   * Canonical serialization: tag, attributes sorted by name, text. Attribute
+   * order is an artefact of removal and re-insertion, not visible state.
+   */
+  function canonical(node) {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    const attrs = [...node.attributes].map((a) => `${a.name}=${JSON.stringify(a.value)}`).sort().join(" ");
+    return `<${node.localName} ${attrs}>${[...node.childNodes].map(canonical).join("")}</${node.localName}>`;
+  }
+
   /** Everything visible that a seek could leave behind. */
   function snapshot() {
     const r = viz().root;
     return [
-      svg().outerHTML,
+      canonical(svg()),
       r.querySelector('[data-role="caption"]').textContent,
       r.querySelector('[data-role="readout"]').textContent,
       r.querySelector('[data-role="count"]').textContent,
-      [...r.querySelectorAll(".vz-panel")].map((p) => p.outerHTML).join(""),
+      [...r.querySelectorAll(".vz-panel")].map(canonical).join(""),
     ].join("\u0000");
   }
 

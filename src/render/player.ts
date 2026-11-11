@@ -1,11 +1,16 @@
 import { compile, type Compiled, type Frame, type StepInfo } from "../core/scene.ts";
 import { frameIndexAt } from "../core/timeline.ts";
 import { TRUST_LABEL, TRUST_MEANING } from "../core/trust.ts";
-import type { Panel, Resolved, Scene } from "../core/types.ts";
+import type { LabelMark, Panel, Resolved, Scene } from "../core/types.ts";
 import { createStage, fitViewBox, type StageRenderer } from "./svg.ts";
 
-/** Rendered label size in CSS px, independent of how large the stage is drawn. */
-const LABEL_PX = 14;
+/**
+ * Labels scale with the drawing but stay readable: LABEL_UNITS world units
+ * tall, clamped to LABEL_MIN..LABEL_MAX CSS px.
+ */
+const LABEL_UNITS = 6;
+const LABEL_MIN = 11;
+const LABEL_MAX = 14;
 
 const ICONS = {
   prev: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg>',
@@ -54,10 +59,11 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   const projection = scene.projection ?? "iso";
   const last = steps.length - 1;
 
-  const viewBox = fitViewBox(
+  const geometryBox = fitViewBox(
     steps.map((s) => s.marks),
     projection,
   );
+  let viewBox = geometryBox;
   const stage = createStage(viewBox, projection, `${scene.title}. ${scene.question} Use the step controls or the arrow keys.`);
 
   // ---- DOM -------------------------------------------------------------
@@ -169,15 +175,38 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
   });
   syncThemeBtn();
 
-  // ---- Label size stays constant on screen --------------------------------
-  const sizeLabels = () => {
-    // The viewBox is fitted with "meet", so the drawn scale is the smaller of the two fits.
-    const r = stage.svg.getBoundingClientRect();
-    const scale = Math.min(r.width / viewBox[2], r.height / viewBox[3]);
-    if (scale > 0) stage.svg.style.setProperty("--label-size", `${LABEL_PX / scale}px`);
+  // ---- Camera fit including labels ----------------------------------------------
+  // Label size is set in screen px, so how much room labels need in world
+  // units depends on the scale, which depends on the room: iterate.
+  const stageLabels = (() => {
+    const seen = new Map<string, LabelMark>();
+    for (const st of steps) for (const m of st.marks) if (m.kind === "label" && !m.transient && !m.leaving) seen.set(`${m.key}|${m.text}|${m.at.join(",")}`, m);
+    return [...seen.values()];
+  })();
+  const fit = () => {
+    let vb = geometryBox;
+    for (let i = 0; i < 5; i++) {
+      stage.setViewBox(vb);
+      const r = stage.svg.getBoundingClientRect();
+      // The viewBox is fitted with "meet", so the drawn scale is the smaller of the two fits.
+      const scale = Math.min(r.width / vb[2], r.height / vb[3]);
+      if (!(scale > 0)) return;
+      const px = Math.min(LABEL_MAX, Math.max(LABEL_MIN, LABEL_UNITS * scale));
+      stage.svg.style.setProperty("--label-size", `${px / scale}px`);
+      const m = stage.measureLabels(stageLabels);
+      if (!m) break;
+      const pad = 4 / scale;
+      const g = geometryBox;
+      const x0 = Math.min(g[0], m[0] - pad), y0 = Math.min(g[1], m[1] - pad);
+      const x1 = Math.max(g[0] + g[2], m[2] + pad), y1 = Math.max(g[1] + g[3], m[3] + pad);
+      const next: [number, number, number, number] = [x0, y0, x1 - x0, y1 - y0];
+      if (next.every((v, j) => Math.abs(v - vb[j]!) < 0.5)) break;
+      vb = next;
+    }
+    viewBox = vb;
   };
-  new ResizeObserver(sizeLabels).observe(stage.svg);
-  sizeLabels();
+  new ResizeObserver(fit).observe(stage.svg);
+  fit();
 
   // ---- Linked highlighting --------------------------------------------------
   let activeLink: string | null = null;
@@ -412,7 +441,9 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>): PlayerApi {
     compiled,
     stage,
     root,
-    viewBox,
+    get viewBox() {
+      return viewBox;
+    },
     seek,
     seekStep: (k) => seek(compiled.restTime(k)),
     play: () => setPlaying(true),
