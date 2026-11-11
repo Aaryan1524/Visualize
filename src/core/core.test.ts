@@ -121,3 +121,28 @@ test("scene: duplicate keys are rejected", () => {
   const bad = defineScene({ ...counter, view: () => [box("x", 0), box("x", 1)] });
   assert.throws(() => compile(bad), /duplicate mark key "x"/);
 });
+
+test("leaving: the previous mark travels to its leaving target and is gone at rest", () => {
+  const prev: Mark[] = [box("b", 0)];
+  const next: Mark[] = [box("b", -40, { leaving: true, tone: "bad" })];
+  const mid = resolveFrame(prev, next, 0.6, DEFAULT_PHASES).find((m) => m.key === "b") as BoxMark;
+  assert.ok(mid && mid.at[0] < 0 && mid.at[0] > -40, "moving toward the target");
+  assert.equal(mid.tone, "bad", "takes the leaving mark's look after the midpoint");
+  assert.ok(!resolveFrame(prev, next, 1, DEFAULT_PHASES).some((m) => m.key === "b"), "not drawn at rest");
+  assert.ok(!resolveFrame(prev, next, DEFAULT_PHASES.move[1], DEFAULT_PHASES).some((m) => m.key === "b"), "faded by the end of the move");
+});
+
+test("leaving: a leaving mark with no previous mark draws nothing", () => {
+  const next: Mark[] = [box("ghost", 0, { leaving: true })];
+  for (const p of [0, 0.5, 1]) assert.equal(resolveFrame([], next, p, DEFAULT_PHASES).length, 0);
+});
+
+test("arc: a hop lifts the mark mid-move and lands it exactly", () => {
+  const prev: Mark[] = [box("a", 0)];
+  const next: Mark[] = [box("a", 60, { arc: 20 })];
+  const mid = resolveFrame(prev, next, 0.5, DEFAULT_PHASES)[0] as BoxMark;
+  assert.ok(mid.at[2] > 15, `lifted, z=${mid.at[2]}`);
+  const end = resolveFrame(prev, next, DEFAULT_PHASES.move[1], DEFAULT_PHASES)[0] as BoxMark;
+  assert.equal(end.at[2], 0);
+  assert.equal(end.at[0], 60);
+});

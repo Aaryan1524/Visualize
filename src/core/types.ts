@@ -81,6 +81,14 @@ interface MarkBase {
   transient?: boolean;
   /** For transient marks: the path followed during the transition. */
   travel?: { from: Vec3; to: Vec3 };
+  /**
+   * In the next state, says where an entity goes as it leaves: the engine
+   * moves the previous mark with this key here during the transition, then
+   * fades it. Never drawn at rest.
+   */
+  leaving?: boolean;
+  /** Height of a hop during the move, so a mark can pass over its neighbours. */
+  arc?: number;
   /** Accessible name of this element. */
   title?: string;
 }
