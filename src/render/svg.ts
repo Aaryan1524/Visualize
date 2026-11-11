@@ -442,7 +442,8 @@ export function createStage(viewBox: [number, number, number, number], projectio
     const gap = 1.5;
     for (const { text, m } of labels) {
       setAttr(text, "transform", null);
-      if (!text.textContent) continue;
+      // Hidden labels (unfit or dropped optional ones) take no part in separation.
+      if (!text.textContent || text.getAttribute("display") === "none") continue;
       const b = text.getBBox();
       if (!b.width) continue;
       let dy = 0;
