@@ -70,7 +70,8 @@ interface MarkBase {
   lit?: boolean;
   /**
    * Entity id(s), space-separated, shared with panel elements for linked
-   * highlighting. Pointing at either side lights everything sharing an id.
+   * highlighting. Pointing at an element lights every element whose ids
+   * contain its ids or are contained by them.
    */
   link?: string;
   enter?: EnterStyle;
@@ -165,10 +166,19 @@ export type Observation =
   | { type: "text"; key: string; equals: string }
   /** These keys appear in this order along a screen axis (left-to-right or top-to-bottom). */
   | { type: "order"; keys: string[]; axis: "x" | "y" }
-  /** The element with this key is drawn (or not). */
+  /**
+   * The element with this key can be seen (or is not drawn at all). Seen
+   * means unobstructed at a real share of its area, not merely present.
+   */
   | { type: "visible"; key: string; visible: boolean }
   /** The element with this key is the highlighted one. */
-  | { type: "lit"; key: string };
+  | { type: "lit"; key: string }
+  /**
+   * The solid with this key is drawn at this world size: [w, d, h] for a
+   * box, [diameter, diameter, h] for a cylinder. Use it wherever a size
+   * encodes a number. Checked against the drawn outline with the projection.
+   */
+  | { type: "extent"; key: string; size: readonly [number, number, number]; tolerance?: number };
 
 export interface Phases {
   exit: readonly [number, number];

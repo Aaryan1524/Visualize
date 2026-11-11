@@ -114,6 +114,8 @@ const CONTROLS = [
   { variant: "wrong-value", expect: "observations" },
   { variant: "crowded-labels", expect: "labels" },
   { variant: "intersecting", expect: "depth order" },
+  { variant: "hidden-behind", expect: "observations" },
+  { variant: "wrong-size", expect: "observations" },
 ];
 
 // ---- Helpers ------------------------------------------------------------------
@@ -266,15 +268,16 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
     report.add("labels", "no overlaps, no spill off faces, not covered, inside the card, panels fit", [...labelProblems]);
 
     // Linked highlighting: pointing at a linked element lights exactly the
-    // elements that share one of its ids, across stage and panels.
+    // related elements (one's ids contain the other's), across stage and panels.
     {
       const linkProblems = [];
       let tried = 0;
-      for (let k = 0; k <= last && tried < 6; k++) {
+      for (let k = 0; k <= last && tried < 12; k++) {
         await page.evaluate((k) => window.__viz.seekStep(k), k);
         await settle(page);
-        const targets = await page.$$(".vz-panel [data-link], .vz-svg [data-link]");
-        for (const el of targets.slice(0, 2)) {
+        // Point from both sides: panel elements (grid cells, equation terms) and stage marks.
+        const targets = [...(await page.$$(".vz-panel [data-link]")).slice(0, 2), ...(await page.$$(".vz-svg [data-link]")).slice(0, 2)];
+        for (const el of targets) {
           const box = await el.boundingBox();
           if (!box || box.width < 2) continue;
           tried++;
@@ -282,9 +285,13 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
           const res = await page.evaluate((x, y) => {
             const hovered = document.elementFromPoint(x, y)?.closest("[data-link]");
             if (!hovered) return { skipped: true };
-            const ids = new Set(hovered.getAttribute("data-link").split(/\s+/));
+            // Related means one element's ids contain the other's.
+            const ids = hovered.getAttribute("data-link").split(/\s+/).filter(Boolean);
             const all = [...document.querySelectorAll("[data-link]")];
-            const shares = (e) => e.getAttribute("data-link").split(/\s+/).some((id) => ids.has(id));
+            const shares = (e) => {
+              const other = e.getAttribute("data-link").split(/\s+/).filter(Boolean);
+              return ids.every((id) => other.includes(id)) || other.every((id) => ids.includes(id));
+            };
             return {
               ids: [...ids],
               missing: all.filter((e) => shares(e) && !e.classList.contains("is-linked")).length,
@@ -293,7 +300,7 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
             };
           }, box.x + box.width / 2, box.y + box.height / 2);
           if (res.skipped) continue;
-          if (res.missing) linkProblems.push(`step ${k}: pointing at ${res.ids.join(" ")} left ${res.missing} sharing elements unlit`);
+          if (res.missing) linkProblems.push(`step ${k}: pointing at ${res.ids.join(" ")} left ${res.missing} related elements unlit`);
           if (res.extra) linkProblems.push(`step ${k}: pointing at ${res.ids.join(" ")} lit ${res.extra} unrelated elements`);
         }
       }

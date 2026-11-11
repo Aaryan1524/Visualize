@@ -70,6 +70,7 @@ export default defineScene<State, Op>({
   observe: (s) => [
     { type: "text", key: "contents", equals: s.items.map((i) => i.value).join(" · ") || "empty" },
     ...s.items.map((it) => ({ type: "visible" as const, key: it.id, visible: true })),
+    ...s.items.map((it) => ({ type: "extent" as const, key: it.id, size: [24, 24, 10] as const })),
   ],
   legend: [
     { tone: "accent", label: "Top of the stack" },
