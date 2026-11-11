@@ -323,6 +323,39 @@ export function createStage(viewBox: [number, number, number, number], projectio
       order = next;
     }
     for (const m of solids) pickInk(nodes.get(m.key)!);
+    separateLabels(marks);
+  }
+
+  /**
+   * Nudge colliding labels apart, vertically. Larger labels, then earlier
+   * ones, keep their place; each later label moves away from what it hits.
+   * Depends only on the frame and the drawn size, so replay stays exact.
+   */
+  function separateLabels(marks: readonly Resolved[]): void {
+    const rank = { large: 0, normal: 1, small: 2 } as const;
+    const labels = marks
+      .filter((m): m is Resolved<LabelMark> => m.kind === "label")
+      .map((m, i) => ({ m, i, text: nodes.get(m.key)!.text! }))
+      .sort((a, b) => rank[a.m.size ?? "normal"] - rank[b.m.size ?? "normal"] || a.i - b.i);
+    const placed: DOMRect[] = [];
+    const gap = 1.5;
+    for (const { text } of labels) {
+      setAttr(text, "transform", null);
+      if (!text.textContent) continue;
+      const b = text.getBBox();
+      if (!b.width) continue;
+      let dy = 0;
+      // The direction is set by the first collision and kept, so moves are monotone.
+      let down: boolean | null = null;
+      for (let pass = 0; pass < 8; pass++) {
+        const hit = placed.find((p) => b.x < p.x + p.width && p.x < b.x + b.width && b.y + dy < p.y + p.height && p.y < b.y + dy + b.height);
+        if (!hit) break;
+        down ??= b.y + b.height / 2 >= hit.y + hit.height / 2;
+        dy = down ? hit.y + hit.height + gap - b.y : hit.y - gap - b.height - b.y;
+      }
+      if (dy) setAttr(text, "transform", `translate(0 ${f(dy)})`);
+      placed.push(new DOMRect(b.x, b.y + dy, b.width, b.height));
+    }
   }
 
   const ruler = el("g", { class: "vz-layer", "data-layer": "ruler", visibility: "hidden", "aria-hidden": "true" });

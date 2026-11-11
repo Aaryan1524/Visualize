@@ -82,10 +82,16 @@ function between(a: Mark, b: Mark, t: number): Mark {
   }
 }
 
-function withEffect(m: Mark, u: number): Mark {
-  if (!m.effect || u <= 0 || u >= 1) return m;
-  if (m.effect === "shake") return offset(m, Math.sin(u * Math.PI * 6) * SHAKE * bump(u), 0);
-  return scaled(m, 1 + PULSE * bump(u));
+/** The effect belongs to the destination mark, so it spans the whole move. */
+function withEffect(m: Mark, u: number, effect: Mark["effect"]): Mark {
+  if (!effect || u <= 0 || u >= 1) return m;
+  if (effect === "shake") return offset(m, Math.sin(u * Math.PI * 6) * SHAKE * bump(u), 0);
+  // A pulse grows from the base: a solid resting on another must not sink into it.
+  const p = scaled(m, 1 + PULSE * bump(u));
+  if ((p.kind === "box" || p.kind === "cylinder") && (m.kind === "box" || m.kind === "cylinder")) {
+    return { ...p, at: [p.at[0], p.at[1], m.at[2]] } as Mark;
+  }
+  return p;
 }
 
 function entering(m: Mark, u: number): Resolved {
@@ -167,7 +173,7 @@ export function resolveFrame(
 
   for (const m of after) {
     const p = byKey.get(m.key);
-    if (p) out.push({ ...withEffect(hop(between(p, m, moveE), moveU, m.arc), moveU), opacity: 1 });
+    if (p) out.push({ ...withEffect(hop(between(p, m, moveE), moveU, m.arc), moveU, m.effect), opacity: 1 });
     else {
       const r = entering(m, enterU);
       if (r.opacity > 0) out.push(r);

@@ -152,3 +152,14 @@ test("arc: transient marks hop along their travel path too", () => {
   const mid = resolveFrame([], [msg], 0.5, DEFAULT_PHASES).find((m) => m.key === "m") as BoxMark;
   assert.ok(mid.at[2] > 25, `lifted, z=${mid.at[2]}`);
 });
+
+test("pulse: a pulsing solid keeps its base where it rests", () => {
+  const prev: Mark[] = [box("a", 0, { at: [0, 0, 6] })];
+  const next: Mark[] = [box("a", 0, { at: [0, 0, 6], effect: "pulse" })];
+  for (const p of [0.3, 0.5, 0.7]) {
+    const r = resolveFrame(prev, next, p, DEFAULT_PHASES)[0] as BoxMark;
+    assert.equal(r.at[2], 6, `base moved at p=${p}`);
+  }
+  const mid = resolveFrame(prev, next, 0.5, DEFAULT_PHASES)[0] as BoxMark;
+  assert.ok(mid.size[2] > 10, "it does grow");
+});
