@@ -97,8 +97,12 @@ function view(s: Joint, e: JointEvent | null): Mark[] {
     const middle: Vec3 = [(term.anchor.outbox![0] + srv.anchor.inbox![0]) / 2, term.anchor.outbox![1], 0.6];
     for (const m of snap.inflight) marks.push(message(`${w}/msg-${m.id}`, at(m), m.kind, { link: `${w}-${m.id}` }));
     for (const ev of evs) {
-      if (ev.type === "arrive") marks.push(message(`${w}/msg-${ev.message.id}`, dest(ev.message), ev.message.kind, { leaving: true }));
-      if (ev.type === "lost") marks.push(message(`${w}/msg-${ev.message.id}`, middle, ev.message.kind, { leaving: true, tone: "bad" }));
+      // An arriving message is absorbed by the part it reaches, so focus lights that part.
+      const receiver = ev.type === "arrive" ? (ev.message.to === "server" ? `${w}/server` : `${w}/terminal`) : "";
+      if (ev.type === "arrive") marks.push(message(`${w}/msg-${ev.message.id}`, dest(ev.message), ev.message.kind, { leaving: true, owner: receiver }));
+      // A lost message stops halfway, turns red and stays on the wire for this step, so the
+      // causal moment is still visible at rest; it fades out on the next step.
+      if (ev.type === "lost") marks.push(message(`${w}/msg-${ev.message.id}`, middle, ev.message.kind, { tone: "bad", exit: "fade" }));
     }
 
     // Lane title just outside the plate's far-left corner, and the running total above each ledger.
