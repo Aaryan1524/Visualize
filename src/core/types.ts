@@ -190,6 +190,8 @@ export interface LinkMark extends MarkBase {
   via?: readonly Vec3[];
   /** Draw as a cased cable lying on the ground rather than a hairline. */
   cable?: boolean;
+  /** Owners the two ends must sit on (set by binding a cable to part anchors). */
+  ends?: readonly [string, string];
   width?: number;
   dashed?: boolean;
   /** floor: under every solid; overlay: above every solid. */

@@ -57,9 +57,25 @@ for (const [name, part] of Object.entries(cases)) {
 
 test("anchors lie on or beside their part", () => {
   const t = cases.terminal, s = cases.server, l = cases.ledger;
-  for (const name of ["port", "top", "screen"]) assert.ok(onSurface(t.anchor[name]!, solids(t.marks)), `terminal ${name}`);
-  for (const name of ["inPort", "outPort", "top", "front"]) assert.ok(onSurface(s.anchor[name]!, solids(s.marks)), `server ${name}`);
-  for (const name of ["inPort", "top", "front"]) assert.ok(onSurface(l.anchor[name]!, solids(l.marks)), `ledger ${name}`);
+  for (const name of ["port", "top", "screen", "foot"] as const) assert.ok(onSurface(t.anchor[name], solids(t.marks)), `terminal ${name}`);
+  for (const name of ["inPort", "outPort", "top", "front", "foot"] as const) assert.ok(onSurface(s.anchor[name], solids(s.marks)), `server ${name}`);
+  for (const name of ["inPort", "top", "front"] as const) assert.ok(onSurface(l.anchor[name], solids(l.marks)), `ledger ${name}`);
+});
+
+test("pins name a real piece of the part, and lie on it", () => {
+  for (const [p, name] of [[cases.terminal, "foot"], [cases.server, "foot"], [cases.ledger, "front"], [cases.keyStore, "front"]] as const) {
+    const pin = (p.pin as (n: string) => { key: string; at: Vec3 })(name);
+    const piece = solids(p.marks).find((m) => m.key === pin.key);
+    assert.ok(piece, `${p.key} pin ${name} names ${pin.key}`);
+    assert.ok(onSurface(pin.at, [piece!]), `${p.key} pin ${name} lies on ${pin.key}`);
+  }
+});
+
+test("a cable bound to anchors records the parts its ends belong to", () => {
+  const c = cable("c", [cases.terminal, "port"], [cases.server, "inPort"]);
+  assert.deepEqual(c.ends, ["t", "s"]);
+  assert.deepEqual([c.from[0], c.from[1]], [cases.terminal.anchor.port[0], cases.terminal.anchor.port[1]]);
+  assert.throws(() => cable("x", [cases.terminal, "nope"], [cases.server, "inPort"]), RangeError);
 });
 
 test("a message waiting at the terminal's outbox sits on the cable, clear of the terminal", () => {

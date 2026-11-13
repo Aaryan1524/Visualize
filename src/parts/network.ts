@@ -10,28 +10,41 @@ const finite = (v: Vec3, what: string) => {
   if (v.some((n) => !Number.isFinite(n))) throw new RangeError(`${what} must be finite`);
 };
 
-export interface Part {
+/**
+ * A finished part. Anchor names are part of its type, so a misspelt name is a
+ * compile error rather than an undefined point. `pin(name)` gives a label
+ * target: an anchor together with the piece it lies on.
+ */
+export interface Part<A extends string = string> {
+  key: string;
   marks: Mark[];
-  anchor: Record<string, Vec3>;
+  anchor: Record<A, Vec3>;
+  pin(name: A): { key: string; at: Vec3 };
+}
+
+function part<A extends string>(key: string, marks: Mark[], anchor: Record<A, Vec3>, pieces: Partial<Record<A, string>> = {}): Part<A> {
+  return {
+    key,
+    marks: owned(key, marks),
+    anchor,
+    pin: (name) => ({ key: pieces[name] ?? (marks[0]!.key), at: anchor[name] }),
+  };
 }
 
 /** Every piece of a part shares its owner, so focus lights the part as a whole. */
 const owned = (owner: string, marks: Mark[]): Mark[] => marks.map((m) => ({ ...m, owner }));
 
 /** The plate a system stands on. `size` is its floor footprint. */
-export function plate(key: string, at: Vec3, size: [number, number]): Part {
+export function plate(key: string, at: Vec3, size: [number, number]): Part<"frontLeft" | "backRight"> {
   finite(at, "Plate position");
   const [w, d] = size;
   if (w < 40 || d < 30) throw new RangeError("A plate needs at least 40×30 units");
-  return {
-    marks: owned(key, [
-      {
-        kind: "box", key, at: add(at, [0, 0, -5]), size: [w, d, 5], radius: 6, tone: "base", role: "foundation",
-        surface: { seam: 0.4, fasteners: { inset: 4, radius: 0.8 } },
-      },
-    ]),
-    anchor: { frontLeft: add(at, [0, d, 0]), backRight: add(at, [w, 0, 0]) },
-  };
+  return part(key, [
+    {
+      kind: "box", key, at: add(at, [0, 0, -5]), size: [w, d, 5], radius: 6, tone: "base", role: "foundation",
+      surface: { seam: 0.4, fasteners: { inset: 4, radius: 0.8 } },
+    },
+  ], { frontLeft: add(at, [0, d, 0]), backRight: add(at, [w, 0, 0]) });
 }
 
 export const TERMINAL_FOOTPRINT: [number, number] = [42, 26];
@@ -40,7 +53,7 @@ export const TERMINAL_FOOTPRINT: [number, number] = [42, 26];
  * A payment terminal: a base, a body with a screen showing `status`, and a
  * card slot. The cable leaves from the port on its +x side.
  */
-export function terminal(key: string, at: Vec3, { status = "", lit = false }: { status?: string; lit?: boolean } = {}): Part {
+export function terminal(key: string, at: Vec3, { status = "", lit = false }: { status?: string; lit?: boolean } = {}): Part<"port" | "outbox" | "top" | "screen" | "foot"> {
   finite(at, "Terminal position");
   const marks: Mark[] = [
     { kind: "box", key: `${key}/base`, at, size: [42, 26, 5], radius: 3, tone: "structure", surface: { seam: 0.5 } },
@@ -52,15 +65,13 @@ export function terminal(key: string, at: Vec3, { status = "", lit = false }: { 
     { kind: "box", key: `${key}/slot`, at: add(at, [9, 7, 27]), size: [24, 4, 1.2], radius: 0.6, tone: "structure" },
     { kind: "box", key: `${key}/port`, at: add(at, [42, 9, 0]), size: [3, 7, 4], radius: 0.6, tone: "structure" },
   ];
-  return {
-    marks: owned(key, marks),
-    anchor: {
+  return part(key, marks, {
       port: add(at, [45, 12.5, 0]),
       outbox: add(at, [48, 9.5, 0.6]),
       top: add(at, [21, 11.5, 27]),
       screen: add(at, [21, 20, 18]),
-    },
-  };
+      foot: add(at, [21, 26, 2.5]),
+  }, { port: `${key}/port`, foot: `${key}/base` });
 }
 
 export const SERVER_FOOTPRINT: [number, number] = [40, 34];
@@ -69,7 +80,7 @@ export const SERVER_FOOTPRINT: [number, number] = [40, 34];
  * A server: a plinth and a rack tower with rack-unit seams, vents and a
  * status lamp. Requests arrive through the port on its −x side.
  */
-export function server(key: string, at: Vec3, { lamp = "muted" as Tone, lit = false } = {}): Part {
+export function server(key: string, at: Vec3, { lamp = "muted" as Tone, lit = false } = {}): Part<"inPort" | "inbox" | "outPort" | "top" | "front" | "foot"> {
   finite(at, "Server position");
   const marks: Mark[] = [
     { kind: "box", key: `${key}/plinth`, at, size: [40, 34, 4], radius: 3, tone: "structure", surface: { seam: 0.5 } },
@@ -82,17 +93,15 @@ export function server(key: string, at: Vec3, { lamp = "muted" as Tone, lit = fa
       },
     },
   ];
-  return {
-    marks: owned(key, marks),
-    anchor: {
+  return part(key, marks, {
       inPort: add(at, [0, 17, 0]),
       inbox: add(at, [-14, 14, 0.6]),
       outPort: add(at, [40, 17, 0]),
       top: add(at, [20, 17, 42]),
       // On the tower's front face, not in the air in front of it.
       front: add(at, [20, 31, 24]),
-    },
-  };
+      foot: add(at, [20, 34, 2]),
+  }, { inPort: `${key}/plinth`, outPort: `${key}/plinth`, foot: `${key}/plinth`, front: `${key}/tower`, top: `${key}/tower` });
 }
 
 /** Coins stack face to face: the pitch equals a coin's height. */
@@ -106,7 +115,7 @@ export interface Coin {
 }
 
 /** A ledger: a turned base with one coin stacked per recorded charge. */
-export function ledger(key: string, centre: Vec3, coins: readonly Coin[]): Part {
+export function ledger(key: string, centre: Vec3, coins: readonly Coin[]): Part<"inPort" | "top" | "front"> {
   finite(centre, "Ledger position");
   const marks: Mark[] = [
     { kind: "cylinder", key: `${key}/base`, at: centre, radius: 19, height: 7, tone: "structure" },
@@ -118,18 +127,15 @@ export function ledger(key: string, centre: Vec3, coins: readonly Coin[]): Part 
       tone: c.tone, lit: c.lit ?? false, enter: "drop",
     } as CylinderMark);
   });
-  return {
-    marks: owned(key, marks),
-    anchor: {
+  return part(key, marks, {
       inPort: add(centre, [-19, 0, 0]),
       top: add(centre, [0, 0, COIN_BASE + coins.length * COIN_HEIGHT]),
       front: add(centre, [0, 19, 4]),
-    },
-  };
+  }, { inPort: `${key}/base`, front: `${key}/base` });
 }
 
 /** A recessed tray that holds stored idempotency keys. */
-export function keyStore(key: string, at: Vec3, { stored = false, lit = false, pulse = false } = {}): Part {
+export function keyStore(key: string, at: Vec3, { stored = false, lit = false, pulse = false } = {}): Part<"top" | "front"> {
   finite(at, "Key store position");
   const marks: Mark[] = [
     { kind: "box", key: `${key}/tray`, at, size: [28, 22, 5], radius: 2.5, tone: "structure", surface: { well: 2 } },
@@ -140,12 +146,23 @@ export function keyStore(key: string, at: Vec3, { stored = false, lit = false, p
       enter: "drop", lit, ...(pulse ? { effect: "pulse" as const } : {}),
     } as BoxMark);
   }
-  return { marks: owned(key, marks), anchor: { top: add(at, [14, 11, 9]), front: add(at, [14, 22, 2]) } };
+  return part(key, marks, { top: add(at, [14, 11, 9]), front: add(at, [14, 22, 2]) }, { front: `${key}/tray`, top: `${key}/tray` });
 }
 
-/** A cased cable lying on the plate, from one anchor to another. */
-export function cable(key: string, from: Vec3, to: Vec3, via: readonly Vec3[] = []): LinkMark {
-  return { kind: "link", key, from: [from[0], from[1], 0.4], to: [to[0], to[1], 0.4], via: via.map((p) => [p[0], p[1], 0.4] as Vec3), cable: true, width: 2.2, layer: "floor" };
+type End = Vec3 | readonly [Part<any>, string];
+const isBound = (e: End): e is readonly [Part<any>, string] => typeof (e as readonly unknown[])[0] === "object";
+
+/**
+ * A cased cable lying on the plate. Pass ends as `[part, "anchorName"]` to bind
+ * them: the cable records which part each end belongs to, and the mounts check
+ * then requires each end to sit on that part, not merely on something nearby.
+ */
+export function cable(key: string, from: End, to: End, via: readonly Vec3[] = []): LinkMark {
+  const point = (e: End): Vec3 | undefined => (isBound(e) ? e[0].anchor[e[1]] : e);
+  const [a, b] = [point(from), point(to)];
+  if (!a || !b) throw new RangeError("cable " + key + ": unknown anchor");
+  const ends = isBound(from) && isBound(to) ? { ends: [from[0].key, to[0].key] as const } : {};
+  return { kind: "link", key, from: [a[0], a[1], 0.4], to: [b[0], b[1], 0.4], via: via.map((p) => [p[0], p[1], 0.4] as Vec3), cable: true, width: 2.2, layer: "floor", ...ends };
 }
 
 export const MESSAGE_SIZE: Vec3 = [11, 7, 6];
