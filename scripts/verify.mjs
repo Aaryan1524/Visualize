@@ -286,6 +286,8 @@ const CONTROLS = [
   { variant: "hidden-value", expect: "observations" },
   { variant: "loose-cable", expect: "mounts" },
   { variant: "wrong-mount", expect: "mounts" },
+  { variant: "oversized-plate", expect: "composition" },
+  { variant: "wide-label", expect: "labels" },
   { variant: "editorial", plant: "no-focus", expect: "focus" },
   { variant: "editorial", plant: "flat-focus", expect: "focus" },
   { variant: "wrong-value", expect: "observations" },
@@ -524,8 +526,8 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
       tx.typography.forEach(s => typographyProblems.add(`step ${k}: ${s}`));
       tx.small.forEach((s) => small.add(`step ${k}: ${s}`));
       tx.faint.forEach((s) => faint.add(s));
-      const lb = await page.evaluate(() => window.__vzCheck.labels());
-      for (const list of [lb.overlaps, lb.spill, lb.hidden, lb.clipped, lb.panels, lb.onParts]) list.forEach((s) => labelProblems.add(`step ${k}: ${s}`));
+      const lb = await page.evaluate(() => window.__vzCheck.labels({ strictFit: true }));
+      for (const list of [lb.overlaps, lb.spill, lb.hidden, lb.clipped, lb.panels, lb.onParts, lb.unfit]) list.forEach((s) => labelProblems.add(`step ${k}: ${s}`));
     }
     report.add("text size", "every visible text node, at every step (11 px minimum)", [...small]);
     report.add("contrast", "WCAG ratio against the face or card behind each text, light theme", [...faint]);

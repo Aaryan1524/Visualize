@@ -226,6 +226,7 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
   setAttr(node.text!, "data-face", g.labelShade);
   setAttr(node.text!, "data-on-panel", onPanel ? "" : null);
   setAttr(node.text!, "data-room", f(onPanel ? g.labelWidth / faceX : g.labelWidth));
+  setAttr(node.text!, "data-optional", m.kind === "box" && m.labelOptional ? "" : null);
   setAttr(node.text!, "data-room-height", onPanel && m.kind === "box" && m.surface?.panel ? f(m.size[2] * (m.surface.panel.to - m.surface.panel.from) * .8) : null);
 }
 

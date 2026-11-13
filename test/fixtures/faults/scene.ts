@@ -9,6 +9,13 @@ import type { Mark } from "../../../src/core/types.ts";
 const faceLabel = defineScene({ ...retries, id: "face-label" });
 const clean = defineScene({ ...stack, id: "clean" });
 const editorial = defineScene({ ...lru, id: "editorial" });
+
+/** Small parts on a vast empty plate: a stage that looks full only because of its foundation. */
+const oversizedPlate = defineScene({
+  ...lru,
+  id: "oversized-plate",
+  view: (s, e) => [{ kind: "box", key: "vast-plate", at: [-400, -60, -12], size: [800, 160, 4], radius: 6, tone: "base", role: "foundation" }, ...lru.view(s, e)],
+});
 const wrongTone = defineScene({
   ...stack, id:"wrong-tone",
   view:(s,e)=>stack.view(s,e).map(m=>m.key==="base" ? {...m,tone:"bad"} : m),
@@ -134,6 +141,7 @@ export const variants = {
   "face-label": faceLabel,
   clean,
   editorial,
+  "oversized-plate": oversizedPlate,
   "wrong-tone":wrongTone,
   "wrong-value": wrongValue,
   "crowded-labels": crowdedLabels,

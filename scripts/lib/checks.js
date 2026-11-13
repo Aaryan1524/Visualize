@@ -422,7 +422,7 @@
     return { small, faint, typography };
   }
 
-  function labels() {
+  function labels({ strictFit = false } = {}) {
     const s = svg();
     const els = [...s.querySelectorAll(".vz-label, .vz-solid-label")].filter((e) => norm(e.textContent) && isShown(e));
     const rects = els.map((e) => e.getBoundingClientRect());
@@ -458,7 +458,12 @@
       guard.remove();
     }
     const panels = [...viz().root.querySelectorAll(".vz-panel-body")].filter((p) => p.scrollWidth > p.clientWidth + 1).map((p) => `panel ${p.parentElement.getAttribute("data-key")} overflows by ${p.scrollWidth - p.clientWidth}px`);
-    return { overlaps, spill, hidden, clipped, panels, onParts: onParts(els) };
+    // At full desktop size, a face label hidden for lack of room is lost information
+    // unless the author marked it optional.
+    const unfit = strictFit
+      ? [...s.querySelectorAll(".vz-solid-label[display='none']")].filter((t) => norm(t.textContent) && !t.hasAttribute("data-optional")).map((t) => `"${norm(t.textContent)}" on ${t.closest("[data-key]").getAttribute("data-key")} is hidden because it does not fit; widen the face, shorten the text, or mark it labelOptional`)
+      : [];
+    return { overlaps, spill, hidden, clipped, panels, onParts: onParts(els), unfit };
   }
 
   /**
@@ -572,10 +577,18 @@
     const side=root.querySelector(".vz-side");
     const figure=side&&isShown(side) ? side.getBoundingClientRect().right-stage.left : stage.width;
     if (figure < body.width*.9) composition.push("figure stage occupies less than 90% of the body width");
-    const solids=[...svg().querySelectorAll(".vz-solid")].filter(isShown).map(e=>e.getBoundingClientRect());
-    if (solids.length) {
-      const width=Math.max(...solids.map(r=>r.right))-Math.min(...solids.map(r=>r.left));
-      if (width/stage.width < .42) composition.push(`solid figure occupies only ${(100*width/stage.width).toFixed(0)}% of the stage width (min 42%)`);
+    // Measure the parts that explain something, not the plates they stand on:
+    // a wide empty plate must not pass for a well-filled stage.
+    const shown=[...svg().querySelectorAll(".vz-solid")].filter(isShown);
+    const isGround=e=>e.dataset.role==="foundation"||e.closest('[data-layer="ground"]');
+    const span=rs=>rs.length ? Math.max(...rs.map(r=>r.right))-Math.min(...rs.map(r=>r.left)) : 0;
+    const subjects=shown.filter(e=>!isGround(e)).map(e=>e.getBoundingClientRect());
+    const everything=shown.map(e=>e.getBoundingClientRect());
+    if (subjects.length) {
+      const width=span(subjects);
+      if (width/stage.width < .35) composition.push(`the parts span only ${(100*width/stage.width).toFixed(0)}% of the stage width (min 35%)`);
+      const ratio=span(everything)/width;
+      if (ratio > 1.5) composition.push(`the plate is ${ratio.toFixed(2)}× as wide as the parts on it (max 1.5×)`);
     }
     const colour=css=>{const e=document.createElement("span");e.style.color=css;root.append(e);const c=getComputedStyle(e).color;e.remove();return c;};
     for (const swatch of root.querySelectorAll(".vz-swatch[data-tone]")) {

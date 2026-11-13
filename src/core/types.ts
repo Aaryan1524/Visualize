@@ -149,6 +149,8 @@ export interface BoxMark extends MarkBase {
   label?: string;
   /** Which visible face carries the label. Use a side when something sits on top. */
   labelFace?: LabelFace;
+  /** The label may be hidden when it does not fit (decoration, not information). */
+  labelOptional?: boolean;
 }
 
 export type LabelFace = "top" | "left" | "right";
