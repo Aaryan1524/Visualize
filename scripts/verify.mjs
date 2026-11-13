@@ -229,6 +229,15 @@ const PLANTS = {
     });
   },
   // The renderer drops the step's focus: everything at full strength.
+  // The fit ignores the caption, and the caption is large enough to reach the drawing.
+  "caption-cover": () => {
+    addEventListener("visualize:ready", () => {
+      const style = document.createElement("style");
+      // The fit measures a hidden copy of the caption; hiding it makes the fit reserve nothing.
+      style.textContent = '.vz[data-presentation="editorial"] .vz-caption { width: 62% !important; } .vz-step-heading { font-size: 46px !important; } .vz-caption[aria-hidden="true"] { display: none !important; }';
+      document.head.append(style);
+    });
+  },
   "no-focus": () => {
     // The player is ready after fonts load; wait for its event rather than page load.
     window.addEventListener("visualize:ready", () => {
@@ -288,6 +297,7 @@ const CONTROLS = [
   { variant: "wrong-mount", expect: "mounts" },
   { variant: "oversized-plate", expect: "composition" },
   { variant: "wide-label", expect: "labels" },
+  { variant: "editorial", plant: "caption-cover", expect: "caption clear" },
   { variant: "editorial", plant: "no-focus", expect: "focus" },
   { variant: "editorial", plant: "flat-focus", expect: "focus" },
   { variant: "wrong-value", expect: "observations" },
@@ -496,7 +506,9 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
       const d = await page.evaluate(() => window.__vzCheck.depth());
       for (const p of await page.evaluate(() => window.__vzCheck.surfaces())) surfaceProblems.add(`${label}: ${p}`);
       samples += d.samples;
-      for (const w of d.wrong.slice(0, 2)) depthProblems.push(`${label}: at ${w.at} ${w.expected} is nearer but ${w.painted} is painted on top`);
+      for (const w of d.wrong.slice(0, 2)) depthProblems.push(String(w.painted ?? "").endsWith("(overlay)")
+        ? `${label}: at ${w.at} ${w.expected} is covered by ${w.painted}; the camera fit should keep parts clear of it`
+        : `${label}: at ${w.at} ${w.expected} is nearer but ${w.painted} is painted on top`);
       for (const [a, b] of d.conflicts) conflictSet.add(`${a} and ${b} intersect (${label})`);
     }
     report.add("depth order", `${instants.length} instants · ${samples} overlap samples ray-cast`, [...depthProblems, ...[...conflictSet].slice(0, 8)]);
@@ -549,7 +561,7 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
       await settle(page);
       for (const [name,problems] of Object.entries(issues)) report.add(name,"every step at desktop and phone widths, both themes",[...problems]);
 
-      const viewportProblems = new Set(), copyProblems = new Set(), drawerProblems = [];
+      const viewportProblems = new Set(), copyProblems = new Set(), drawerProblems = [], coverProblems = new Set();
       for (const theme of ["light", "dark"]) for (const [width, height] of [[1440, 900], [1920, 1080]]) {
         await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: theme }]);
         await page.setViewport({ width, height, deviceScaleFactor: 1 });
@@ -559,10 +571,12 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
           const result = await page.evaluate(() => window.__vzCheck.desktop());
           result.viewport.forEach(p => viewportProblems.add(`${theme} ${width}×${height} step ${k}: ${p}`));
           result.copy.forEach(p => copyProblems.add(`step ${k}: ${p}`));
+          result.covered.forEach(p => coverProblems.add(`${theme} ${width}×${height} step ${k}: ${p}`));
           if (steps[k].teaching?.prediction) {
             await page.click(".vz-predict-options button");
             const answered = await page.evaluate(() => window.__vzCheck.desktop());
             answered.viewport.forEach(p => viewportProblems.add(`${theme} ${width}×${height} feedback: ${p}`));
+            answered.covered.forEach(p => coverProblems.add(`${theme} ${width}×${height} step ${k} with feedback: ${p}`));
             answered.copy.forEach(p => copyProblems.add(`feedback: ${p}`));
           }
         }
@@ -570,9 +584,11 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
           await page.evaluate(t => window.__viz.seek(t), tl.start[k] + tl.duration[k] * p);
           const result = await page.evaluate(() => window.__vzCheck.desktop());
           result.viewport.forEach(problem => viewportProblems.add(`${theme} ${width}×${height} move ${k} at ${p}: ${problem}`));
+          result.covered.forEach(problem => coverProblems.add(`${theme} ${width}×${height} move ${k} at ${p}: ${problem}`));
         }
       }
       report.add("desktop viewport", "1440×900 and 1920×1080, both themes: no page scroll; stage, controls, prediction and feedback fit; 4 samples per move", [...viewportProblems]);
+      report.add("caption clear", "no part or label under the step heading or prediction card, at rest, in motion and with feedback shown", [...coverProblems]);
       report.add("copy budget", "short title, action, prediction and feedback; paragraphs confined to Details", [...copyProblems]);
 
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });

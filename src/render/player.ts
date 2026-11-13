@@ -3,6 +3,7 @@ import { frameIndexAt } from "../core/timeline.ts";
 import { TRUST_LABEL, TRUST_MEANING } from "../core/trust.ts";
 import type { LabelMark, Panel, Resolved, Scene } from "../core/types.ts";
 import { createStage, fitViewBox, type StageRenderer } from "./svg.ts";
+import { clearOf, silhouettes } from "./clear.ts";
 
 /**
  * Labels scale with the drawing but stay readable: LABEL_UNITS world units
@@ -265,26 +266,86 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
     for (const st of steps) for (const m of st.marks) if (m.kind === "label" && !m.transient && !m.leaving) seen.set(`${m.key}|${m.text}|${m.at.join(",")}`, m);
     return [...seen.values()];
   })();
-  const fit = () => {
-    let vb = geometryBox;
+  const fitLabels = (g: [number, number, number, number]) => {
+    let vb = g;
     for (let i = 0; i < 5; i++) {
       stage.setViewBox(vb);
       const r = stage.svg.getBoundingClientRect();
       // The viewBox is fitted with "meet", so the drawn scale is the smaller of the two fits.
       const scale = Math.min(r.width / vb[2], r.height / vb[3]);
-      if (!(scale > 0)) return;
+      if (!(scale > 0)) return null;
       const px = Math.min(LABEL_MAX, Math.max(LABEL_MIN, LABEL_UNITS * scale));
       stage.svg.style.setProperty("--label-size", `${px / scale}px`);
       const m = stage.measureLabels(stageLabels);
       if (!m) break;
       const pad = 4 / scale;
-      const g = geometryBox;
       const x0 = Math.min(g[0], m[0] - pad), y0 = Math.min(g[1], m[1] - pad);
       const x1 = Math.max(g[0] + g[2], m[2] + pad), y1 = Math.max(g[1] + g[3], m[3] + pad);
       const next: [number, number, number, number] = [x0, y0, x1 - x0, y1 - y0];
       if (next.every((v, j) => Math.abs(v - vb[j]!) < 0.5)) break;
       vb = next;
     }
+    return vb;
+  };
+
+  // ---- Keep the drawing clear of the caption ---------------------------------
+  // The editorial caption overlays the stage's top-left. Its largest footprint
+  // over every step (heading plus any prediction card with its feedback) is
+  // reserved, and the view grows until no part is under it.
+  const shapes = editorial ? silhouettes(steps.map((s) => s.marks), projection) : [];
+  const captionFootprint = (): { left: number; top: number; width: number; height: number } | null => {
+    if (!editorial || getComputedStyle(caption).position !== "absolute") return null;
+    const probe = h("section", { class: "vz-caption", "aria-hidden": "true" });
+    probe.style.visibility = "hidden";
+    stageBox.append(probe);
+    let height = 0;
+    try {
+      for (const s of steps) {
+        const heading = h("h2", { class: "vz-step-heading" }, escapeHtml(s.teaching?.heading ?? ""));
+        probe.replaceChildren(heading);
+        const p = s.teaching?.prediction;
+        if (p) {
+          const card = h("section", { class: "vz-predict" });
+          const options = h("div", { class: "vz-predict-options" });
+          for (const c of p.choices) options.append(h("button", { type: "button", tabindex: "-1" }, escapeHtml(c)));
+          card.append(h("span", { class: "vz-predict-kicker" }, "Predict"), h("p", {}, escapeHtml(p.question)), options, h("p", { class: "vz-predict-feedback" }, escapeHtml(p.explanation)));
+          probe.append(card);
+        }
+        height = Math.max(height, probe.getBoundingClientRect().height);
+      }
+      const r = probe.getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height };
+    } finally {
+      probe.remove();
+    }
+  };
+  const fit = () => {
+    const cap = captionFootprint();
+    let base = geometryBox;
+    let vb = geometryBox;
+    for (let round = 0; round < 3; round++) {
+      const labelled = fitLabels(base);
+      if (!labelled) return;
+      vb = labelled;
+      if (!cap || !shapes.length) break;
+      const cleared = clearOf(vb, shapes, (box) => {
+        stage.setViewBox(box);
+        const r = stage.svg.getBoundingClientRect();
+        const scale = Math.min(r.width / box[2], r.height / box[3]);
+        if (!(scale > 0)) return null;
+        const ox = r.left + (r.width - box[2] * scale) / 2, oy = r.top + (r.height - box[3] * scale) / 2;
+        const gap = 12;
+        return {
+          x0: box[0] + (cap.left - gap - ox) / scale, x1: box[0] + (cap.left + cap.width + gap - ox) / scale,
+          y0: box[1] + (cap.top - gap - oy) / scale, y1: box[1] + (cap.top + cap.height + gap - oy) / scale,
+        };
+      });
+      if (cleared.every((v, j) => Math.abs(v - vb[j]!) < 0.5)) break;
+      // Labels are sized from the scale, so fit them again around the grown view.
+      base = cleared;
+      vb = fitLabels(cleared) ?? cleared;
+    }
+    stage.setViewBox(vb);
     viewBox = vb;
   };
   const resize = new ResizeObserver(fit);

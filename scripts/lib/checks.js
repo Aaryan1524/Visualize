@@ -299,7 +299,10 @@
               const [cx, cy] = toClient(x, y);
               const el = document.elementFromPoint(cx, cy);
               const shown = el && el.closest("[data-key]");
-              const got = shown && shown.getAttribute("data-key");
+              // Something outside the drawing (the caption or the prediction card) covering a part
+              // is named as such, not reported as an unnamed painter.
+              const cover = !shown && el && el.closest(".vz-predict, .vz-caption, .vz-side, .vz-panels");
+              const got = shown ? shown.getAttribute("data-key") : cover ? `the ${cover.classList.contains("vz-predict") ? "prediction card" : cover.classList.contains("vz-caption") ? "step caption" : "panel"} (overlay)` : null;
               samples++;
               if (got !== best) wrong.push({ at: [Math.round(cx), Math.round(cy)], vb: [x, y], pair: [keys[i], keys[j]], expected: best, painted: got });
             }
@@ -564,7 +567,47 @@
     for (const selector of [".vz-text", ".vz-setup", ".vz-meta", ".vz-foot"]) {
       if (isShown(root.querySelector(selector))) copy.push(`${selector} is visible outside Details`);
     }
-    return { viewport, copy };
+    return { viewport, copy, covered: coveredByCaption() };
+  }
+
+  // Parts and labels under the caption overlay (the step heading and prediction card).
+  // Every eval scene hit this, and depth reported it only as an unnamed painter.
+  function coveredByCaption() {
+    const root = viz().root, out = [];
+    const caption = root.querySelector(".vz-caption");
+    if (!caption || getComputedStyle(caption).position !== "absolute") return out;
+    const covers = [...caption.querySelectorAll(".vz-step-heading, .vz-predict")].filter(isShown)
+      .map(e => ({ name: e.classList.contains("vz-predict") ? "prediction card" : "step heading", r: e.getBoundingClientRect() }))
+      .filter(c => c.r.width > 0 && c.r.height > 0);
+    if (!covers.length) return out;
+    const toScreen = (poly) => {
+      const m = poly.getScreenCTM();
+      return [...poly.points].map(p => [m.a * p.x + m.c * p.y + m.e, m.b * p.x + m.d * p.y + m.f]);
+    };
+    const overlaps = (pts, r) => {
+      const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+      if (Math.max(...xs) <= r.left || Math.min(...xs) >= r.right || Math.max(...ys) <= r.top || Math.min(...ys) >= r.bottom) return false;
+      const corners = [[r.left, r.top], [r.right, r.top], [r.right, r.bottom], [r.left, r.bottom]];
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length], n = [b[1] - a[1], a[0] - b[0]];
+        if (!n[0] && !n[1]) continue;
+        const pp = pts.map(p => p[0] * n[0] + p[1] * n[1]), rp = corners.map(p => p[0] * n[0] + p[1] * n[1]);
+        if (Math.max(...pp) <= Math.min(...rp) + .5 || Math.max(...rp) <= Math.min(...pp) + .5) return false;
+      }
+      return true;
+    };
+    for (const solid of svg().querySelectorAll(".vz-solid")) {
+      if (!isShown(solid) || Number(solid.getAttribute("opacity") ?? 1) < .3) continue;
+      const faces = [...solid.querySelectorAll(":scope > polygon")].map(toScreen).filter(p => p.length >= 3);
+      for (const c of covers) if (faces.some(f => overlaps(f, c.r))) { out.push(`${solid.dataset.key} is under the ${c.name}`); break; }
+    }
+    for (const text of svg().querySelectorAll(".vz-label-g > text")) {
+      if (!isShown(text)) continue;
+      const r = text.getBoundingClientRect();
+      if (!r.width) continue;
+      for (const c of covers) if (r.right > c.r.left && r.left < c.r.right && r.bottom > c.r.top && r.top < c.r.bottom) { out.push(`label "${norm(text.textContent)}" is under the ${c.name}`); break; }
+    }
+    return out;
   }
 
   function design() {
