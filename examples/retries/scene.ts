@@ -52,12 +52,15 @@ export function twin() {
 // ---- Stage --------------------------------------------------------------------------
 // Two identical systems on two plates, one behind the other. Every position
 // comes from a part's anchors; nothing below is placed by eye except the parts.
-const LANE = 94;
-const laneY = (w: World) => (w === "unsafe" ? 0 : LANE);
-const TERMINAL_X = 0;
-const SERVER_X = 80;
-const STORE_X = 128;
-const LEDGER_X = 182;
+/** Where each actor stands. Everything else (cables, messages, labels) is derived from parts. */
+export interface Layout {
+  lane: number;
+  terminalX: number;
+  serverX: number;
+  storeX: number;
+  ledgerX: number;
+}
+export const LAYOUT: Layout = { lane: 94, terminalX: 0, serverX: 80, storeX: 128, ledgerX: 182 };
 
 const STATUS: Record<Snapshot["client"]["status"], string> = {
   idle: "Ready",
@@ -68,33 +71,34 @@ const STATUS: Record<Snapshot["client"]["status"], string> = {
 };
 
 /** The world's parts, built once per state so cables and messages use their anchors. */
-function rig(w: World, snap: Snapshot, evs: Ev[]) {
-  const y = laneY(w);
+function rig(L: Layout, w: World, snap: Snapshot, evs: Ev[]) {
+  const y = w === "unsafe" ? 0 : L.lane;
   const has = (type: Ev["type"]) => evs.some((x) => x.type === type);
-  const term = terminal(`${w}/terminal`, [TERMINAL_X, y + 2, 0], { status: STATUS[snap.client.status], lit: has("paid") || has("timeout") });
+  const term = terminal(`${w}/terminal`, [L.terminalX, y + 2, 0], { status: STATUS[snap.client.status], lit: has("paid") || has("timeout") });
   const lamp: Tone = has("charge") ? "accent" : has("replay") ? "cold" : "good";
-  const srv = server(`${w}/server`, [SERVER_X, y - 2.5, 0], { lamp, lit: has("replay") });
+  const srv = server(`${w}/server`, [L.serverX, y - 2.5, 0], { lamp, lit: has("replay") });
   const coins = snap.ledger.map((c, k) => ({ id: String(c.id), tone: (k === 0 ? "good" : "bad") as Tone, lit: evs.some((x) => x.type === "charge" && x.charge.id === c.id) }));
-  const led = ledger(`${w}/ledger`, [LEDGER_X, y + 14.5, 0], coins);
-  const store = w === "safe" ? keyStore(`${w}/store`, [STORE_X, y - 14, 0], { stored: snap.store !== null, lit: has("replay"), pulse: has("replay") }) : null;
+  const led = ledger(`${w}/ledger`, [L.ledgerX, y + 14.5, 0], coins);
+  const store = w === "safe" ? keyStore(`${w}/store`, [L.storeX, y - 14, 0], { stored: snap.store !== null, lit: has("replay"), pulse: has("replay") }) : null;
   return { y, term, srv, led, store };
 }
 
-function view(s: Joint, e: JointEvent | null): Mark[] {
+/** The view for a layout; the scene uses LAYOUT, tests move actors to prove nothing else depends on it. */
+export const viewWith = (L: Layout) => (s: Joint, e: JointEvent | null): Mark[] => {
   const marks: Mark[] = [];
   for (const w of WORLDS) {
     const snap = s.worlds[w];
     const evs = e?.events[w] ?? [];
-    const { y, term, srv, led, store } = rig(w, snap, evs);
-    marks.push(...plate(`${w}/plate`, [-18, y - 18, 0], [LEDGER_X + 40, 68]).marks);
-    marks.push(cable(`${w}/wire`, term.anchor.port!, srv.anchor.inPort!));
-    marks.push(cable(`${w}/db-wire`, srv.anchor.outPort!, led.anchor.inPort!));
+    const { y, term, srv, led, store } = rig(L, w, snap, evs);
+    marks.push(...plate(`${w}/plate`, [L.terminalX - 18, y - 18, 0], [L.ledgerX - L.terminalX + 40, 68]).marks);
+    marks.push(cable(`${w}/wire`, [term, "port"], [srv, "inPort"]));
+    marks.push(cable(`${w}/db-wire`, [srv, "outPort"], [led, "inPort"]));
     marks.push(...term.marks, ...srv.marks, ...led.marks, ...(store?.marks ?? []));
 
     // Messages wait at their sender, then ride the cable to where they arrive or are lost.
-    const at = (m: Message) => (m.from === "client" ? term.anchor.outbox! : srv.anchor.inbox!);
-    const dest = (m: Message) => (m.to === "server" ? srv.anchor.inbox! : term.anchor.outbox!);
-    const middle: Vec3 = [(term.anchor.outbox![0] + srv.anchor.inbox![0]) / 2, term.anchor.outbox![1], 0.6];
+    const at = (m: Message) => (m.from === "client" ? term.anchor.outbox : srv.anchor.inbox);
+    const dest = (m: Message) => (m.to === "server" ? srv.anchor.inbox : term.anchor.outbox);
+    const middle: Vec3 = [(term.anchor.outbox[0] + srv.anchor.inbox[0]) / 2, term.anchor.outbox[1], 0.6];
     for (const m of snap.inflight) marks.push(message(`${w}/msg-${m.id}`, at(m), m.kind, { link: `${w}-${m.id}` }));
     for (const ev of evs) {
       // An arriving message is absorbed by the part it reaches, so focus lights that part.
@@ -107,22 +111,23 @@ function view(s: Joint, e: JointEvent | null): Mark[] {
 
     // Lane title just outside the plate's far-left corner, and the running total above each ledger.
     // Each lane is named beyond its plate's outer front-right corner, next to its outcome.
-    marks.push({ kind: "label", key: `${w}/title`, at: [LEDGER_X + 30, y + 60, -5], text: LANE_TITLE[w], anchor: "start" });
+    marks.push({ kind: "label", key: `${w}/title`, at: [L.ledgerX + 30, y + 60, -5], text: LANE_TITLE[w], anchor: "start" });
     // The total floats at a fixed height that clears the tallest stack in the run.
-    marks.push({ kind: "label", key: `${w}/total`, at: [LEDGER_X + 22, y + 14.5, COIN_BASE + 3 * COIN_HEIGHT + 24], text: `$${totalCharged(snap)}`, size: "large" });
+    marks.push({ kind: "label", key: `${w}/total`, at: [L.ledgerX + 22, y + 14.5, COIN_BASE + 3 * COIN_HEIGHT + 24], text: `$${totalCharged(snap)}`, size: "large" });
   }
   // Part names once, in a row in front of the front plate, each pinned to its part.
-  const front = rig("safe", s.worlds.safe, e?.events.safe ?? []);
-  const rowY = LANE + 62;
-  const name = (key: string, text: string, x: number, target: { key: string; at: Vec3 }): Mark => ({ kind: "label", key, at: [x, rowY, -5], text, size: "small", target });
+  const front = rig(L, "safe", s.worlds.safe, e?.events.safe ?? []);
+  const rowY = L.lane + 62;
+  const name = (key: string, text: string, target: { key: string; at: Vec3 }): Mark => ({ kind: "label", key, at: [target.at[0], rowY, -5], text, size: "small", target });
   marks.push(
-    name("name-terminal", "Terminal", 19, { key: "safe/terminal/base", at: [19, LANE + 28, 2.5] }),
-    name("name-server", "Server", SERVER_X + 20, { key: "safe/server/plinth", at: [SERVER_X + 20, LANE + 31.5, 2] }),
-    name("name-ledger", "Ledger", LEDGER_X, { key: "safe/ledger/base", at: front.led.anchor.front! }),
+    name("name-terminal", "Terminal", front.term.pin("foot")),
+    name("name-server", "Server", front.srv.pin("foot")),
+    name("name-ledger", "Ledger", front.led.pin("front")),
+    name("name-store", "Key store", front.store!.pin("front")),
   );
-  marks.push(name("name-store", "Key store", STORE_X + 16, { key: "safe/store/tray", at: [STORE_X + 14, LANE + 8, 2.5] }));
   return marks;
-}
+};
+const view = viewWith(LAYOUT);
 
 function describe(ev: Ev): string {
   switch (ev.type) {
