@@ -229,6 +229,14 @@ const PLANTS = {
     });
   },
   // The renderer drops the step's focus: everything at full strength.
+  // Chip notes too long for their chips at phone width.
+  "clipped-chip": () => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s = document.createElement("style");
+      s.textContent = ".vz-strip span::after{content:' rejected (429)'}";
+      document.head.append(s);
+    });
+  },
   // The fit ignores the caption, and the caption is large enough to reach the drawing.
   "caption-cover": () => {
     addEventListener("visualize:ready", () => {
@@ -298,6 +306,7 @@ const CONTROLS = [
   { variant: "oversized-plate", expect: "composition" },
   { variant: "wide-label", expect: "labels" },
   { variant: "editorial", plant: "caption-cover", expect: "caption clear" },
+  { variant: "editorial", plant: "clipped-chip", expect: "layout" },
   { variant: "editorial", plant: "no-focus", expect: "focus" },
   { variant: "editorial", plant: "flat-focus", expect: "focus" },
   { variant: "wrong-value", expect: "observations" },
@@ -776,6 +785,11 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
             const tx = await page.evaluate(() => window.__vzCheck.text());
             tx.typography.forEach(s => typographyProblems.add(`${theme} ${width}px step ${k}: ${s}`));
             tx.small.forEach((s) => layoutProblems.push(`390px step ${k}: ${s}`));
+            // Text cut off inside a fixed-size chip or total ("429" and "timeout" were, in the evals).
+            const cut = await page.evaluate(() => [...document.querySelectorAll(".vz-strip li > *, .vz-totals span")]
+              .filter((e) => e.getClientRects().length && e.textContent.trim() && e.scrollWidth > e.clientWidth + 1)
+              .map((e) => `"${e.textContent.trim()}" is cut off (${e.scrollWidth}px of text in ${e.clientWidth}px)`));
+            cut.forEach((s) => layoutProblems.push(`390px step ${k}: ${s}`));
           }
           await page.evaluate((k) => window.__viz.seekStep(k), last);
         }
