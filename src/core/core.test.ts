@@ -163,3 +163,14 @@ test("pulse: a pulsing solid keeps its base where it rests", () => {
   const mid = resolveFrame(prev, next, 0.5, DEFAULT_PHASES)[0] as BoxMark;
   assert.ok(mid.size[2] > 10, "it does grow");
 });
+
+test("a step that only rules things out focuses what remains, not what was ruled out", async () => {
+  const { focusOf } = await import("./scene.ts");
+  const cell = (k: string, tone: "subject" | "muted") => ({ kind: "box" as const, key: k, at: [0, 0, 0] as const, size: [10, 10, 10] as const, tone, role: "subject" as const });
+  const prev = [cell("a", "subject"), cell("b", "subject"), cell("c", "subject"), cell("d", "subject")];
+  const next = [cell("a", "muted"), cell("b", "muted"), cell("c", "subject"), cell("d", "subject")];
+  assert.deepEqual([...focusOf(prev as never, next as never)!].sort(), ["c", "d"]);
+  // A step that also changes something else focuses that change, not the survivors.
+  const moved = [...next.slice(0, 3), { ...cell("d", "subject"), at: [5, 0, 0] as const }];
+  assert.deepEqual([...focusOf(prev as never, moved as never)!], ["d"]);
+});

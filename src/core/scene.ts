@@ -128,10 +128,22 @@ export function focusOf(prev: readonly Mark[] | null, next: readonly Mark[], exp
   if (explicit === "all" || prev === null) return null;
   if (explicit) return new Set(explicit);
   const before = new Map(prev.map((m) => [m.key, shape(m)]));
+  const toneBefore = new Map(prev.map((m) => [m.key, m.tone]));
   const owners = new Set<string>();
+  // Marks that were just muted (ruled out, discarded, retired) changed, but the
+  // step is about what remains: a binary-search run lit the discarded half and
+  // dimmed the survivors. Muting is the author saying "this no longer matters".
+  const retired = new Set<string>();
   for (const m of next) {
     if (m.kind === "label") continue;
-    if (m.transient || m.leaving || before.get(m.key) !== shape(m)) owners.add(ownerOf(m));
+    if (!(m.transient || m.leaving || before.get(m.key) !== shape(m))) continue;
+    if (m.tone === "muted" && toneBefore.has(m.key) && toneBefore.get(m.key) !== "muted") retired.add(ownerOf(m));
+    else owners.add(ownerOf(m));
+  }
+  for (const o of owners) retired.delete(o);
+  if (!owners.size && retired.size) {
+    // Only retirements: focus the subjects still in play.
+    for (const m of next) if ((m.kind === "box" || m.kind === "cylinder") && m.role === "subject" && m.tone !== "muted" && !retired.has(ownerOf(m))) owners.add(ownerOf(m));
   }
   if (!owners.size) return null;
   // If nothing focused is still drawn at rest (only marks in flight or leaving changed),
