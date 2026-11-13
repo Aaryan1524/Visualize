@@ -1,5 +1,6 @@
 import { defineScene } from "../../src/core/scene.ts";
-import type { Mark, Observation, Panel, Source, Vec3 } from "../../src/core/types.ts";
+import type { Mark, Observation, Panel, Source, Teaching, Vec3 } from "../../src/core/types.ts";
+import { plate } from "../../src/parts/network.ts";
 import { formatNumber as fmt, grid, linked, tex } from "../../src/render/math.ts";
 import { attention, steps, type AttnEvent, type AttnState } from "./model.ts";
 
@@ -67,7 +68,7 @@ function gaugeValues(s: AttnState): { values: number[]; unit: number; what: stri
 
 function view(s: AttnState, e: AttnEvent | null): Mark[] {
   const f = s.focus;
-  const marks: Mark[] = [{ kind: "box", key: "base", at: [-22, -16, -4], size: [tx(N - 1) + PLINTH[0] + 44, OUT_Y + 44, 4], tone: "base" }];
+  const marks: Mark[] = [...plate("base", [-22, -16, 0], [tx(N - 1) + PLINTH[0] + 44, OUT_Y + 44]).marks];
   const weighted = s.phase === "softmax" || s.phase === "mix" || s.phase === "all";
 
   for (let i = 0; i < N; i++) {
@@ -78,11 +79,15 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
       key: `tok-${i}`,
       at: [x, 0, 0],
       size: PLINTH,
+      radius: 3,
+      role: "subject",
+      surface: { seam: 0.5 },
       tone: "structure",
       label: tok(i),
       labelFace: "left",
       lit: isFocus,
       link: `q-${i} k-${i} v-${i}`,
+      owner: `tok-${i}`,
     });
     // Query, key and value vectors as bars at their true heights.
     const groups: [string, number[], "cold" | "hot" | "good", number][] = [
@@ -92,7 +97,7 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
     ];
     for (const [name, v, tone, ox] of groups) {
       v.forEach((value, d) => {
-        marks.push({ kind: "box", key: `${name}-${i}-${d}`, at: [x + ox + d * 6, 16, PLINTH[2]], size: [5, 8, barH(value)], tone, link: `${name}-${i}` });
+        marks.push({ kind: "box", key: `${name}-${i}-${d}`, at: [x + ox + d * 6, 16, PLINTH[2]], size: [5, 8, barH(value)], radius: 0.8, tone, link: `${name}-${i}`, owner: `tok-${i}` });
       });
     }
   }
@@ -103,7 +108,7 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
     const max = Math.max(...g.values);
     for (let j = 0; j < N; j++) {
       const [cx, cy] = gaugeAt(j);
-      marks.push({ kind: "cylinder", key: `pad-${j}`, at: [cx, cy, 0], radius: 15, height: 1, tone: "muted" });
+      marks.push({ kind: "cylinder", key: `pad-${j}`, at: [cx, cy, 0], radius: 15, height: 1, tone: "muted", owner: `gauge-${j}` });
       const v = g.values[j];
       if (v === undefined) continue;
       const h = Math.max(0.6, v * g.unit);
@@ -119,6 +124,7 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
         enter: "grow",
         label: fmt(v),
         link: `q-${f} k-${j}`,
+        owner: `gauge-${j}`,
       });
 
       // The query reaching each key, on the floor; thickness shows the weight once there is one.
@@ -139,9 +145,9 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
   const outputs = s.phase === "mix" ? [f] : s.phase === "all" ? A.tokens.map((_, i) => i) : [];
   for (const i of outputs) {
     const x = tx(i);
-    marks.push({ kind: "box", key: `out-${i}`, at: [x, OUT_Y, 0], size: [PLINTH[0], 20, 6], tone: "muted", enter: "fade", link: `z-${i}` });
+    marks.push({ kind: "box", key: `out-${i}`, at: [x, OUT_Y, 0], size: [PLINTH[0], 20, 6], radius: 2.5, surface: { seam: 0.5 }, tone: "muted", enter: "fade", link: `z-${i}`, owner: `out-${i}` });
     A.output[i]!.forEach((value, d) => {
-      marks.push({ kind: "box", key: `z-${i}-${d}`, at: [x + 17 + d * 8, OUT_Y + 6, 6], size: [6, 8, barH(value)], tone: "good", enter: "grow", link: `z-${i}` });
+      marks.push({ kind: "box", key: `z-${i}-${d}`, at: [x + 17 + d * 8, OUT_Y + 6, 6], size: [6, 8, barH(value)], radius: 0.8, tone: "good", enter: "grow", link: `z-${i}`, owner: `out-${i}` });
     });
     marks.push({ kind: "label", key: `out-label-${i}`, at: [x + PLINTH[0] / 2, OUT_Y + 36, -4], text: `output for “${tok(i)}”`, size: "small", target: { key: `out-${i}`, at: [x + PLINTH[0] / 2, OUT_Y + 20, 3] } });
   }
@@ -241,14 +247,15 @@ function panels(s: AttnState, e: AttnEvent | null): Panel[] {
   );
 
   const out: Panel[] = [
-    { key: "eq", title: "Scaled dot-product attention", html: EQ + `<div class="vz-calc">${tex(calc(s, e), { display: true })}</div>` },
-    { key: "vectors", title: "Query, key and value of each token", html: vectors },
-    { key: "matrix", title: matrixTitle, html: matrix },
+    { key: "eq", place: "side", title: "Scaled dot-product attention", html: EQ + `<div class="vz-calc">${tex(calc(s, e), { display: true })}</div>` },
+    { key: "vectors", place: "side", title: "Query, key and value", html: vectors },
+    { key: "matrix", place: "side", title: matrixTitle, html: matrix },
   ];
   const outRows = s.phase === "mix" ? [f] : s.phase === "all" ? A.tokens.map((_, i) => i) : [];
   if (outRows.length) {
     out.push({
       key: "output",
+      place: "side",
       title: "Output  z = Σ w · v",
       html: grid(
         A.output.map((r) => r),
@@ -298,7 +305,7 @@ function observe(s: AttnState): Observation[] {
   // Bar heights are the numbers: check the drawn size, not just the label.
   A.tokens.forEach((_, i) =>
     (["q", "k", "v"] as const).forEach((name) =>
-      A[name.toUpperCase() as "Q" | "K" | "V"][i]!.forEach((v, d) => obs.push({ type: "extent", key: `${name}-${i}-${d}`, size: [5, 8, barH(v)] })),
+      A[name.toUpperCase() as "Q" | "K" | "V"][i]!.forEach((v, d) => obs.push({ type: "extent", key: `${name}-${i}-${d}`, size: [5, 8, barH(v)], radius: 0.8 })),
     ),
   );
   const g = gaugeValues(s);
@@ -326,16 +333,42 @@ function observe(s: AttnState): Observation[] {
   for (const i of outRows)
     A.output[i]!.forEach((z, d) => {
       obs.push({ type: "text", key: `z-${i}-${d}-value`, equals: fmt(z) });
-      obs.push({ type: "extent", key: `z-${i}-${d}`, size: [6, 8, barH(z)] });
+      obs.push({ type: "extent", key: `z-${i}-${d}`, size: [6, 8, barH(z)], radius: 0.8 });
     });
   if (s.phase !== "intro" && s.phase !== "all") obs.push({ type: "lit", key: `tok-${f}` });
   return obs;
 }
 
+const HEADING: Record<string, string> = {
+  intro: "Three tokens, each with a query, key and value.",
+  query: "Follow “sat”: its query asks the question.",
+  scale: "Divide every score by √d_k.",
+  softmax: "Softmax turns scores into weights that sum to 1.",
+  mix: "Mix the values in those proportions.",
+  all: "Every token does the same, all at once.",
+};
+const CHAPTER: Record<string, string> = { intro: "Ask", query: "Ask", score: "Score", scale: "Scale", softmax: "Weigh", mix: "Mix", all: "Mix" };
+
+function teaching(s: AttnState, e: AttnEvent | null): Teaching {
+  const t: Teaching = {
+    chapter: CHAPTER[s.phase]!,
+    heading: s.phase === "score" ? `Score “${tok(s.focus)}” against “${tok(e!.key!)}”.` : HEADING[s.phase]!,
+  };
+  if (s.phase === "scale") {
+    const w = A.weights[s.focus]!;
+    const top = tok(w.indexOf(Math.max(...w)));
+    t.prediction = { question: "Which token will get the most weight?", choices: A.tokens.slice(), answer: top, explanation: `${top}: it has the largest scaled score.` };
+  }
+  return t;
+}
+
 export default defineScene<AttnState, AttnEvent>({
   id: "attention",
   title: "Scaled dot-product attention",
-  question: "How does one token decide which other tokens to listen to?",
+  question: "How does a token choose what to attend?",
+  presentation: "editorial",
+  setup: "Each token scores every token with its query, turns the scores into weights, and mixes the values.",
+  teaching,
   trust: "computed",
   assumptions: [
     "Q, K and V are given directly. In a Transformer they are learned linear projections of each token's embedding.",
