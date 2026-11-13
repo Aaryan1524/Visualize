@@ -116,6 +116,13 @@ const looseCable = defineScene({
   view: (s, e) => [...stack.view(s, e), { kind: "link", key: "loose", from: [24, 12, 0.4], to: [90, 12, 0.4], cable: true, width: 2.2, layer: "floor" }],
 });
 
+/** A cable that touches a part but claims to be plugged into another one. */
+const wrongMount = defineScene({
+  ...stack,
+  id: "wrong-mount",
+  view: (s, e) => [...stack.view(s, e), { kind: "link", key: "misplugged", from: [12, 12, 0.4], to: [20, 20, 0.4], cable: true, width: 2.2, layer: "floor", ends: ["elsewhere", "elsewhere"] }],
+});
+
 /** A free label drawn across a standing part it does not point to. */
 const labelOnPart = defineScene({
   ...stack,
@@ -140,6 +147,7 @@ export const variants = {
   "label-on-part": labelOnPart,
   "hidden-value": hiddenValue,
   "loose-cable": looseCable,
+  "wrong-mount": wrongMount,
 };
 
 export default clean;

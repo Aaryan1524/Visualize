@@ -285,6 +285,7 @@ const CONTROLS = [
   { variant: "label-on-part", expect: "labels" },
   { variant: "hidden-value", expect: "observations" },
   { variant: "loose-cable", expect: "mounts" },
+  { variant: "wrong-mount", expect: "mounts" },
   { variant: "editorial", plant: "no-focus", expect: "focus" },
   { variant: "editorial", plant: "flat-focus", expect: "focus" },
   { variant: "wrong-value", expect: "observations" },
@@ -394,13 +395,17 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
     const near = (p, [lo, hi]) => [0, 1, 2].every((i) => p[i] >= lo[i] - 1.5 && p[i] <= hi[i] + 1.5);
     let ends = 0;
     steps.forEach((st, k) => {
-      const solids = st.marks.filter(standing).map(bounds);
+      const standingMarks = st.marks.filter(standing);
+      const solids = standingMarks.map(bounds);
       for (const m of st.marks) {
         if (m.kind !== "link" || !m.cable || m.transient || m.leaving) continue;
-        for (const [name, p] of [["start", m.from], ["end", m.to]]) {
+        [["start", m.from], ["end", m.to]].forEach(([name, p], i) => {
           ends++;
-          if (!solids.some((b) => near(p, b))) problems.push(`step ${k}: cable ${m.key} ${name} at (${p.map((n) => n.toFixed(1)).join(", ")}) is not on a part`);
-        }
+          // A bound end must sit on the part it names, not merely on something nearby.
+          const owner = m.ends?.[i];
+          const pool = owner ? standingMarks.filter((s) => (s.owner ?? s.key) === owner).map(bounds) : solids;
+          if (!pool.some((b) => near(p, b))) problems.push(`step ${k}: cable ${m.key} ${name} at (${p.map((n) => n.toFixed(1)).join(", ")}) is not on ${owner ?? "a part"}`);
+        });
       }
     });
     report.add("mounts", `${ends} cable ends checked against standing parts`, [...new Set(problems)].slice(0, 20));
