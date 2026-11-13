@@ -14,6 +14,8 @@ The shape the field draws. Ten eval sessions on 0.3 (five prompts, with and with
 - **Chip text cut off on phones** ("429", "timeout") now fails layout, and chips wrap instead.
 - **Round parts are sorted by their footprints.** A marker beside a plinth sat inside the plinth's bounding square and was reported as intersecting it.
 - **Fixes the eval runs found in the kit:** terminal pins on the base, labels too tall for their face, a crash in the surface check, and rails limited to 12 slots.
+- **A blog image reads on its own.** `export-svg --frame` adds the title, the step's action and the legend around the checked drawing, and exports leave out inherited styles (a 1.7 MB file is now about a third the size per shape).
+- **Focus on what remains.** A step that only rules things out focused the discarded cells; muted marks no longer count as the change.
 - **The eval rubric scores the reader first.** The old rubric only checked that the skill was followed.
 
 ## 0.3.0

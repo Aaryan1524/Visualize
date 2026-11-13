@@ -3,12 +3,20 @@
 //
 //   node scripts/export-svg.mjs dist/retries.html --step 8 --out retries-8.svg [--theme dark] [--diff diff.png]
 //   node scripts/export-svg.mjs dist/retries.html --step 8 --out x.svg --plant drop-text   must fail
+//   node scripts/export-svg.mjs dist/retries.html --step 8 --out x.svg --frame              with title, step and legend
 //
 // Every style the page resolves at runtime (theme tokens, label ink and size,
 // facet light) is written onto the elements, so the file needs no stylesheet.
 // The export is then checked: the SVG is opened alone in Chrome and compared
 // pixel by pixel with the live stage, ignoring one-pixel antialiasing shifts
 // and the HTML heading laid over the stage. Exits non-zero above 0.3%.
+//
+// --frame wraps the checked drawing with the figure's title, the step's action
+// and the legend, so the image reads on its own in a post: the bare stage of
+// one step had no title, no key and no time (the blog eval).
+//
+// Styles equal to what an element would inherit (or the initial value) are
+// left out, which keeps files small: the first exports were 1.7 MB.
 
 import { bundledStyles } from "./lib/styles.mjs";
 import { writeFileSync } from "node:fs";
@@ -18,8 +26,12 @@ import { launch, openPage, settle } from "./lib/browser.mjs";
 
 const args = process.argv.slice(2);
 const file = resolve(args.shift() ?? "");
-const opt = { step: null, out: null, diff: null, theme: "light", width: 1440, height: 900, tolerance: 0.3, plant: null };
-for (let i = 0; i < args.length; i++) opt[args[i].replace(/^--/, "")] = args[++i];
+const opt = { step: null, out: null, diff: null, theme: "light", width: 1440, height: 900, tolerance: 0.3, plant: null, frame: false };
+for (let i = 0; i < args.length; i++) {
+  const k = args[i].replace(/^--/, "");
+  if (k === "frame") opt.frame = true;
+  else opt[k] = args[++i];
+}
 if (!opt.out) throw new Error("--out is required");
 
 const PROPS = [
@@ -40,10 +52,19 @@ try {
     const copy = source.cloneNode(true);
     const a = [source, ...source.querySelectorAll("*")];
     const b = [copy, ...copy.querySelectorAll("*")];
+    // Inherited properties are written only where they differ from the parent's;
+    // the rest only where they differ from their initial value.
+    const INHERITED = new Set(["fill", "fill-opacity", "stroke", "stroke-width", "stroke-opacity", "stroke-linejoin", "stroke-linecap", "stroke-dasharray", "visibility", "paint-order", "font-family", "font-size", "font-weight", "letter-spacing", "text-anchor", "dominant-baseline"]);
+    const INITIAL = { opacity: "1", display: "inline", filter: "none", "vector-effect": "none" };
+    const computed = new Map(a.map((el) => [el, getComputedStyle(el)]));
     a.forEach((el, i) => {
-      const cs = getComputedStyle(el);
-      const style = PROPS.map((p) => `${p}:${cs.getPropertyValue(p)}`).join(";");
-      b[i].setAttribute("style", style);
+      const cs = computed.get(el), parent = el === source ? null : computed.get(el.parentElement);
+      const style = PROPS.filter((p) => {
+        const v = cs.getPropertyValue(p);
+        if (INHERITED.has(p)) return !parent || parent.getPropertyValue(p) !== v;
+        return INITIAL[p] !== v;
+      }).map((p) => `${p}:${cs.getPropertyValue(p)}`).join(";");
+      if (style) b[i].setAttribute("style", style); else b[i].removeAttribute("style");
       b[i].removeAttribute("class");
     });
     const fonts = document.createElementNS("http://www.w3.org/2000/svg", "style");
@@ -67,6 +88,17 @@ try {
     return { svg: new XMLSerializer().serializeToString(copy), width: rect.width, height: rect.height };
   }, PROPS, opt.plant, fontCss);
   writeFileSync(opt.out, `<?xml version="1.0" encoding="UTF-8"?>\n${svg}\n`);
+  // What a frame needs, read from the page at this step.
+  const frame = opt.frame ? await page.evaluate(() => {
+    const root = document.querySelector(".vz"), cs = getComputedStyle(root);
+    const text = (sel) => root.querySelector(sel)?.textContent?.trim() ?? "";
+    return {
+      kicker: text(".vz-kicker"), question: text(".vz-question"), action: text(".vz-step-heading") || text(".vz-text"),
+      legend: [...root.querySelectorAll(".vz-legend li")].map((li) => ({ label: li.textContent.trim(), colour: getComputedStyle(li.querySelector(".vz-swatch")).backgroundColor })),
+      ink: cs.getPropertyValue("--ink").trim() || "#111", ink2: cs.getPropertyValue("--ink-2").trim() || "#555",
+      card: getComputedStyle(root.querySelector(".vz-card") ?? root).backgroundColor,
+    };
+  }) : null;
 
   // Check: the file on its own must look like the live stage.
   // The step heading is HTML laid over the stage, not part of the figure.
@@ -121,7 +153,28 @@ try {
   if (missingText.length || liveInv.text.length !== fileInv.text.length) structural.push(`text differs: live ${liveInv.text.length} labels, file ${fileInv.text.length}`);
   if (fileInv.shapes < liveInv.shapes) structural.push(`file has ${fileInv.shapes} shapes, live stage ${liveInv.shapes}`);
   const ok = diff <= Number(opt.tolerance) && structural.length === 0;
-  console.log(`wrote ${opt.out} · ${(svg.length / 1024).toFixed(0)} KB · ${liveInv.text.length} labels, ${fileInv.shapes} shapes · differs from the live stage at ${diff.toFixed(2)}% of pixels${diff > Number(opt.tolerance) ? ` (max ${opt.tolerance}%)` : ""}`);
+  // The checked drawing goes inside the frame unchanged.
+  if (frame && ok) {
+    const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    const pad = 28, head = 92, foot = frame.legend.length ? 56 : 16;
+    const W = Math.ceil(width) + pad * 2, H = Math.ceil(height) + head + foot;
+    const inner = svg.replace(/^<svg /, `<svg x="${pad}" y="${head}" `);
+    let x = pad;
+    const legend = frame.legend.map((l) => {
+      const item = `<circle cx="${x + 4}" cy="${H - foot / 2 - 4}" r="4" fill="${l.colour}"/><text x="${x + 14}" y="${H - foot / 2}" font-size="13" fill="${frame.ink2}">${esc(l.label)}</text>`;
+      x += 30 + l.label.length * 7;
+      return item;
+    }).join("");
+    const font = `font-family="Visualize Sans, system-ui, sans-serif"`;
+    const framed = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(frame.question)} ${esc(frame.action)}" ${font}>`
+      + `<rect width="${W}" height="${H}" rx="14" fill="${frame.card}"/>`
+      + `<text x="${pad}" y="30" font-size="13" fill="${frame.ink2}">${esc(frame.kicker)}</text>`
+      + `<text x="${pad}" y="58" font-size="24" font-weight="600" fill="${frame.ink}">${esc(frame.question)}</text>`
+      + `<text x="${pad}" y="82" font-size="15" fill="${frame.ink2}">${esc(frame.action)}</text>`
+      + inner + legend + `</svg>`;
+    writeFileSync(opt.out, `<?xml version="1.0" encoding="UTF-8"?>\n${framed}\n`);
+  }
+  console.log(`wrote ${opt.out}${frame ? " (framed: title, action, legend)" : ""} · ${(svg.length / 1024).toFixed(0)} KB · ${liveInv.text.length} labels, ${fileInv.shapes} shapes · differs from the live stage at ${diff.toFixed(2)}% of pixels${diff > Number(opt.tolerance) ? ` (max ${opt.tolerance}%)` : ""}`);
   for (const p of structural) console.log(`  ${p}`);
   if (!ok) process.exitCode = 1;
 } finally {

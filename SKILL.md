@@ -83,7 +83,7 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
    verify: passed (<n> observations; depth, focus, labels, layout, both themes). Files: <page>, <scene dir>.
    Open: <page>#step=<the key step>. Not verified by machine: <whatever you judged only by eye>.
    ```
-8. **Export** if needed: `node <skill>/scripts/export-svg.mjs <built page> --step k --out f.svg` (checked against the live stage), or `<Figure scene={…} />` from `<skill>/src/react/Figure.tsx` (see `references/authoring.md`).
+8. **Export** if needed: `node <skill>/scripts/export-svg.mjs <built page> --step k --out f.svg --frame` (checked against the live stage; `--frame` adds the title, the step's action and the legend, so an image in a post reads on its own; leave it off only when the host page supplies them), or `<Figure scene={…} />` from `<skill>/src/react/Figure.tsx` (see `references/authoring.md`).
 
 ## Parts
 

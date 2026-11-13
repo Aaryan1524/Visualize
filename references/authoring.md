@@ -54,7 +54,7 @@ Every step carries a trust level shown with the action. Use `sourced` only with 
 ## Outputs
 
 - **Standalone page:** `node scripts/build.mjs <dir>` writes `dist/<id>.html`, one file that opens from disk.
-- **SVG of one step:** `node scripts/export-svg.mjs dist/<id>.html --step k --out f.svg [--theme dark]`. Every style is resolved onto its element. The file is opened alone and compared with the live stage, both by structure (labels, shapes) and by pixels.
+- **SVG of one step:** `node scripts/export-svg.mjs dist/<id>.html --step k --out f.svg [--frame] [--theme dark]`. `--frame` adds the title, the step's action and the legend around the drawing, for an image that must read on its own. Every style is resolved onto its element (inherited values are left out). The file is opened alone and compared with the live stage, both by structure (labels, shapes) and by pixels.
 - **React:** import the component and your scene by path from the skill folder, and bundle them with any TypeScript-aware bundler (esbuild, Vite, Next.js). This is the route `pnpm check:embed` tests (`test/embed/app.tsx`).
 
   ```tsx
