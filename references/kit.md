@@ -17,6 +17,8 @@ Every mark has `key`, the model entity id. The key is identity across steps: the
 | `transient` + `travel` | Drawn only while transitioning, along `travel.from` → `travel.to`. |
 | `effect` | `pulse` (grows from its base) or `shake`; both cancel out by the end of the move. |
 | `title` | Accessible name. |
+| `owner` | The part this piece belongs to; parts set it. Focus lights all pieces of an owner together. |
+| `emphasis` | 0–1, set by the engine from the step's focus. Receding marks mix toward the stage colour (opaque, so painter's order holds). Plates and labels never recede. |
 | `textRole` | `name`, `status`, `value` or `symbol`: shared typography, preserving the authored text. Values use mono/tabular numerals; names, statuses and symbols use the main face. |
 
 **`box`**: `at` is the minimum corner and `size` is `[w, d, h]`.
@@ -92,6 +94,15 @@ Parts validate their inputs and throw a `RangeError` on impossible sizes or posi
 - `tex(source, { display })`: KaTeX in which only `\htmlData` is trusted.
 - `linked(ids, body)`: a term linked to entities.
 - `grid(values, { rows, cols, link, key, tone, blank, digits })`: a number table.
+
+## Focus
+
+In editorial scenes the engine computes each step's focus: the owners of marks that changed since the previous step. Changed means moved, appeared, changed tone or text, or is leaving or in flight. Everything else recedes to `RECEDE` (0.42).
+
+- Override per step with `teaching.focus: ["safe/server", "unsafe/ledger"]`, or `"all"`.
+- If nothing focused is still drawn at rest, nothing recedes.
+- Give a message that is absorbed by a part that part as its `owner`, so the receiver lights up.
+- The `focus` check compares the drawn emphasis with the model's and requires receding solids to look different.
 
 ## Motion and time
 

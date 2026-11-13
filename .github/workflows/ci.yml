@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Google Chrome is preinstalled on GitHub's Ubuntu runners; scripts/lib/browser.mjs finds it.
+      - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm check:reproducible
+      - run: pnpm verify
+      - run: pnpm verify:controls
+      - run: pnpm check:embed
+      - name: Keep screenshots and contact sheets for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shots
+          path: shots/

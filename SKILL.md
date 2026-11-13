@@ -4,7 +4,7 @@ description: Build step-through visual explanations whose picture is checked aga
 license: MIT
 compatibility: Node.js 24+ (runs TypeScript directly) and Google Chrome or Chromium for verification. Run `npm install` (or `pnpm install`) once in this folder.
 metadata:
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 # Visualize
@@ -21,6 +21,8 @@ Three reference explanations ship in `examples/`. Open the closest one before st
 
 **The model is the truth, and the picture is checked against it.** Never type a number, an order or an outcome into the view. Compute it in the model, show it through the view, and declare what the reader should see as observations, which `verify` reads back from the rendered page.
 
+**For the look: one causal moment per step, and everything else recedes.** The engine focuses whatever changed since the last step and lets the rest fall back toward the stage. Your job is to make the change itself visible at rest: a lost message stays on the wire, a second charge stacks a second coin. A step where nothing visible changes is a step that teaches nothing.
+
 ## Choose the representation
 
 Go down this ladder and stop at the first rung that fits. Name the rung in your plan.
@@ -30,6 +32,29 @@ Go down this ladder and stop at the first rung that fits. Name the rung in your 
 3. **An analogy, only with a written mapping.** List what each part means and what the analogy does not preserve, in `assumptions`.
 
 Do not draw boxes-and-arrows diagrams. Do not invent a decorative machine whose parts mean nothing.
+
+## Decisions this skill makes
+
+A one-line prompt leaves these open. Decide them like this without asking. Ask the user only about the three marked **ask**, and only when the prompt and files don't answer them.
+
+| Decision | Default | Why |
+|---|---|---|
+| **The scenario** (concept, sizes, values) **ask** if they change the answer | Small readable values (capacity 3–6, $20, 40 ms); state them in `assumptions` | Small numbers keep every value legible on a face |
+| **Output destination** **ask** if unclear | Standalone page always; plus SVG of the key step when they say image, blog or static; plus React when they say component, React or Next.js | Every output is checked, so producing the page first costs nothing |
+| **What to contrast with** **ask** when "versus what?" is ambiguous | The naive alternative the concept fixes (FIFO for LRU, no key for idempotency) | A contrast makes the mechanism visible |
+| Representation | Rung 1 of the ladder above | The concept's own parts teach its real vocabulary |
+| Size | A **figure**: one system, 6–11 steps, 3–5 chapters. A **reference**: two systems compared, at most 12 steps. Larger: refuse and propose a split | Past 12 steps, readers lose the thread; two systems is the most a stage holds legibly |
+| Number of systems | One; two only when the point is a contrast run on the same inputs | Two lanes halve the size of everything |
+| Input sequence | Chosen so every interesting case happens, each asserted in `model.test.ts` | A run without the eviction or loss explains nothing |
+| Prediction | Exactly one, just before the causal decision | Predicting forces the reader to hold the rule |
+| Focus | Automatic (what changed); set `teaching.focus` only when the cause is not what moved | The default is right for most steps and is checked |
+| Parts | Kit parts; a new part in `src/parts/` when none fits; never raw boxes in a scene | Finish and checks come with the part |
+| Colour | Neutral parts; a semantic tone only for an outcome class (hit, miss, lost, duplicate, stored), at most three meanings, each in the legend | Colour that means everything means nothing |
+| Words | Title 8 words or fewer; one action of 12 words or fewer per step; part names of 1–3 words, in a row with leaders | Paragraphs get read instead of the figure |
+| Flat maths | Only when the concept has equations or matrices; terms linked to solids | Maths on a tilted face is unreadable |
+| Theme | Follow the reader's preference; review in light first, then dark | Both are checked |
+| Trust | `computed` for exact models, `model` for simplified ones, `sourced` only with an exact location | The badge must be true |
+| Where files go | In the user's project: the scene in an explanations folder, the built page in its public or static folder, screenshots beside the scene (verify puts them there) | Keeps the skill folder clean |
 
 ## Workflow
 
@@ -41,8 +66,16 @@ Do not draw boxes-and-arrows diagrams. Do not invent a decorative machine whose 
 3. **Assemble the view from parts.** Use `src/parts/`. Every mark's `key` is a model entity id: keys carry identity across steps, so motion, linking and checks follow them. Position things with the parts' anchors, not by eye.
 4. **Teach in beats** (`teaching`). Use 3–5 chapters and one short action per step (12 words at most). Add one prediction just before the causal moment, such as "D is next. Which key leaves?". The longer caption, assumptions and transcript go in the Details drawer automatically.
 5. **Declare observations** (`observe`): every value shown, every order that matters, every size that encodes a number (`extent`), what must be visible and what must be gone, semantic tones, and what is lit.
+   **Working draft early:** after the model and a rough view, build and open the page before any polish. A wrong representation is cheap to change now and expensive later.
 6. **Build, verify and look.** Run `node <skill>/scripts/build.mjs <dir> --out <folder>` and then `node <skill>/scripts/verify.mjs <dir>`, and fix until it prints `passed`. Screenshots go to `<parent of dir>/shots/<name>/`. Then open the screenshots and the two contact sheets in `shots/` and look at them, at 1× and with `scripts/shoot.mjs` at 4×. A passing verify proves correctness and mechanical tidiness, not beauty.
-7. **Export** if needed: `node <skill>/scripts/export-svg.mjs <built page> --step k --out f.svg` (checked against the live stage), or `<Figure scene={…} />` from `<skill>/src/react/Figure.tsx` (see `references/authoring.md`).
+7. **Deliver** with this report, and nothing vaguer:
+
+   ```text
+   Built <title>: <n> steps in <chapters> chapters, from <parts>. Model tested against <reference>.
+   verify: passed (<n> observations; depth, focus, labels, layout, both themes). Files: <page>, <scene dir>.
+   Open: <page>#step=<the key step>. Not verified by machine: <whatever you judged only by eye>.
+   ```
+8. **Export** if needed: `node <skill>/scripts/export-svg.mjs <built page> --step k --out f.svg` (checked against the live stage), or `<Figure scene={…} />` from `<skill>/src/react/Figure.tsx` (see `references/authoring.md`).
 
 ## Parts
 

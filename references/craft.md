@@ -31,6 +31,14 @@ The look comes from constraint: one camera, one material system, a few tones, fi
 | A face label that does not fit is not drawn; optional labels drop where they would collide | Screen text spilled off a phone-sized terminal; slot numbers landed on the guide rail |
 | Lane and system titles go beside their plate, near the outcome | A title between two plates was read as naming the wrong one |
 
+## Emphasis
+
+| Rule | Why |
+|---|---|
+| What changed is in focus; everything else recedes (engine default) | "Too much remains equally prominent throughout": every step looked the same at a glance |
+| The causal change must be visible at rest | "The reply is lost." first showed a dimmed scene with nothing lit, because the loss happened mid-transition and left no trace |
+| Receding means mixing toward the stage colour, not transparency | Transparent solids would show what is behind them and break painter's order |
+
 ## Motion
 
 | Rule | Why |

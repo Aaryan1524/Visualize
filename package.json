@@ -1,6 +1,6 @@
 {
   "name": "visualize",
-  "version": "0.0.1",
+  "version": "0.3.0",
   "description": "An engine for model-driven, step-through visual explanations: isometric stages, linked math panels, and checks that the picture matches the model.",
   "license": "MIT",
   "private": true,
@@ -17,7 +17,8 @@
     "verify:controls": "node scripts/verify.mjs --controls --quick",
     "export:svg": "node scripts/export-svg.mjs",
     "check:embed": "node scripts/check-embed.mjs",
-    "new-scene": "node scripts/new-scene.mjs"
+    "new-scene": "node scripts/new-scene.mjs",
+    "check:reproducible": "node scripts/check-reproducible.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
