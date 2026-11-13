@@ -68,7 +68,14 @@ function gaugeValues(s: AttnState): { values: number[]; unit: number; what: stri
 
 function view(s: AttnState, e: AttnEvent | null): Mark[] {
   const f = s.focus;
-  const marks: Mark[] = [...plate("base", [-22, -16, 0], [tx(N - 1) + PLINTH[0] + 44, OUT_Y + 44]).marks];
+  const marks: Mark[] = [...plate("base", [-16, -12, 0], [tx(N - 1) + PLINTH[0] + 32, OUT_Y + 34]).marks];
+  // The gauge pads and output trays stand from the first step: places where
+  // scores and results will appear, so the stage reads as one machine throughout.
+  for (let j = 0; j < N; j++) {
+    const [cx, cy] = gaugeAt(j);
+    marks.push({ kind: "cylinder", key: `pad-${j}`, at: [cx, cy, 0], radius: 15, height: 1, tone: "muted", owner: `gauge-${j}` });
+    marks.push({ kind: "box", key: `out-${j}`, at: [tx(j), OUT_Y, 0], size: [PLINTH[0], 20, 6], radius: 2.5, surface: { seam: 0.5 }, tone: "muted", link: `z-${j}`, owner: `out-${j}` });
+  }
   const weighted = s.phase === "softmax" || s.phase === "mix" || s.phase === "all";
 
   for (let i = 0; i < N; i++) {
@@ -108,7 +115,6 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
     const max = Math.max(...g.values);
     for (let j = 0; j < N; j++) {
       const [cx, cy] = gaugeAt(j);
-      marks.push({ kind: "cylinder", key: `pad-${j}`, at: [cx, cy, 0], radius: 15, height: 1, tone: "muted", owner: `gauge-${j}` });
       const v = g.values[j];
       if (v === undefined) continue;
       const h = Math.max(0.6, v * g.unit);
@@ -145,7 +151,6 @@ function view(s: AttnState, e: AttnEvent | null): Mark[] {
   const outputs = s.phase === "mix" ? [f] : s.phase === "all" ? A.tokens.map((_, i) => i) : [];
   for (const i of outputs) {
     const x = tx(i);
-    marks.push({ kind: "box", key: `out-${i}`, at: [x, OUT_Y, 0], size: [PLINTH[0], 20, 6], radius: 2.5, surface: { seam: 0.5 }, tone: "muted", enter: "fade", link: `z-${i}`, owner: `out-${i}` });
     A.output[i]!.forEach((value, d) => {
       marks.push({ kind: "box", key: `z-${i}-${d}`, at: [x + 17 + d * 8, OUT_Y + 6, 6], size: [6, 8, barH(value)], radius: 0.8, tone: "good", enter: "grow", link: `z-${i}`, owner: `out-${i}` });
     });
