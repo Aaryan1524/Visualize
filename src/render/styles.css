@@ -495,7 +495,8 @@
   .vz[data-presentation="editorial"] .vz-panel { display: block; }
   .vz[data-presentation="editorial"] .vz-panel h3 { margin-bottom: 12px; }
   .vz[data-presentation="editorial"] .vz-panel-body { display: block; }
-  .vz-strip { grid-template-columns: repeat(var(--vz-strip-count, 9), minmax(0, 1fr)); gap: 3px; }
+  /* Chips wrap to a second row before their text is cut off. */
+  .vz-strip { grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); gap: 4px; }
   .vz-totals { margin-top: 16px; gap: 14px; }
   .vz[data-presentation="editorial"] .vz-solid-label[data-text-role="symbol"] { font-size: calc(var(--label-size) * 1.15); }
   .vz[data-presentation="editorial"] .vz-count { margin: 0 2px; white-space: nowrap; }
