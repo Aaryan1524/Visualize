@@ -228,6 +228,27 @@ const PLANTS = {
       v.seekStep = (k) => v.seek(v.compiled.restTime(k));
     });
   },
+  // The renderer drops the step's focus: everything at full strength.
+  "no-focus": () => {
+    // The player is ready after fonts load; wait for its event rather than page load.
+    window.addEventListener("visualize:ready", () => {
+      const v = window.__viz;
+      const seek = v.seek;
+      v.seek = (t) => {
+        seek(t);
+        for (const g of v.stage.svg.querySelectorAll("[data-emphasis]")) g.removeAttribute("data-emphasis");
+      };
+      v.seekStep = (k) => v.seek(v.compiled.restTime(k));
+    });
+  },
+  // Emphasis is recorded but CSS stops mixing receding solids toward the stage.
+  "flat-focus": () => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s = document.createElement("style");
+      s.textContent = ".vz-solid{--tone:var(--tone-base)!important}";
+      document.head.append(s);
+    });
+  },
   // Pointing at a linked element lights nothing.
   linking: () => {
     window.addEventListener("pointerover", (e) => e.stopImmediatePropagation(), true);
@@ -264,6 +285,8 @@ const CONTROLS = [
   { variant: "label-on-part", expect: "labels" },
   { variant: "hidden-value", expect: "observations" },
   { variant: "loose-cable", expect: "mounts" },
+  { variant: "editorial", plant: "no-focus", expect: "focus" },
+  { variant: "editorial", plant: "flat-focus", expect: "focus" },
   { variant: "wrong-value", expect: "observations" },
   { variant: "crowded-labels", expect: "labels" },
   { variant: "intersecting", expect: "depth order" },
@@ -405,6 +428,37 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
     report.add("observations", `${obsCount} declared across ${steps.length} steps`, obsProblems);
     if (obsCount === 0) report.rows.at(-1).problems.push("the scene declares no observations, so nothing ties the picture to the model");
     report.add("captions", `caption, readout and trust at ${steps.length} steps`, capProblems);
+
+    // Focus: the page draws each solid at the emphasis the model-driven compile chose,
+    // and a receding solid visibly differs from its full-strength tone.
+    {
+      const problems = [];
+      let receding = 0;
+      for (let k = 0; k <= last; k++) {
+        const expected = steps[k].marks.filter((m) => m.kind === "box" || m.kind === "cylinder").map((m) => [m.key, m.emphasis ?? 1]);
+        receding += expected.filter(([, e]) => e < 1).length;
+        await page.evaluate((k) => window.__viz.seekStep(k), k);
+        const seen = await page.evaluate((expected) => {
+          const out = [];
+          const probe = document.createElement("canvas").getContext("2d");
+          const lum = (css) => { probe.fillStyle = "#000"; probe.fillStyle = css; probe.fillRect(0, 0, 1, 1); const d = probe.getImageData(0, 0, 1, 1).data; return 0.2126 * d[0] + 0.7152 * d[1] + 0.0722 * d[2]; };
+          for (const [key, e] of expected) {
+            const g = window.__viz.stage.svg.querySelector(`[data-key="${CSS.escape(key)}"]`);
+            if (!g) continue;
+            const drawn = Number(g.getAttribute("data-emphasis") ?? 1);
+            if (Math.abs(drawn - e) > 0.01) { out.push(`${key}: drawn at emphasis ${drawn}, model step says ${e}`); continue; }
+            if (e < 1) {
+              const top = g.querySelector('.vz-face[data-shade="top"]');
+              const cs = getComputedStyle(g);
+              if (top && Math.abs(lum(getComputedStyle(top).fill) - lum(cs.getPropertyValue("--tone-base"))) < 8 && Math.abs(lum(cs.getPropertyValue("--tone")) - lum(cs.getPropertyValue("--tone-base"))) < 8) out.push(`${key}: marked receding but drawn at full strength`);
+            }
+          }
+          return out;
+        }, expected);
+        seen.forEach((p) => problems.push(`step ${k}: ${p}`));
+      }
+      if (steps.some((s) => s.marks.some((m) => m.emphasis !== undefined))) report.add("focus", `${receding} receding solids across ${steps.length} steps`, problems.slice(0, 20));
+    }
 
     // Layout stability: the stage keeps one size at every step, so nothing
     // jumps and the camera fit never depends on what was seen before.

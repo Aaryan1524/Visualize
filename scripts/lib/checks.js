@@ -566,7 +566,8 @@
     for (const swatch of root.querySelectorAll(".vz-swatch[data-tone]")) {
       const tone=swatch.dataset.tone;
       for (const solid of svg().querySelectorAll(`.vz-solid[data-tone="${tone}"]`)) {
-        if (colour(getComputedStyle(swatch).backgroundColor)!==colour(getComputedStyle(solid).getPropertyValue("--tone"))) semantics.push(`${tone}: solid colour differs from its legend`);
+        // Compare the tone at full strength: a receding solid is mixed toward the stage on purpose.
+        if (colour(getComputedStyle(swatch).backgroundColor)!==colour(getComputedStyle(solid).getPropertyValue("--tone-base"))) semantics.push(`${tone}: solid colour differs from its legend`);
         if (solid.hasAttribute("data-lit")) {
           const edge=getComputedStyle(solid.querySelector(".vz-edge")).stroke;
           if (colour(edge)!==colour(getComputedStyle(solid).getPropertyValue("--tone"))) semantics.push(`${tone}: highlight introduces a different semantic colour`);
