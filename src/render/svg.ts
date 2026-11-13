@@ -137,6 +137,15 @@ function common(node: Node, m: Resolved): void {
   setAttr(r, "data-lit", m.lit ? "" : null);
   setAttr(r, "data-link", m.link ?? null);
   setAttr(r, "opacity", m.opacity < 1 ? f(m.opacity) : null);
+  // Receding marks mix their tone toward the stage; they stay opaque, so painter's order holds.
+  const emph = m.emphasis ?? 1;
+  setAttr(r, "data-emphasis", emph < 1 ? f(emph) : null);
+  if (emph < 1) r.style.setProperty("--emph", f(emph));
+  else {
+    r.style.removeProperty("--emph");
+    // An emptied style attribute would make a revisited step differ from a fresh one.
+    if (!r.getAttribute("style")) r.removeAttribute("style");
+  }
   if (m.title) {
     let t = r.querySelector(":scope > title");
     if (!t) r.prepend((t = el("title")));
@@ -307,7 +316,7 @@ export function createStage(viewBox: [number, number, number, number], projectio
     const t = n.text;
     // A detached element has no computed fill yet; measuring it would cache a wrong answer.
     if (!t || !t.textContent || !n.root.isConnected || t.hasAttribute("data-on-panel")) return;
-    const id = `${n.root.getAttribute("data-tone") ?? ""}|${t.getAttribute("data-face") ?? ""}`;
+    const id = `${n.root.getAttribute("data-tone") ?? ""}|${t.getAttribute("data-face") ?? ""}|${n.root.getAttribute("data-emphasis") ?? "1"}`;
     let ink = inkCache.get(id);
     if (!ink) {
       const face = n.root.querySelector<SVGElement>(`.vz-face[data-shade="${t.getAttribute("data-face")}"]`);

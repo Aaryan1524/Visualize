@@ -15,18 +15,21 @@ export interface Part {
   anchor: Record<string, Vec3>;
 }
 
+/** Every piece of a part shares its owner, so focus lights the part as a whole. */
+const owned = (owner: string, marks: Mark[]): Mark[] => marks.map((m) => ({ ...m, owner }));
+
 /** The plate a system stands on. `size` is its floor footprint. */
 export function plate(key: string, at: Vec3, size: [number, number]): Part {
   finite(at, "Plate position");
   const [w, d] = size;
   if (w < 40 || d < 30) throw new RangeError("A plate needs at least 40×30 units");
   return {
-    marks: [
+    marks: owned(key, [
       {
         kind: "box", key, at: add(at, [0, 0, -5]), size: [w, d, 5], radius: 6, tone: "base", role: "foundation",
         surface: { seam: 0.4, fasteners: { inset: 4, radius: 0.8 } },
       },
-    ],
+    ]),
     anchor: { frontLeft: add(at, [0, d, 0]), backRight: add(at, [w, 0, 0]) },
   };
 }
@@ -50,7 +53,7 @@ export function terminal(key: string, at: Vec3, { status = "", lit = false }: { 
     { kind: "box", key: `${key}/port`, at: add(at, [42, 9, 0]), size: [3, 7, 4], radius: 0.6, tone: "structure" },
   ];
   return {
-    marks,
+    marks: owned(key, marks),
     anchor: {
       port: add(at, [45, 12.5, 0]),
       outbox: add(at, [48, 9.5, 0.6]),
@@ -80,7 +83,7 @@ export function server(key: string, at: Vec3, { lamp = "muted" as Tone, lit = fa
     },
   ];
   return {
-    marks,
+    marks: owned(key, marks),
     anchor: {
       inPort: add(at, [0, 17, 0]),
       inbox: add(at, [-14, 14, 0.6]),
@@ -116,7 +119,7 @@ export function ledger(key: string, centre: Vec3, coins: readonly Coin[]): Part 
     } as CylinderMark);
   });
   return {
-    marks,
+    marks: owned(key, marks),
     anchor: {
       inPort: add(centre, [-19, 0, 0]),
       top: add(centre, [0, 0, COIN_BASE + coins.length * COIN_HEIGHT]),
@@ -137,7 +140,7 @@ export function keyStore(key: string, at: Vec3, { stored = false, lit = false, p
       enter: "drop", lit, ...(pulse ? { effect: "pulse" as const } : {}),
     } as BoxMark);
   }
-  return { marks, anchor: { top: add(at, [14, 11, 9]), front: add(at, [14, 22, 2]) } };
+  return { marks: owned(key, marks), anchor: { top: add(at, [14, 11, 9]), front: add(at, [14, 22, 2]) } };
 }
 
 /** A cased cable lying on the plate, from one anchor to another. */

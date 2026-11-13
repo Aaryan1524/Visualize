@@ -74,6 +74,8 @@ export function compile<S, E>(scene: Scene<S, E>, opts: { hold?: number } = {}):
     };
   });
 
+  if (scene.presentation === "editorial") applyFocus(steps);
+
   const timeline = buildTimeline(
     trace.steps.map((s) => (scene.timing ? scene.timing(s.event) : {})),
     opts.hold,
@@ -106,4 +108,42 @@ export function compile<S, E>(scene: Scene<S, E>, opts: { hold?: number } = {}):
     frameAt,
     restTime: (k) => timeline.rest[Math.min(Math.max(k, 0), steps.length - 1)]!,
   };
+}
+
+
+/** How far recessive marks fade toward the stage (1 = full strength). */
+export const RECEDE = 0.42;
+
+const ownerOf = (m: Mark) => m.owner ?? m.key;
+/** Context never recedes: plates and other foundations, and labels (text stays readable). */
+const recedes = (m: Mark) => m.kind !== "label" && !(m.kind === "box" && (m.role === "foundation" || m.tone === "base"));
+const shape = (m: Mark) => JSON.stringify({ ...m, emphasis: undefined });
+
+/**
+ * The default focus: owners whose marks changed since the previous step (moved,
+ * appeared, changed tone or text, are leaving or in flight). A step can name
+ * its own focus, or "all". Pure: it depends only on the two steps' marks.
+ */
+export function focusOf(prev: readonly Mark[] | null, next: readonly Mark[], explicit?: readonly string[] | "all"): Set<string> | null {
+  if (explicit === "all" || prev === null) return null;
+  if (explicit) return new Set(explicit);
+  const before = new Map(prev.map((m) => [m.key, shape(m)]));
+  const owners = new Set<string>();
+  for (const m of next) {
+    if (m.kind === "label") continue;
+    if (m.transient || m.leaving || before.get(m.key) !== shape(m)) owners.add(ownerOf(m));
+  }
+  if (!owners.size) return null;
+  // If nothing focused is still drawn at rest (only marks in flight or leaving changed),
+  // dimming would leave the reader looking at nothing: keep everything at full strength.
+  const atRest = next.some((m) => m.kind !== "label" && !m.transient && !m.leaving && owners.has(ownerOf(m)));
+  return atRest ? owners : null;
+}
+
+function applyFocus(steps: StepInfo[]): void {
+  steps.forEach((step, i) => {
+    const focus = focusOf(i === 0 ? null : steps[i - 1]!.marks, step.marks, step.teaching?.focus);
+    if (!focus) return;
+    step.marks = step.marks.map((m) => (recedes(m) && !focus.has(ownerOf(m)) && !focus.has(m.key) ? { ...m, emphasis: RECEDE } : m));
+  });
 }

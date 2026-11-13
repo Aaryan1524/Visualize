@@ -98,6 +98,17 @@ interface MarkBase {
   leaving?: boolean;
   /** Height of a hop during the move, so a mark can pass over its neighbours. */
   arc?: number;
+  /**
+   * The part this mark belongs to (parts set it on every piece). Focus treats
+   * all pieces of one owner together: a change to a server's tower lights the
+   * whole server.
+   */
+  owner?: string;
+  /**
+   * How strongly the mark is drawn, 0–1. Set by the engine from the step's
+   * focus; scenes rarely set it themselves. Recessive marks fade toward the stage.
+   */
+  emphasis?: number;
   /** Accessible name of this element. */
   title?: string;
 }
@@ -237,6 +248,12 @@ export type Projection = "iso" | "front";
 export interface Teaching {
   chapter: string;
   heading: string;
+  /**
+   * What the reader should look at in this step: owners or keys. By default
+   * the engine focuses whatever changed since the previous step and lets the
+   * rest recede. `"all"` keeps everything at full strength.
+   */
+  focus?: readonly string[] | "all";
   prediction?: {
     question: string;
     choices: string[];

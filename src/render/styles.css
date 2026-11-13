@@ -171,16 +171,19 @@
 }
 
 /* Solids: tinted faces under a crisp ink edge. */
-.vz-solid { --tone: var(--t-subject); }
-.vz-solid[data-tone="base"] { --tone: var(--t-base); }
-.vz-solid[data-tone="structure"] { --tone: var(--t-structure); }
-.vz-solid[data-tone="subject"] { --tone: var(--t-subject); }
-.vz-solid[data-tone="accent"] { --tone: var(--t-accent); }
-.vz-solid[data-tone="hot"] { --tone: var(--t-hot); }
-.vz-solid[data-tone="cold"] { --tone: var(--t-cold); }
-.vz-solid[data-tone="good"] { --tone: var(--t-good); }
-.vz-solid[data-tone="bad"] { --tone: var(--t-bad); }
-.vz-solid[data-tone="muted"] { --tone: var(--t-muted); }
+/* --emph (set by the engine from the step's focus) mixes a receding solid toward the stage. */
+.vz-solid { --tone-base: var(--t-subject); --tone: color-mix(in oklab, var(--tone-base) calc(var(--emph, 1) * 100%), var(--stage, var(--card))); }
+.vz-solid[data-tone="base"] { --tone-base: var(--t-base); }
+.vz-solid[data-tone="structure"] { --tone-base: var(--t-structure); }
+.vz-solid[data-tone="subject"] { --tone-base: var(--t-subject); }
+.vz-solid[data-tone="accent"] { --tone-base: var(--t-accent); }
+.vz-solid[data-tone="hot"] { --tone-base: var(--t-hot); }
+.vz-solid[data-tone="cold"] { --tone-base: var(--t-cold); }
+.vz-solid[data-tone="good"] { --tone-base: var(--t-good); }
+.vz-solid[data-tone="bad"] { --tone-base: var(--t-bad); }
+.vz-solid[data-tone="muted"] { --tone-base: var(--t-muted); }
+.vz-solid[data-emphasis] { filter: none !important; }
+.vz-link-g[data-emphasis] { opacity: calc(0.3 + 0.7 * var(--emph, 1)); }
 
 .vz-face { stroke: none; }
 .vz-face[data-shade="top"] { fill: color-mix(in oklab, var(--tone) var(--top-mix), var(--shade-top)); }

@@ -48,6 +48,13 @@ function scaled(m: Mark, s: number, heightOnly = false): Mark {
 }
 
 function between(a: Mark, b: Mark, t: number): Mark {
+  const m = betweenShape(a, b, t);
+  // Emphasis is continuous, so focus shifts glide with the move and seeking stays exact.
+  const ea = a.emphasis ?? 1, eb = b.emphasis ?? 1;
+  return ea === 1 && eb === 1 ? m : { ...m, emphasis: lerp(ea, eb, t) };
+}
+
+function betweenShape(a: Mark, b: Mark, t: number): Mark {
   const discrete = t >= 0.5 ? b : a;
   if (a.kind !== b.kind) return discrete;
   switch (b.kind) {
