@@ -1,10 +1,10 @@
 ---
 name: visualize
-description: Build step-through visual explanations whose picture is checked against an executable model, drawn in one constrained isometric style from finished parts (rails, cartridges, terminals, servers, ledgers, key stores, cables, plates) with flat linked panels for equations and number grids. Use whenever someone wants an algorithm, data structure, protocol, distributed-system behaviour, ML mechanism or paper method explained visually, animated or step by step, for docs, a blog, a course, onboarding or a paper companion, even if they never say "visualize". Outputs a standalone HTML page, a standalone SVG of any step, or a React component; every number on the page is verified against the model in headless Chrome.
+description: Build step-through visual explanations whose picture is checked against an executable model, drawn in one constrained isometric style from finished parts (rails, rings, markers, reservoirs, sources, gates, terminals, servers, ledgers, cables, plates) in the shape the field already draws, with flat linked panels for equations, grids and sequence diagrams. Use whenever someone wants an algorithm, data structure, protocol, distributed-system behaviour, ML mechanism or paper method explained visually, animated or step by step, for docs, a blog, a course, onboarding or a paper companion, even if they never say "visualize". Outputs a standalone HTML page, a standalone SVG of any step, or a React component; every number on the page is verified against the model in headless Chrome.
 license: MIT
 compatibility: Node.js 24+ (runs TypeScript directly) and Google Chrome or Chromium for verification. Run `npm install` (or `pnpm install`) once in this folder.
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
 ---
 
 # Visualize
@@ -15,7 +15,9 @@ Three reference explanations ship in `examples/`. Open the closest one before st
 
 - `examples/lru/`: a cache on a recency rail. A hit hops an entry to the fresh end; an eviction pushes the stalest off the cold end. It has a prediction before the first eviction.
 - `examples/retries/`: two payment systems on two plates (terminal, server, key store, ledger), run on the same faults. The ledger without idempotency keys ends with two coins, the one with keys with one.
-- `examples/attention/`: scaled dot-product attention. Gauges morph from score to scaled score to weight, linked to the equation and grids. It is not yet in the editorial style.
+- `examples/attention/`: scaled dot-product attention. Gauges morph from score to scaled score to weight, linked to the equation and grids in a side column.
+
+`test/fixtures/gallery-ring/` and `test/fixtures/gallery-flow/` show the ring, marker, reservoir, source, gate and sequence parts on their own.
 
 ## The one idea that matters
 
@@ -25,13 +27,17 @@ Three reference explanations ship in `examples/`. Open the closest one before st
 
 ## Choose the representation
 
-Go down this ladder and stop at the first rung that fits. Name the rung in your plan.
+**Start from what the field already draws.** Before choosing parts, write one line in your plan: "A textbook draws <concept> as <shape>." A round-robin scheduler is a circle of slots with a pointer moving round it. A semaphore is a pool of permits that a caller takes at a gate and gives back. Quicksort's partition is a row of cells with i and j marked on it. Two-phase commit is a sequence diagram with time running down. That shape is what the reader already knows; build *it*, in the kit's style, and say why if you depart from it.
 
-1. **The concept's own structure, built as finished parts.** A cache is slots on a rail; a payment system is a terminal, a server and a ledger joined by cables; a queue is items in a channel. One part per real element, counted true.
-2. **Native flat mathematics beside the stage.** For equations, matrices and derivations, use flat panels (`tex`, `grid`) linked by entity ids to the solids they describe.
+The evals taught this. Without it, four of five subjects came out as a straight rail of slots because that was the part at hand, and a plain flat diagram drawn without the skill taught them better each time.
+
+Then go down this ladder and stop at the first rung that fits. Name the rung in your plan.
+
+1. **The concept's canonical shape, built as finished parts.** A cache is slots on a rail. Anything circular is a `ringAssembly` with `marker`s for its positions. A stock of something countable is a `reservoir`, refilled by a `source`, and callers meet it at a `gate`. A payment system is a terminal, a server and a ledger joined by cables. One part per real element, counted true. Draw the cause, not only the states: what a request consumes must visibly go to it, and a rate must have a source.
+2. **Native flat panels beside the stage**, linked by entity ids to the solids: `tex` and `grid` for equations and matrices, and `sequence` for anything the field draws on a timeline (protocols, retries, timeouts). When time is the subject, the timeline is not optional.
 3. **An analogy, only with a written mapping.** List what each part means and what the analogy does not preserve, in `assumptions`.
 
-Do not draw boxes-and-arrows diagrams. Do not invent a decorative machine whose parts mean nothing.
+Do not draw boxes-and-arrows diagrams. Do not invent a decorative machine whose parts mean nothing. Do not force a subject onto a rail because the rail exists: a missing part is a kit gap, so build it in `src/parts/`.
 
 ## Decisions this skill makes
 
@@ -42,7 +48,9 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
 | **The scenario** (concept, sizes, values) **ask** if they change the answer | Small readable values (capacity 3–6, $20, 40 ms); state them in `assumptions` | Small numbers keep every value legible on a face |
 | **Output destination** **ask** if unclear | Standalone page always; plus SVG of the key step when they say image, blog or static; plus React when they say component, React or Next.js | Every output is checked, so producing the page first costs nothing |
 | **What to contrast with** **ask** when "versus what?" is ambiguous | The naive alternative the concept fixes (FIFO for LRU, no key for idempotency) | A contrast makes the mechanism visible |
-| Representation | Rung 1 of the ladder above | The concept's own parts teach its real vocabulary |
+| Representation | The shape the field draws (write the one line), built at rung 1 of the ladder | A reader recognises the shape they were taught; the evals lost wherever it was missing |
+| Pointers and indices | `marker`s standing at their slot (`ring.outside(i)`, `rail.front(i)`), never a separate track in front | A pointer on a lane in front read as being on the wrong slot |
+| Time | A `sequence` side panel whenever timing is the point (timeouts, retries, rates) | Time with no axis lives only in captions |
 | Size | A **figure**: one system, 6–11 steps, 3–5 chapters. A **reference**: two systems compared, at most 12 steps. Larger: refuse and propose a split | Past 12 steps, readers lose the thread; two systems is the most a stage holds legibly |
 | Number of systems | One; two only when the point is a contrast run on the same inputs | Two lanes halve the size of everything |
 | Input sequence | Chosen so every interesting case happens, each asserted in `model.test.ts` | A run without the eviction or loss explains nothing |
@@ -81,7 +89,12 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
 
 | Part | Module | Use it for | Anchors |
 |---|---|---|---|
-| `railAssembly` and `cartridge` | `src/parts/rail.ts` | Ordered slots with entries that slide, hop and leave: caches, queues, buffers, priority orders | `slot(i)`, `anchor.first`, `anchor.last` |
+| `railAssembly` and `cartridge` | `src/parts/rail.ts` | Ordered slots in a line with entries that slide, hop and leave: caches, queues, arrays (up to 16), priority orders. `slotLabel` names slots; given names are never dropped; `ports` gives a cable per slot | `slot(i)`, `front(i)`, `port(i)`, `anchor.first`, `anchor.last` |
+| `ringAssembly` and `puck` | `src/parts/flow.ts` | Slots round a circle: circular buffers, hash rings, round robin, clock replacement | `slot(i)`, `outside(i)`, `side(i)`, `anchor.centre` |
+| `marker` | same | A pointer standing at one slot: head, tail, lo, mid, hi, next. Hops to its next slot; lanes for two on one slot | `tip`, `foot` |
+| `reservoir` | same | A countable stack with its capacity: tokens, permits, credits, free buffers | `top`, `take`, `front`, `capacity` |
+| `source` | same | Something that adds at a rate, over what it fills: refill, arrivals, a producer | `out`, `body` |
+| `gate` | same | Where a request meets what it needs and passes (bar up) or is turned away (bar down) | `in`, `out`, `reject`, `top` |
 | `terminal` | `src/parts/network.ts` | A client or device with a lit status screen | `port`, `outbox`, `top`, `screen` |
 | `server` | same | A service: rack units, vents, a status lamp whose tone shows activity | `inPort`, `inbox`, `outPort`, `top`, `front` |
 | `ledger` | same | Durable records stacked one per entry: charges, writes, commits | `inPort`, `top`, `front` |
@@ -89,6 +102,7 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
 | `plate` | same | The fastened ground a system stands on | `frontLeft`, `backRight` |
 | `cable` and `message` | same | Connections lying on the plate, and capsules that ride them | n/a |
 | `strip` and `totals` | `src/render/components.ts` | The strip under the stage: requests or events, and big totals | n/a |
+| `sequence` | same | A flat side panel: lanes, time running down, messages (lost ones crossed), timer marks | n/a |
 | `tex`, `linked` and `grid` | `src/render/math.ts` | Flat equations and number grids whose terms link to solids | n/a |
 
 When a concept needs a part that does not exist, build it in `src/parts/` from boxes and cylinders with owned surface details (`references/kit.md`). Never use scene-specific CSS. A missing part is a kit gap; record it.
@@ -99,7 +113,8 @@ When a concept needs a part that does not exist, build it in `src/parts/` from b
 
 - **One constrained style.** Use the fixed isometric camera, the shared tones and the kit's shading. Colour carries meaning (hit, miss, lost, duplicate, stored), one meaning per tone, stated in the legend.
 - **Finished parts, not slabs.** Housings have seams, screens are recessed, servers show rack units and vents, round things are turned. Detail belongs to a part and follows its motion.
-- **Motion means something.** Use `enter` and `exit` for coming and going, `leaving` for "goes there" (evicted, consumed, delivered), `arc` to pass over neighbours, travel along a cable for messages, and `pulse` for a moment of emphasis. Nothing moves for decoration.
+- **Motion means something.** Use `enter` and `exit` for coming and going, `leaving` for "goes there" (evicted, consumed, delivered), `arc` to pass over neighbours, travel along a cable for messages, and `pulse` for a moment of emphasis. Nothing moves for decoration. A thing consumed travels to what consumed it.
+- **Identity is drawn.** Which slot, which connection, which pointer: names a scene gives are never dropped, and a cable's tone shows whether it is in use.
 - **Words are few and pinned.** Use a title of 8 words at most, one action per step and short part names with leaders. A label that does not fit its face is not drawn; optional labels drop where they would sit on a part.
 - **The figure dominates.** One desktop viewport holds the title, the stage, the current action, the strip and the controls.
 

@@ -11,6 +11,10 @@ The look comes from constraint: one camera, one material system, a few tones, fi
 | Detail belongs to a part and moves with it (`surface`) | Decoration overlaid on the scene drifted off moving parts |
 | A part rests on something: plinth, plate or tray | Floating solids read as an error |
 | Distinct functions get distinct silhouettes | Identical boxes for different roles forced the reader to rely on labels |
+| Build the shape the field already draws (a ring for anything circular, a stock with its refill and its gate, a row with its pointers on it, a timeline for timing) | In the 0.3 evals four of five subjects became a rail of slots; plain flat diagrams drawn without the skill taught each of them better, because they used the shape every textbook uses |
+| Draw the cause: what is consumed goes to what consumed it; a rate has a visible source | In one eval run the stock and the requests were two unconnected objects, so the rule lived only in the caption |
+| A pointer stands at its own slot (`marker`), straight below it on screen | Head and tail on a lane in front of the rail read as pointing at the previous slot |
+| Identities a scene names are always drawn; a connection's tone shows whether it is in use | Connection names were dropped as optional labels and in-use and idle cables looked the same, so the picture could not say who held what |
 
 ## Colour and tone
 

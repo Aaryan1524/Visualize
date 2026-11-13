@@ -61,7 +61,7 @@ Every mark has `key`, the model entity id. The key is identity across steps: the
 Each part returns `{ marks, anchor }`. Spread `marks` into the view, and use `anchor` points for cables, messages, label targets and neighbours.
 
 ```ts
-const rail = railAssembly({ key: "", slots: 3 });        // 1–12 slots; cell 28×24×17, pitch 42
+const rail = railAssembly({ key: "", slots: 3 });        // 1–16 slots; cell 28×24×17, pitch 42
 marks.push(...rail.marks, cartridge({ key: "entry-A", at: rail.slot(0), size: RAIL_CELL, label: "A", tone: "subject" }));
 
 const term = terminal("safe/terminal", [0, 0, 0], { status: "waiting", lit });
@@ -75,7 +75,13 @@ marks.push(...plate("safe/plate", [-18, -20, 0], [254, 80]).marks,
 
 | Part | Footprint | Anchors |
 |---|---|---|
-| `railAssembly` | `(slots-1)·pitch + cell[0]` long | `slot(i)` (minimum corner of an entry at rest), `anchor.first`, `anchor.last`, `length` |
+| `railAssembly` | `(slots-1)·pitch + cell[0]` long | `slot(i)` (minimum corner of an entry at rest), `front(i)` (floor spot for a marker, straight below the slot on screen), `port(i)` (with `ports: true`), `anchor.first`, `anchor.last`, `length`. `slotLabel: i => name` names slots (never dropped); the default numbers are optional; `null` draws none |
+| `ringAssembly` (`flow.ts`) | plinth radius `radius + 16`; 3–16 slots, slot 0 at the back, clockwise on screen | `slot(i)` (pad top centre), `outside(i)` (floor spot for a marker), `side(i)` (where that marker's name goes), `angle(i)`, `anchor.centre`, `anchor.front`. Same `slotLabel` rule |
+| `puck(mark)` | radius 7.5, 9 tall | an entry on a ring slot; value on top |
+| `marker(key, at, name, { tone, lane, side, height, hop })` | foot radius 3.4, 30 tall | `tip`, `foot`. Hops over what it passes (`arc` 26). `lane` 1–3 stands a second pointer beside the first on one slot. Its name is pinned to its cap and never dropped |
+| `reservoir(key, centre, { capacity, items, unit })` | radius 17; 3.6 per item; up to 20 | `top` (where the next item lands), `take` (the top item), `front`, `capacity` (top of the capacity post). Items alternate radius so the stack can be counted; they `drop` in |
+| `source(key, over, { rate, height })` | column 36 behind `over`, hopper `height` above it | `out` (the hopper's mouth), `body`. Its rate is written beside it. Put it over a reservoir so dropped items fall from it |
+| `gate(key, at, { open, lit })` | 8 × 30, lane along +x | `in`, `out`, `reject` (where turned-away requests go), `top`. `open: true` raises the bar, `false` lowers it, `null` is idle |
 | `cartridge(mark)` | the size you give | adds radius, inset, seam and the subject role |
 | `terminal` | 45 × 26, body top 27 (slot top 28.2) | `port`, `outbox`, `top`, `screen` |
 | `server` | 40 × 34, 42 tall | `inPort`, `inbox`, `outPort`, `top`, `front` |
@@ -84,6 +90,8 @@ marks.push(...plate("safe/plate", [-18, -20, 0], [254, 80]).marks,
 | `plate` | `[w, d]`, at least 40 × 30 | `frontLeft`, `backRight` |
 
 Parts validate their inputs and throw a `RangeError` on impossible sizes or positions.
+
+**Pick the part from the field's picture, not the other way round.** If the concept is circular, use the ring; if a caller takes something from a stock, show the stock, where it is refilled and the gate where it is taken, and send what is taken to the caller (`leaving`). A pointer stands at its slot as a `marker`.
 
 **Adding a part:** compose boxes and cylinders, give every piece a key under the part's prefix, put detail in `surface`, derive anchors from the same dimensions, add a test (bounds disjoint, supported, anchors on surfaces) and a fixture under `test/fixtures/`.
 
@@ -94,6 +102,8 @@ Parts validate their inputs and throw a `RangeError` on impossible sizes or posi
 - `tex(source, { display })`: KaTeX in which only `\htmlData` is trusted.
 - `linked(ids, body)`: a term linked to entities.
 - `grid(values, { rows, cols, link, key, tone, blank, digits })`: a number table.
+- `sequence({ lanes, messages, marks, now, until, unit })`: a sequence diagram for a `place: "side"` panel. Lanes run left to right and time runs down. Messages up to `now` are drawn send to arrival, and those sent or arriving at `now` are lit. A `lost` message stops halfway with a cross. `marks` are moments on a lane (a timer firing); `ghost` marks show what would have happened. The panel keeps one height at every step. Give messages the stage entity's id as `link`.
+- Cables: a toned cable shows state at 1× (in use, carrying, failing); leave idle ones untoned.
 
 ## Focus
 

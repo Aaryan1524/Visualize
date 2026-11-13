@@ -2,7 +2,21 @@
 
 One version covers the kit and the skill (`package.json` `version` and `SKILL.md` `metadata.version` move together). Each entry names the failure that caused it, so the reason for a rule is never lost.
 
-## 0.3.0 (unreleased)
+## 0.4.0 (unreleased)
+
+The shape the field draws. Ten eval sessions on 0.3 (five prompts, with and without the skill) found that the skill won on finish and proof every time but taught worse in four of five: the kit's parts chose the picture.
+
+- **Start from what the field draws.** Four subjects came out as a straight rail of slots. `SKILL.md` now asks for one line naming the textbook shape before any part is chosen, and the decision table adds pointers and time.
+- **New parts** (`src/parts/flow.ts`): a ring of slots with pucks; markers that stand at their slot and hop to the next; a reservoir with a capacity post and countable items; a source with its rate; a gate that passes or turns away. Each has part tests and a gallery fixture that runs with the examples in verify.
+- **A sequence-diagram panel.** A protocol figure lost its time axis. `sequence()` draws lanes with time running down, lit at `now`, with lost messages crossed.
+- **Identity is drawn.** Connection names were dropped as optional labels. Names a scene gives slots are now never dropped, a toned cable shows that it is in use, and a pointer stands straight below its slot on screen (a lane in front read as the previous slot).
+- **The caption no longer covers the drawing.** All five eval scenes were rearranged by hand to dodge the heading and prediction card. The camera fit now reserves their largest footprint; `caption clear` checks it, and depth names the overlay instead of a `null` painter.
+- **Chip text cut off on phones** ("429", "timeout") now fails layout, and chips wrap instead.
+- **Round parts are sorted by their footprints.** A marker beside a plinth sat inside the plinth's bounding square and was reported as intersecting it.
+- **Fixes the eval runs found in the kit:** terminal pins on the base, labels too tall for their face, a crash in the surface check, and rails limited to 12 slots.
+- **The eval rubric scores the reader first.** The old rubric only checked that the skill was followed.
+
+## 0.3.0
 
 The look and the decisions.
 
