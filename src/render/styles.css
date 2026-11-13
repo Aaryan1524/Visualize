@@ -526,6 +526,15 @@
 
 /* Cables: a darker casing under a lighter core. */
 .vz-link-g[data-cable] .vz-link { stroke: color-mix(in oklab, var(--t-structure) 55%, white); stroke-linecap: round; stroke-linejoin: round; }
+/* A cable's tone is its state: a toned cable (in use, carrying, failing) reads at 1×; an untoned one is idle. */
+.vz-link-g[data-cable] .vz-link:is([data-tone="accent"], [data-tone="hot"], [data-tone="cold"], [data-tone="good"], [data-tone="bad"], [data-tone="subject"]) { stroke: var(--cable-tone); }
+.vz-link-g[data-cable] .vz-link[data-tone="accent"] { --cable-tone: var(--t-accent); }
+.vz-link-g[data-cable] .vz-link[data-tone="hot"] { --cable-tone: var(--t-hot); }
+.vz-link-g[data-cable] .vz-link[data-tone="cold"] { --cable-tone: var(--t-cold); }
+.vz-link-g[data-cable] .vz-link[data-tone="good"] { --cable-tone: var(--t-good); }
+.vz-link-g[data-cable] .vz-link[data-tone="bad"] { --cable-tone: var(--t-bad); }
+.vz-link-g[data-cable] .vz-link[data-tone="subject"] { --cable-tone: var(--t-subject); }
+.vz-link-g[data-cable][data-lit] .vz-cable-casing { stroke: color-mix(in oklab, var(--cable-tone, var(--t-structure)) 40%, var(--shade-side)); }
 .vz-cable-casing { fill: none; stroke: color-mix(in oklab, var(--t-structure) 55%, var(--shade-side)); stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 polyline.vz-link { fill: none; }
 
@@ -542,3 +551,21 @@ polyline.vz-link { fill: none; }
   .vz[data-presentation="editorial"] .vz-body[data-side] { display: block; }
   .vz[data-presentation="editorial"] .vz-side { margin-top: 12px; }
 }
+/* Kit sequence diagram (src/render/components.ts): lanes, time down. */
+.vz-seq { display: block; width: 100%; height: auto; font: 500 12px var(--sans); }
+.vz-seq text { fill: var(--ink); }
+.vz-seq .vz-seq-lane { font-weight: 600; font-size: 13px; }
+.vz-seq .vz-seq-tick { fill: var(--ink-2); font: 500 12px var(--mono); }
+.vz-seq-life { stroke: var(--ink-2); stroke-width: 1; stroke-opacity: .5; }
+.vz-seq-now { stroke: var(--t-accent); stroke-width: 1; stroke-dasharray: 2 3; }
+.vz-seq-msg line { stroke: var(--ink-2); stroke-width: 1.4; }
+.vz-seq-msg path { fill: var(--ink-2); }
+.vz-seq-msg[data-status="good"] line { stroke: var(--t-good); } .vz-seq-msg[data-status="good"] path { fill: var(--t-good); }
+.vz-seq-msg[data-status="bad"] line { stroke: var(--t-bad); } .vz-seq-msg[data-status="bad"] path { fill: var(--t-bad); }
+.vz-seq-msg[data-status="accent"] line { stroke: var(--t-accent); } .vz-seq-msg[data-status="accent"] path { fill: var(--t-accent); }
+.vz-seq-msg .vz-seq-x { fill: none; stroke: var(--t-bad); stroke-width: 1.6; }
+.vz-seq-msg:not([data-lit]) :is(line, path) { opacity: .55; }
+.vz-seq-msg[data-lit] line { stroke-width: 2.2; }
+.vz-seq-mark circle { fill: var(--card); stroke: var(--ink-2); stroke-width: 1.4; }
+.vz-seq-mark[data-status="bad"] circle { stroke: var(--t-bad); } .vz-seq-mark[data-status="good"] circle { stroke: var(--t-good); } .vz-seq-mark[data-status="accent"] circle { stroke: var(--t-accent); }
+.vz-seq-mark[data-ghost] { opacity: .5; }

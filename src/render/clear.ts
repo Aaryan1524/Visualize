@@ -56,6 +56,7 @@ export function silhouettes(allMarks: readonly (readonly Mark[])[], projection: 
     push(b);
     // Mostly transparent over the top half of a drop or lift, as in fitViewBox.
     if (m.enter === "drop" || m.exit === "lift") push(raise(b, DROP / 2));
+    if (m.arc) push(raise(b, m.arc));
     if (m.transient && m.travel) for (const p of [m.travel.from, m.travel.to]) push(boundsOf({ ...m, at: p } as SolidMark));
   }
   return out;

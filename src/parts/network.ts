@@ -22,7 +22,7 @@ export interface Part<A extends string = string> {
   pin(name: A): { key: string; at: Vec3 };
 }
 
-function part<A extends string>(key: string, marks: Mark[], anchor: Record<A, Vec3>, pieces: Partial<Record<A, string>> = {}): Part<A> {
+export function part<A extends string>(key: string, marks: Mark[], anchor: Record<A, Vec3>, pieces: Partial<Record<A, string>> = {}): Part<A> {
   return {
     key,
     marks: owned(key, marks),

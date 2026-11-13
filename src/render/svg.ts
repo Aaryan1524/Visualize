@@ -49,6 +49,12 @@ export function fitViewBox(allMarks: readonly (readonly Mark[])[], projection: P
         add(x1, y1);
         // Room for solids dropping in from above or lifting away. They are
         // mostly transparent over the top half of the move, so half is enough.
+        // A hop rises by its arc at the middle of a move; both ends raised cover the peak.
+        if (m.arc) {
+          const raised = screenExtent({ min: [b.min[0], b.min[1], b.min[2] + m.arc], max: [b.max[0], b.max[1], b.max[2] + m.arc] }, projection);
+          add(raised[0], raised[1]);
+          add(raised[2], raised[3]);
+        }
         if (m.enter === "drop" || m.exit === "lift") {
           const up = DROP / 2;
           const raised = screenExtent({ min: [b.min[0], b.min[1], b.min[2] + up], max: [b.max[0], b.max[1], b.max[2] + up] }, projection);
@@ -202,7 +208,7 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
     setAttr(node.inset,"display",g.inset ? null : "none");
   }
   setAttr(node.root,"data-rounded",m.kind === "box" && m.radius ? "" : null);
-  setAttr(node.root,"data-role",m.kind === "box" ? m.role ?? null : null);
+  setAttr(node.root,"data-role",m.role ?? null);
   const details = m.kind === "box" ? surfaceGeometry(m, projection) : [];
   setAttr(node.root, "data-turned", m.kind === "cylinder" ? "" : null);
   while (node.surface!.children.length > details.length) node.surface!.lastElementChild!.remove();

@@ -161,6 +161,8 @@ export interface CylinderMark extends MarkBase {
   at: Vec3;
   radius: number;
   height: number;
+  /** As on boxes: a foundation (plinth) everything stands on, or the subject. */
+  role?: "foundation" | "subject";
   label?: string;
   /** "top", or a side ("left" and "right" both mean the near side). */
   labelFace?: LabelFace;

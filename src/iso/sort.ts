@@ -1,4 +1,4 @@
-import type { Projection, SolidMark } from "../core/types.ts";
+import type { CylinderMark, Projection, SolidMark } from "../core/types.ts";
 import { viewVector } from "./project.ts";
 import { boundsOf, type Bounds } from "./solids.ts";
 
@@ -48,6 +48,36 @@ export function paintOrder(a: Bounds, b: Bounds, projection: Projection = "iso")
   return 0;
 }
 
+/**
+ * Round parts are not their bounding boxes: a marker beside a ring's plinth, or
+ * a pad on a ring, sits inside the plinth's bounding square without touching
+ * it. When the boxes give no answer, separate the real footprints in plan
+ * (circle against circle or rectangle). A vertical plane between them decides
+ * the order: the part on the viewer's side of it is in front.
+ */
+function planOrder(a: SolidMark, b: SolidMark, projection: Projection): -1 | 0 | 1 {
+  if (a.kind !== "cylinder" && b.kind !== "cylinder") return 0;
+  const v = viewVector(projection);
+  // Direction from a's footprint to b's, if they are apart.
+  let n: [number, number] | null = null;
+  if (a.kind === "cylinder" && b.kind === "cylinder") {
+    const dx = b.at[0] - a.at[0], dy = b.at[1] - a.at[1];
+    if (Math.hypot(dx, dy) >= a.radius + b.radius - EPS) n = [dx, dy];
+  } else {
+    const [cyl, box, sign] = a.kind === "cylinder" ? [a as CylinderMark, b, -1] : [b as CylinderMark, a, 1];
+    const bb = boundsOf(box);
+    const px = Math.max(bb.min[0], Math.min(cyl.at[0], bb.max[0]));
+    const py = Math.max(bb.min[1], Math.min(cyl.at[1], bb.max[1]));
+    const dx = cyl.at[0] - px, dy = cyl.at[1] - py;
+    // n points from box to cylinder; flip it so it points from a to b.
+    if (Math.hypot(dx, dy) >= cyl.radius - EPS && (dx || dy)) n = [sign * dx, sign * dy];
+  }
+  if (!n) return 0;
+  const toward = n[0] * v[0] + n[1] * v[1];
+  // b is on the viewer's side: draw a first.
+  return toward >= 0 ? -1 : 1;
+}
+
 function centreDepth(b: Bounds, projection: Projection): number {
   const v = viewVector(projection);
   let d = 0;
@@ -77,7 +107,7 @@ export function depthSort<M extends SolidMark>(marks: readonly M[], projection: 
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
       if (!screenOverlap(bounds[i]!, bounds[j]!, projection)) continue;
-      const o = paintOrder(bounds[i]!, bounds[j]!, projection);
+      const o = paintOrder(bounds[i]!, bounds[j]!, projection) || planOrder(marks[i]!, marks[j]!, projection);
       if (o === 0) {
         conflicts.push([marks[i]!.key, marks[j]!.key]);
         continue;

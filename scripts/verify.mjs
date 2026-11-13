@@ -332,13 +332,12 @@ function rng(seed) {
   };
 }
 
+// The examples, plus the kit galleries, which keep every part passing every check.
 function sceneDirs() {
-  const ex = join(ROOT, "examples");
-  if (!existsSync(ex)) return [];
-  return readdirSync(ex)
-    .sort()
-    .map((n) => join(ex, n))
-    .filter((d) => existsSync(join(d, "scene.ts")));
+  const found = (dir, keep = () => true) => existsSync(dir)
+    ? readdirSync(dir).sort().filter(keep).map((n) => join(dir, n)).filter((d) => existsSync(join(d, "scene.ts")))
+    : [];
+  return [...found(join(ROOT, "examples")), ...found(join(ROOT, "test", "fixtures"), (n) => n.startsWith("gallery-"))];
 }
 
 async function variantsOf(dir) {
@@ -786,9 +785,15 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
             tx.typography.forEach(s => typographyProblems.add(`${theme} ${width}px step ${k}: ${s}`));
             tx.small.forEach((s) => layoutProblems.push(`390px step ${k}: ${s}`));
             // Text cut off inside a fixed-size chip or total ("429" and "timeout" were, in the evals).
+            // Cut off sideways, or wrapped onto a line the chip hides.
             const cut = await page.evaluate(() => [...document.querySelectorAll(".vz-strip li > *, .vz-totals span")]
-              .filter((e) => e.getClientRects().length && e.textContent.trim() && e.scrollWidth > e.clientWidth + 1)
-              .map((e) => `"${e.textContent.trim()}" is cut off (${e.scrollWidth}px of text in ${e.clientWidth}px)`));
+              .filter((e) => e.getClientRects().length && e.textContent.trim())
+              .flatMap((e) => {
+                const box = (e.closest("li") ?? e).getBoundingClientRect(), r = e.getBoundingClientRect();
+                if (e.scrollWidth > e.clientWidth + 1) return [`"${e.textContent.trim()}" is cut off (${e.scrollWidth}px of text in ${e.clientWidth}px)`];
+                if (r.bottom > box.bottom + 1 || r.right > box.right + 1) return [`"${e.textContent.trim()}" runs out of its chip`];
+                return [];
+              }));
             cut.forEach((s) => layoutProblems.push(`390px step ${k}: ${s}`));
           }
           await page.evaluate((k) => window.__viz.seekStep(k), last);

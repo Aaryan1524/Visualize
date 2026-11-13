@@ -146,3 +146,52 @@ test("rounded extrusions keep their declared dimensions and an unbroken top rim"
   assert.ok(g.inset && g.inset.length>20);
   assert.deepEqual(geometryOf(m,"front").outline,geometryOf({...m,radius:0},"front").outline);
 });
+
+// Round parts inside each other's bounding squares but not touching: markers
+// around a ring's plinth, pads on it. Order them against true cylinder ray casts.
+test("depth sort orders round parts by their real footprints, not their boxes", () => {
+  type Cyl = { kind: "cylinder"; key: string; at: Vec3; radius: number; height: number; tone: "subject" };
+  const C = Math.cos(Math.PI / 6);
+  const hit = (m: Cyl, sx: number, sy: number): number | null => {
+    // Ray toward the viewer through screen point (sx, sy): p(t) = p0 + t(1,1,1), starting on z = 0.
+    const xmy = sx / C, xpy = 2 * sy;
+    const p0x = (xmy + xpy) / 2, p0y = (xpy - xmy) / 2;
+    const ox = p0x - m.at[0], oy = p0y - m.at[1];
+    // |o + t(1,1)|² = r²
+    const A = 2, B = 2 * (ox + oy), K = ox * ox + oy * oy - m.radius * m.radius;
+    const disc = B * B - 4 * A * K;
+    if (disc < 0) return null;
+    const t0 = (-B - Math.sqrt(disc)) / (2 * A), t1 = (-B + Math.sqrt(disc)) / (2 * A);
+    const lo = Math.max(t0, m.at[2]), hi = Math.min(t1, m.at[2] + m.height);
+    return lo <= hi ? hi : null;
+  };
+  const r = rng(7);
+  let checked = 0;
+  for (let trial = 0; trial < 40; trial++) {
+    const plinth: Cyl = { kind: "cylinder", key: "plinth", at: [0, 0, 0], radius: 40, height: 6, tone: "subject" };
+    const scene: Cyl[] = [plinth];
+    for (let k = 0; k < 6; k++) {
+      // Outside the plinth's circle, inside its bounding square: on a diagonal.
+      const ang = (Math.PI / 4) * (1 + 2 * Math.floor(r() * 4)) + (r() - 0.5) * 0.3;
+      const rad = 3 + r() * 2;
+      const dist = 40 + rad + 0.5 + r() * 4;
+      const c: Cyl = { kind: "cylinder", key: `m${k}`, at: [Math.cos(ang) * dist, Math.sin(ang) * dist, 0], radius: rad, height: 10 + r() * 20, tone: "subject" };
+      if (scene.every((o) => Math.hypot(o.at[0] - c.at[0], o.at[1] - c.at[1]) >= o.radius + c.radius)) scene.push(c);
+    }
+    const { order, conflicts } = depthSort(scene as never);
+    assert.deepEqual(conflicts, [], `trial ${trial}`);
+    const paint = new Map(order.map((m, i) => [m.key, i]));
+    for (let k = 0; k < 600; k++) {
+      const sx = (r() - 0.5) * 140, sy = (r() - 0.6) * 100;
+      let nearest: string | null = null, best = -Infinity, top: string | null = null, topIndex = -1;
+      for (const m of scene) {
+        const t = hit(m, sx, sy);
+        if (t === null) continue;
+        if (t > best + 1e-9) [best, nearest] = [t, m.key];
+        if (paint.get(m.key)! > topIndex) [topIndex, top] = [paint.get(m.key)!, m.key];
+      }
+      if (nearest) { checked++; assert.equal(top, nearest, `trial ${trial} at (${sx.toFixed(1)}, ${sy.toFixed(1)})`); }
+    }
+  }
+  assert.ok(checked > 2000);
+});

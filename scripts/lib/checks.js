@@ -490,6 +490,8 @@
             const under = document.elementFromPoint(r.left + ((i + 0.5) / 5) * r.width, r.top + ((j + 0.5) / 3) * r.height);
             const solid = under && under.closest(".vz-solid");
             if (!solid || solid.closest('[data-layer="ground"]')) continue;
+            // A label pinned to its part may cross the plate or plinth everything stands on, never another part.
+            if (own && solid.getAttribute("data-role") === "foundation") continue;
             const key = solid.getAttribute("data-key");
             if (key !== own) hits.add(key);
           }
