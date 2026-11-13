@@ -75,7 +75,7 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
 4. **Teach in beats** (`teaching`). Use 3–5 chapters and one short action per step (12 words at most). Add one prediction just before the causal moment, such as "D is next. Which key leaves?". The longer caption, assumptions and transcript go in the Details drawer automatically.
 5. **Declare observations** (`observe`): every value shown, every order that matters, every size that encodes a number (`extent`), what must be visible and what must be gone, semantic tones, and what is lit.
    **Working draft early:** after the model and a rough view, build and open the page before any polish. A wrong representation is cheap to change now and expensive later.
-6. **Build, verify and look.** Run `node <skill>/scripts/build.mjs <dir> --out <folder>` and then `node <skill>/scripts/verify.mjs <dir>`, and fix until it prints `passed`. Screenshots go to `<parent of dir>/shots/<name>/`. Then open the screenshots and the two contact sheets in `shots/` and look at them, at 1× and with `scripts/shoot.mjs` at 4×. A passing verify proves correctness and mechanical tidiness, not beauty.
+6. **Build, verify and look.** Run `node <skill>/scripts/build.mjs <dir> --out <folder>` and then `node <skill>/scripts/verify.mjs <dir>`, and fix until it prints `passed`. Screenshots go to `<parent of dir>/shots/<name>/`. Then open the screenshots and the two contact sheets in `shots/` and look at them, at 1× and at 4× (`node <skill>/scripts/shoot.mjs <page> --step k --select .vz-stage --scale 4 --out close.png`). A passing verify proves correctness and mechanical tidiness, not beauty.
 7. **Deliver** with this report, and nothing vaguer:
 
    ```text

@@ -44,6 +44,11 @@ export interface Ring extends Part<"centre" | "front"> {
   angle(i: number): number;
   /** The side a marker at slot i should put its name: away from the ring. */
   side(i: number): MarkerSide;
+  /**
+   * How tall a marker at slot i should be: tall behind the ring so it rises
+   * above it, short in front so it never stands over the slot it points at.
+   */
+  markerHeight(i: number): number;
   radius: number;
   /** Height of a slot's top above the ring's floor. */
   top: number;
@@ -59,7 +64,7 @@ export function ringAssembly({ key, slots, at = [0, 0, 0], radius, slotLabel }: 
   finite(at, "Ring position");
   // Neighbouring pads keep their bounding squares apart in every direction, so
   // depth order between them is never ambiguous (the worst case is at 45°).
-  const minimum = Math.max(24, (2 * Math.SQRT2 * RING_PAD + 2) / (2 * Math.sin(Math.PI / slots)));
+  const minimum = Math.max(30, (2 * Math.SQRT2 * RING_PAD + 2) / (2 * Math.sin(Math.PI / slots)));
   const R = radius ?? minimum;
   if (!Number.isFinite(R) || R < minimum - 1e-9) throw new RangeError(`A ring of ${slots} slots needs a radius of at least ${minimum.toFixed(1)}`);
   const outer = R + RING_PAD + 7;
@@ -83,7 +88,8 @@ export function ringAssembly({ key, slots, at = [0, 0, 0], radius, slotLabel }: 
     return add(at, [(xmy + xpy) / 2, (xpy - xmy) / 2, 0]);
   };
   const marks: Mark[] = [
-    { kind: "cylinder", key: `${key}/plinth`, at, radius: outer, height: RING_PLINTH, tone: "base", role: "foundation" } as CylinderMark,
+    // The plinth is the ring's body, not ground: it counts toward how much of the stage the subject fills.
+    { kind: "cylinder", key: `${key}/plinth`, at, radius: outer, height: RING_PLINTH, tone: "base" } as CylinderMark,
     // The hub inside the slots leaves a channel between them and the rim, so the ring reads as a ring.
     // Its bounding square stays clear of the pads' (slot 0 sits on the diagonal).
     { kind: "cylinder", key: `${key}/hub`, at: add(at, [0, 0, RING_PLINTH]), radius: Math.max(4, R * Math.SQRT1_2 - RING_PAD - 1), height: 2, tone: "structure" } as CylinderMark,
@@ -104,10 +110,16 @@ export function ringAssembly({ key, slots, at = [0, 0, 0], radius, slotLabel }: 
     slot: (i) => (check(i), around(i, R, top)),
     outside: (i) => (check(i), around(i, outer + 4, 0)),
     angle: (i) => (check(i), angle(i)),
+    markerHeight: (i) => {
+      check(i);
+      const ey = (Math.cos(angle(i)) + Math.sin(angle(i))) / 2;
+      return ey > 0.2 ? 11 : ey > -0.2 ? 20 : MARKER_HEIGHT;
+    },
     side: (i) => {
       check(i);
-      const ex = Math.cos(angle(i)) - Math.sin(angle(i));
-      return Math.abs(ex) < 0.35 ? "above" : ex > 0 ? "start" : "end";
+      // Beside, on the outer side; under the foot in front, where anything higher lands on the ring.
+      const ex = Math.cos(angle(i)) - Math.sin(angle(i)), ey = (Math.cos(angle(i)) + Math.sin(angle(i))) / 2;
+      return ey > 0.2 ? "below" : ex >= 0 ? "start" : "end";
     },
     radius: R,
     top,
@@ -123,7 +135,7 @@ export function puck(mark: Omit<CylinderMark, "kind" | "radius" | "height"> & { 
 
 export const MARKER_HEIGHT = 30;
 /** Where a marker's name goes: over its cap, or beside it to the screen right ("start") or left ("end"). */
-export type MarkerSide = "above" | "start" | "end";
+export type MarkerSide = "above" | "start" | "end" | "below";
 
 /**
  * A pointer standing on the floor next to the slot it points at: a foot, a
@@ -133,7 +145,7 @@ export type MarkerSide = "above" | "start" | "end";
 export function marker(key: string, at: Vec3, name: string, { tone = "accent", lit = false, lane = 0, height = MARKER_HEIGHT, hop = 26, side = "above" }: { tone?: Tone; lit?: boolean; lane?: number; height?: number; hop?: number; side?: MarkerSide } = {}): Part<"tip" | "foot"> {
   finite(at, "Marker position");
   if (!Number.isInteger(lane) || lane < 0 || lane > 3) throw new RangeError("A marker lane is 0–3");
-  if (!(height >= 14)) throw new RangeError("A marker needs a height of at least 14");
+  if (!(height >= 10)) throw new RangeError("A marker needs a height of at least 10");
   // Side by side along the screen's horizontal (+x −y), so lanes never hide each other.
   const foot = add(at, [lane * 7, -lane * 7, 0]);
   const tall = height + lane * 9;
@@ -145,7 +157,7 @@ export function marker(key: string, at: Vec3, name: string, { tone = "accent", l
     // The name stands over the cap, or beside it on the side away from what it points at.
     {
       kind: "label", key: `${key}/name`, text: name, size: "normal", target: { key: `${key}/cap`, at: add(foot, [0, 0, tall]) },
-      ...(side === "above" ? { at: add(foot, [0, 0, tall + 7]) } : { at: add(foot, side === "start" ? [5, -5, tall - 1] : [-5, 5, tall - 1]), anchor: side }),
+      ...(side === "above" ? { at: add(foot, [0, 0, tall + 7]) } : side === "below" ? { at: add(foot, [4, 4, -3]) } : { at: add(foot, side === "start" ? [5, -5, tall - 1] : [-5, 5, tall - 1]), anchor: side }),
     } as LabelMark,
   ];
   return part(key, marks, { tip: add(foot, [0, 0, tall]), foot }, { tip: `${key}/cap`, foot: `${key}/foot` });
