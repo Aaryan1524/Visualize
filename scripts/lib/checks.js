@@ -341,6 +341,18 @@
     return rgba(getComputedStyle(document.body).backgroundColor);
   }
 
+  /** The whole face a label sits on: on a rounded box a side is many facets, so take their union. */
+  function faceBox(label) {
+    const g = label.closest("[data-key]");
+    if (label.hasAttribute("data-on-panel")) return g.querySelector('[data-detail="panel"]').getBoundingClientRect();
+    const shade = label.getAttribute("data-face") || "top";
+    const faces = [...g.querySelectorAll(`.vz-face[data-shade="${shade}"]:not([display="none"])`)].map((f) => f.getBoundingClientRect());
+    if (!faces.length) return labelFace(label).getBoundingClientRect();
+    const l = Math.min(...faces.map((r) => r.left)), t = Math.min(...faces.map((r) => r.top));
+    const r = Math.max(...faces.map((x) => x.right)), b = Math.max(...faces.map((x) => x.bottom));
+    return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
+  }
+
   /** The face a solid's label is drawn on. */
   function labelFace(label) {
     const g = label.closest("[data-key]");
@@ -434,7 +446,7 @@
         if (r.left < card.left || r.right > card.right || r.top < card.top || r.bottom > card.bottom) clipped.push(`"${norm(e.textContent)}" outside the card`);
         if (!e.classList.contains("vz-solid-label")) return;
         const g = e.closest("[data-key]");
-        const fr = labelFace(e).getBoundingClientRect();
+        const fr = faceBox(e);
         if (r.width > fr.width * 0.92) spill.push(`"${norm(e.textContent)}" is wider than its face (${r.width.toFixed(0)} > ${fr.width.toFixed(0)} px)`);
         else if (r.height > fr.height * 1.05) spill.push(`"${norm(e.textContent)}" is taller than its face (${r.height.toFixed(0)} > ${fr.height.toFixed(0)} px)`);
         const [cx, cy] = [r.left + r.width / 2, r.top + r.height / 2];
@@ -556,7 +568,10 @@
     if (root.dataset.presentation !== "editorial") return {composition,semantics,callouts};
     const stage=root.querySelector(".vz-stage").getBoundingClientRect();
     const body=root.querySelector(".vz-body").getBoundingClientRect();
-    if (stage.width < body.width*.9) composition.push("figure stage occupies less than 90% of the body width");
+    // With linked maths beside the stage, the figure is the stage plus its side column.
+    const side=root.querySelector(".vz-side");
+    const figure=side&&isShown(side) ? side.getBoundingClientRect().right-stage.left : stage.width;
+    if (figure < body.width*.9) composition.push("figure stage occupies less than 90% of the body width");
     const solids=[...svg().querySelectorAll(".vz-solid")].filter(isShown).map(e=>e.getBoundingClientRect());
     if (solids.length) {
       const width=Math.max(...solids.map(r=>r.right))-Math.min(...solids.map(r=>r.left));
