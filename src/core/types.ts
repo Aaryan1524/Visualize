@@ -210,6 +210,11 @@ export interface Panel {
   title?: string;
   /** Trusted HTML produced by the scene author or the math helper. */
   html: string;
+  /**
+   * Editorial layout: "strip" (default) sits under the stage; "side" sits in a
+   * column beside it, for linked equations and grids that need height.
+   */
+  place?: "strip" | "side";
 }
 
 /**

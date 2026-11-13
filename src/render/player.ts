@@ -127,7 +127,13 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
   });
   stageBox.append(stage.svg);
   const panelsBox = h("aside", { class: "vz-panels", "aria-label": "Details for the current step" });
+  const sideBox = h("aside", { class: "vz-side", "aria-label": "Linked mathematics for the current step" });
+  const anySide = steps.some((s) => s.panels.some((p) => p.place === "side"));
   body.append(stageBox);
+  if (anySide) {
+    body.dataset.side = "";
+    body.append(sideBox);
+  }
   if (anyPanels) body.append(panelsBox);
 
   const caption = h("section", { class: "vz-caption", "aria-live": "polite", "aria-atomic": "true" });
@@ -339,7 +345,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
         n = { section, title, body: pbody, html: "" };
         panelNodes.set(p.key, n);
       }
-      panelsBox.append(n.section); // keeps declared order
+      (p.place === "side" ? sideBox : panelsBox).append(n.section); // keeps declared order
       n.title.textContent = p.title ?? "";
       n.title.hidden = !p.title;
       if (n.html !== p.html) {
