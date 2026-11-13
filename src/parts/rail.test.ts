@@ -6,7 +6,7 @@ import { surfaceGeometry } from "../iso/surface.ts";
 import { resolveFrame } from "../core/interpolate.ts";
 import type { SolidMark } from "../core/types.ts";
 
-for(const slots of [1,2,3,6,12]) test(`rail with ${slots} slots: supported cells, disjoint solids, attached endpoints`,()=>{
+for(const slots of [1,2,3,6,12,15,16]) test(`rail with ${slots} slots: supported cells, disjoint solids, attached endpoints`,()=>{
   const rail=railAssembly({key:"rack",slots,at:[17,-8,21]});
   assert.equal(new Set(rail.marks.map(m=>m.key)).size,rail.marks.length);
   const solids=rail.marks.filter((m):m is SolidMark=>m.kind==="box"||m.kind==="cylinder");
@@ -31,7 +31,7 @@ for(const slots of [1,2,3,6,12]) test(`rail with ${slots} slots: supported cells
 });
 
 test("rail rejects dimensions that cause overlapping slots",()=>{
-  for(const slots of [0,1.5,13]) assert.throws(()=>railAssembly({key:"x",slots}),RangeError);
+  for(const slots of [0,1.5,17]) assert.throws(()=>railAssembly({key:"x",slots}),RangeError);
   assert.throws(()=>railAssembly({key:"x",slots:3,pitch:28}),RangeError);
 });
 
@@ -49,4 +49,27 @@ test("cartridge surface remains attached during an out-of-order seek",()=>{
   const delta=[(mid.at[0]-a.at[0])*Math.cos(Math.PI/6), (mid.at[0]-a.at[0])/2-(mid.at[2]-a.at[2])];
   const before=surfaceGeometry(a,"iso")[0]!.points;
   shape[0]!.points.forEach((p,i)=>p.forEach((v,k)=>assert.ok(Math.abs(v-before[i]![k]!-delta[k]!)<1e-8)));
+});
+
+test("rail ports stand on the floor behind each slot, flush with the base",()=>{
+  const at:[number,number,number]=[5,-3,10];
+  const rail=railAssembly({key:"pool",slots:4,at,ports:true,slotLabel:i=>`C${i+1}`});
+  const solids=rail.marks.filter((m):m is SolidMark=>m.kind==="box"||m.kind==="cylinder");
+  const base=boundsOf(solids.find(m=>m.key==="pool/base")!);
+  for(let i=0;i<4;i++){
+    const b=boundsOf(solids.find(m=>m.key===`pool/port-${i}`)!);
+    const p=rail.port(i);
+    assert.equal(b.min[2],at[2]-10,"port stands on the floor");
+    assert.equal(b.max[1],base.min[1],"port is flush with the back of the base");
+    assert.equal(p[1],b.min[1]); assert.equal(p[2],b.min[2]);
+    assert.ok(p[0]>b.min[0]&&p[0]<b.max[0]);
+  }
+  for(let i=0;i<solids.length;i++) for(let j=i+1;j<solids.length;j++) {
+    const a=boundsOf(solids[i]!),b=boundsOf(solids[j]!);
+    assert.ok(![0,1,2].every(axis=>Math.min(a.max[axis]!,b.max[axis]!)-Math.max(a.min[axis]!,b.min[axis]!)>1e-8),`${solids[i]!.key} intersects ${solids[j]!.key}`);
+  }
+  assert.deepEqual(rail.marks.filter(m=>m.kind==="label").map(m=>m.kind==="label"&&m.text),["C1","C2","C3","C4"]);
+  assert.equal(railAssembly({key:"q",slots:2,slotLabel:null}).marks.filter(m=>m.kind==="label").length,0);
+  assert.throws(()=>railAssembly({key:"q",slots:2}).port(0),RangeError);
+  assert.throws(()=>rail.port(4),RangeError);
 });

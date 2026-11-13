@@ -71,7 +71,7 @@ export function terminal(key: string, at: Vec3, { status = "", lit = false }: { 
       top: add(at, [21, 11.5, 27]),
       screen: add(at, [21, 20, 18]),
       foot: add(at, [21, 26, 2.5]),
-  }, { port: `${key}/port`, foot: `${key}/base` });
+  }, { port: `${key}/port`, foot: `${key}/base`, top: `${key}/body`, screen: `${key}/body` });
 }
 
 export const SERVER_FOOTPRINT: [number, number] = [40, 34];

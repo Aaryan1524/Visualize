@@ -227,7 +227,19 @@ function updateSolid(node: Node, m: Resolved<SolidMark>, projection: Projection)
   setAttr(node.text!, "data-on-panel", onPanel ? "" : null);
   setAttr(node.text!, "data-room", f(onPanel ? g.labelWidth / faceX : g.labelWidth));
   setAttr(node.text!, "data-optional", m.kind === "box" && m.labelOptional ? "" : null);
-  setAttr(node.text!, "data-room-height", onPanel && m.kind === "box" && m.surface?.panel ? f(m.size[2] * (m.surface.panel.to - m.surface.panel.from) * .8) : null);
+  setAttr(node.text!, "data-room-height", onPanel && m.kind === "box" && m.surface?.panel ? f(m.size[2] * (m.surface.panel.to - m.surface.panel.from) * .8) : projection === "iso" ? faceHeight(m, g.labelShade) : null);
+}
+
+/**
+ * The screen height (in user units) of the face a plain face label sits on, so
+ * a label taller than its face is hidden like one that is too wide. It matches
+ * the labels check, which measures the face's bounding box with 5% tolerance.
+ */
+function faceHeight(m: SolidMark, shade: string | undefined): string | null {
+  if (m.kind !== "box" || !m.label) return null;
+  const [w, d, h] = m.size;
+  const room = shade === "top" ? (w + d) / 2 : shade === "left" ? h + w / 2 : shade === "right" ? h + d / 2 : 0;
+  return room > 0 ? f(room * 1.05) : null;
 }
 
 function makeLabel(m: LabelMark): Node {

@@ -639,6 +639,9 @@
         return Math.hypot(p.x-a[0]-u*dx,p.y-a[1]-u*dy)<.08;
       });
       for(const path of paths) {
+        // An empty path cannot be sampled; report it instead of throwing out of the whole run.
+        let drawable=true; try { path.getPointAtLength(0); } catch { drawable=false; }
+        if(!drawable) { problems.push(`${m.key}: ${path.dataset.detail} finish renders an empty path (${(path.getAttribute("d")??"").slice(0,40)})`); continue; }
         const transform=edge.getScreenCTM().inverse().multiply(path.getScreenCTM());
         const length=path.getTotalLength();
         for(let i=0;i<=12;i++) {

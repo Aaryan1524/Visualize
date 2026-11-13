@@ -11,11 +11,19 @@ export interface RailOptions {
   cell?: Vec3;
   pitch?: number;
   flat?: boolean;
+  /**
+   * A cable port behind every slot, standing on the floor 10 units below the
+   * rail (`at[2] - 10`, where the feet stand). `port(i)` is its back face at
+   * floor level, for a cable that belongs to that slot (a pooled connection).
+   */
+  ports?: boolean;
+  /** Text of the optional number under each slot; `null` draws none. Default "01", "02"… */
+  slotLabel?: ((i: number) => string) | null;
 }
 
 /** A rail of real slots, with anchors derived from the same dimensions. */
-export function railAssembly({ key, slots, at = [0, 0, 0], cell = RAIL_CELL, pitch = RAIL_PITCH, flat = false }: RailOptions) {
-  if (!Number.isInteger(slots) || slots < 1 || slots > 12) throw new RangeError("A rail needs 1–12 slots");
+export function railAssembly({ key, slots, at = [0, 0, 0], cell = RAIL_CELL, pitch = RAIL_PITCH, flat = false, ports = false, slotLabel = (i) => String(i + 1).padStart(2, "0") }: RailOptions) {
+  if (!Number.isInteger(slots) || slots < 1 || slots > 16) throw new RangeError("A rail needs 1–16 slots");
   if (cell.some((n, i) => !Number.isFinite(n) || n < [16, 12, 6][i]!) || !Number.isFinite(pitch) || pitch < cell[0] + 6) throw new RangeError("Rail cells need dimensions of at least 16×12×6 and 6 units of spacing");
   if (at.some(n => !Number.isFinite(n))) throw new RangeError("Rail position must be finite");
   const [w, d] = cell;
@@ -46,13 +54,20 @@ export function railAssembly({ key, slots, at = [0, 0, 0], cell = RAIL_CELL, pit
     box(`tray-${i}-back`, [x - 1, -1, 3], [w + 2, 1, 1.3], { radius: .4 });
     box(`tray-${i}-front`, [x - 1, d, 3], [w + 2, 1, 1.3], { radius: .4 });
     // Slot numbers are optional: shown where there is room, dropped where they would sit on a part.
-    marks.push({ kind: "label", key: id(`slot-${i}`), at: flat ? point(x + w/2, 0, -13) : point(x + w/2, d + 7, -2), text: String(i+1).padStart(2,"0"), size: "small", optional: true });
+    if (slotLabel) marks.push({ kind: "label", key: id(`slot-${i}`), at: flat ? point(x + w/2, 0, -13) : point(x + w/2, d + 7, -2), text: slotLabel(i), size: "small", optional: true });
+    // A port block against the back of the base, from the floor up to the base top.
+    if (ports) box(`port-${i}`, [x + w/2 - 3.5, -13, -10], [7, 4, 8], { radius: .6, tone: "structure" });
   }
+  const port = (i: number): Vec3 => {
+    if (!ports) throw new RangeError("This rail was built without ports");
+    if (!Number.isInteger(i) || i < 0 || i >= slots) throw new RangeError("Port index outside the rail");
+    return point(i * pitch + w/2, -13, -10);
+  };
   const slot = (i: number): Vec3 => {
     if (!Number.isInteger(i) || i < 0 || i >= slots) throw new RangeError("Slot index outside the rail");
     return point(i * pitch, 0, 3);
   };
-  return { marks, slot, length, cell, id, anchor: {
+  return { marks, slot, port, length, cell, id, anchor: {
     first: { key: id("tray-0"), at: point(0, d, 3) },
     last: { key: id(`tray-${slots - 1}`), at: point(length, d, 3) },
   } };
