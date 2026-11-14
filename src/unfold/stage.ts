@@ -36,6 +36,8 @@ function bounds(marks: readonly Mark[]): THREE.Box3 {
     if (m.kind === "box") { b.expandByPoint(v3(m.at)); b.expandByPoint(v3([m.at[0] + m.size[0], m.at[1] + m.size[1], m.at[2] + m.size[2]])); }
     else if (m.kind === "cylinder") { b.expandByPoint(v3([m.at[0] - m.radius, m.at[1] - m.radius, m.at[2]])); b.expandByPoint(v3([m.at[0] + m.radius, m.at[1] + m.radius, m.at[2] + m.height])); }
     else if (m.kind === "link") { b.expandByPoint(v3(m.from)); b.expandByPoint(v3(m.to)); }
+    // A label's point, with room for its text either side.
+    else if (m.kind === "label") { const p = v3(m.at); const w = m.text.length * 2.2; b.expandByPoint(p.clone().add(new THREE.Vector3(w, 4, 0))); b.expandByPoint(p.clone().add(new THREE.Vector3(-w, -4, 0))); }
   }
   return b;
 }
@@ -84,7 +86,7 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
   const plan = new THREE.Vector3(0, 1, 0.06);
   const angle = (k: number) => new THREE.Vector3(k % 4 < 2 ? 0.55 : 1.05, 1.1, 1.25);
   let shots: Shot[] = [];
-  const planShot = (b: THREE.Box3) => fit(b, plan, 0.86);
+  const planShot = (b: THREE.Box3) => fit(b, plan, 0.8);
   const computeShots = () => {
     shots = steps.map((s, k) => {
       const shot = s.teaching?.shot;
@@ -95,7 +97,7 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
       const fb = anyReceded && focus.length ? bounds(focus) : all.clone();
       // Keep some of the whole in frame, so what changed is seen in its place.
       const blend = fb.clone().union(new THREE.Box3(all.min.clone().lerp(fb.min, 0.6), all.max.clone().lerp(fb.max, 0.6)));
-      return fit(blend, angle(k), 0.78);
+      return fit(blend, angle(k), 0.7);
     });
   };
 
@@ -119,10 +121,14 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
     group.add(mesh);
     let edge: THREE.LineBasicMaterial | undefined;
     if (look.edges) {
-      edge = new THREE.LineBasicMaterial({ color: look.ink, transparent: true, opacity: 0.9 });
-      // Ink outlines follow the box's silhouette edges; a rounded mesh has no sharp edges to find.
-      const outline = m.kind === "box" ? new THREE.BoxGeometry(m.size[0] * 0.995, m.size[2] * 0.995, m.size[1] * 0.995) : new THREE.CylinderGeometry(m.radius, m.radius, m.height, 48);
-      group.add(new THREE.LineSegments(geometry(`e${key}`, () => new THREE.EdgesGeometry(outline, 40)), edge));
+      // The ink line is the part's own silhouette: a slightly larger back-facing shell in ink,
+      // so it follows rounded corners exactly, as a pen outline would.
+      edge = new THREE.MeshBasicMaterial({ color: look.ink, side: THREE.BackSide, transparent: true }) as unknown as THREE.LineBasicMaterial;
+      const hull = new THREE.Mesh(g, edge as unknown as THREE.Material);
+      const t = 0.55;
+      const [sx, sy, sz] = m.kind === "box" ? [m.size[0], m.size[2], m.size[1]] : [m.radius * 2, m.height, m.radius * 2];
+      hull.scale.set((sx + 2 * t) / sx, (sy + 2 * t) / sy, (sz + 2 * t) / sz);
+      group.add(hull);
     }
     return { obj: group, mat, edge, geomKey: key };
   }
@@ -231,6 +237,9 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
     renderer.setSize(r.width, r.height, false);
     svg.setAttribute("viewBox", `0 0 ${r.width} ${r.height}`);
     camera.aspect = r.width / r.height;
+    // The step heading sits over the stage's top-left: move the picture right and down to clear it.
+    if (r.width > 700) camera.setViewOffset(r.width, r.height, -r.width * 0.045, -r.height * 0.04, r.width, r.height);
+    else camera.clearViewOffset();
     camera.updateProjectionMatrix();
     computeShots();
     draw();

@@ -14,7 +14,7 @@ export interface PaintState { tone: Tone; role?: "foundation" | "subject"; lit: 
 export interface Look {
   setup(scene: THREE.Scene, renderer: THREE.WebGLRenderer, figure: { floor: number; span: number; centre: THREE.Vector3 }): void;
   material(tone: Tone, role?: "foundation" | "subject"): THREE.MeshStandardMaterial;
-  paint(mat: THREE.MeshStandardMaterial, s: PaintState, edge?: THREE.LineBasicMaterial): void;
+  paint(mat: THREE.MeshStandardMaterial, s: PaintState, edge?: THREE.LineBasicMaterial | THREE.MeshBasicMaterial): void;
   /** Ink outlines on every solid (paper) or none (clay). */
   edges: boolean;
   ink: THREE.ColorRepresentation;
