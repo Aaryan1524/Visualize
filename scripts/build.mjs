@@ -37,6 +37,12 @@ const escapeHtml = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 /** KaTeX's stylesheet with only the woff2 fonts, inlined as data URIs. */
+/** A recorded narration (scripts/voice.mjs) travels inside the page. */
+function voiceScript(dir, id) {
+  const file = join(dir, "voice", `${id}.json`);
+  return existsSync(file) ? `<script>window.__VZ_VOICE=${readFileSync(file, "utf8").replace(/<\//g, "<\\/")}</script>\n` : "";
+}
+
 function katexCss() {
   const css = readFileSync(join(KATEX_DIR, "katex.min.css"), "utf8");
   return css.replace(/src:([^;}]+)/g, (whole, list) => {
@@ -101,7 +107,7 @@ Promise.all([document.fonts.load('500 16px "Visualize Sans"'), document.fonts.lo
 <body>
 <main id="app"></main>
 <noscript><h1>${escapeHtml(variant.question)}</h1><ol start="0">${steps}</ol></noscript>
-<script>${js}</script>
+${voiceScript(dir, name)}<script>${js}</script>
 </body>
 </html>
 `;

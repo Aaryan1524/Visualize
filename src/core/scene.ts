@@ -10,6 +10,8 @@ export function defineScene<S, E>(scene: Scene<S, E>): Scene<S, E> {
 export interface StepInfo {
   teaching?: Teaching;
   caption: string;
+  /** The spoken script for this step, with [words|ids] links. */
+  voice?: string;
   trust: Trust;
   source?: Source;
   readout: string;
@@ -65,6 +67,7 @@ export function compile<S, E>(scene: Scene<S, E>, opts: { hold?: number } = {}):
     return {
       ...(scene.teaching ? { teaching: scene.teaching(s.state, s.event, i) } : {}),
       caption: s.caption,
+      ...(scene.voice ? { voice: scene.voice(s.state, s.event, i) } : {}),
       trust: s.trust,
       ...(s.source ? { source: s.source } : {}),
       readout: scene.readout ? scene.readout(s.state, s.event) : "",

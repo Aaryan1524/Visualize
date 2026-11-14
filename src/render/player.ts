@@ -6,6 +6,38 @@ import { createStage, fitViewBox, type StageRenderer } from "./svg.ts";
 import { clearOf, silhouettes } from "./clear.ts";
 import { createUnfoldStage, type UnfoldStage } from "../unfold/stage.ts";
 
+/** Quiet synthesised cues for a listening tour: a card turning, a slide away, a found chime. */
+function playCue(a: AudioContext, kind: "flip" | "slide" | "chime"): void {
+  const now = a.currentTime, out = a.createGain();
+  out.connect(a.destination);
+  const noise = (dur: number) => {
+    const b = a.createBuffer(1, Math.ceil(a.sampleRate * dur), a.sampleRate), d = b.getChannelData(0);
+    let seed = 11;
+    for (let i = 0; i < d.length; i++) { seed = (seed * 16807) % 2147483647; d[i] = (seed / 1073741823.5 - 1) * (1 - i / d.length); }
+    const src = a.createBufferSource();
+    src.buffer = b;
+    return src;
+  };
+  if (kind === "chime") {
+    for (const [f, delay] of [[659.25, 0], [987.77, 0.11]] as const) {
+      const o = a.createOscillator(), g = a.createGain();
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, now + delay); g.gain.exponentialRampToValueAtTime(0.15, now + delay + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, now + delay + 1.4);
+      o.connect(g).connect(a.destination); o.start(now + delay); o.stop(now + delay + 1.5);
+    }
+    return;
+  }
+  const s = noise(kind === "flip" ? 0.16 : 0.55), f = a.createBiquadFilter();
+  f.type = kind === "flip" ? "bandpass" : "lowpass";
+  f.frequency.setValueAtTime(kind === "flip" ? 2400 : 2600, now);
+  if (kind === "slide") f.frequency.exponentialRampToValueAtTime(300, now + 0.5);
+  out.gain.setValueAtTime(0.0001, now);
+  out.gain.exponentialRampToValueAtTime(kind === "flip" ? 0.22 : 0.11, now + 0.02);
+  out.gain.exponentialRampToValueAtTime(0.0001, now + (kind === "flip" ? 0.16 : 0.55));
+  s.connect(f).connect(out);
+  s.start(now);
+}
+
 /**
  * Labels scale with the drawing but stay readable: LABEL_UNITS world units
  * tall, clamped to LABEL_MIN..LABEL_MAX CSS px.
@@ -589,6 +621,75 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
     target = goal;
     setPlaying(true);
   };
+
+  // ---- Listen: recorded narration that lights what it names -------------------
+  // A tour plays each step's clip after the camera settles, lights the parts a
+  // phrase names while it is spoken, and moves on. It stops at a prediction,
+  // so the reader answers before hearing the answer.
+  type Track = { duration: number; type: string; audio: string; links: { start: number; end: number; ids: string[] }[] } | null;
+  const voice: Track[] | null = (page ? (window as unknown as { __VZ_VOICE?: { steps: Track[] } }).__VZ_VOICE?.steps : null) ?? null;
+  let listening = false, clip: HTMLAudioElement | null = null, listenTimer = 0, listenRaf = 0;
+  let sound: AudioContext | null = null;
+  const listenBtn = h("button", { class: "vz-btn vz-listen", type: "button", "aria-pressed": "false" }, "Listen");
+  const lightIds = (ids: string[]) => {
+    activeLink = ids.length ? ids.join(" ") : null;
+    applyLink();
+    unfold?.highlight(ids);
+  };
+  const cueFor = (k: number) => {
+    if (!sound || k === 0) return;
+    const before = new Set(steps[k - 1]!.marks.map((m) => m.key)), now = steps[k]!.marks;
+    const kind = k === last ? "chime" : now.some((m) => m.kind !== "label" && !before.has(m.key)) ? "flip" : "slide";
+    playCue(sound, kind);
+  };
+  const stopListening = () => {
+    listening = false;
+    clearTimeout(listenTimer);
+    cancelAnimationFrame(listenRaf);
+    clip?.pause();
+    clip = null;
+    lightIds([]);
+    listenBtn.setAttribute("aria-pressed", "false");
+    listenBtn.textContent = "Listen";
+  };
+  const listenAt = (k: number) => {
+    const track = voice?.[k];
+    goTo(k);
+    cueFor(k);
+    if (!track) { listenTimer = window.setTimeout(() => (k < last && listening ? listenAt(k + 1) : stopListening()), 1600); return; }
+    const el = new Audio(`data:${track.type};base64,${track.audio}`);
+    clip = el;
+    el.onended = () => {
+      cancelAnimationFrame(listenRaf);
+      lightIds([]);
+      if (!listening) return;
+      if (steps[k]?.teaching?.prediction && !predictionAnswered) { stopListening(); prediction.querySelector("button")?.focus(); return; }
+      listenTimer = window.setTimeout(() => (k < last ? listenAt(k + 1) : stopListening()), 600);
+    };
+    const follow = () => {
+      if (clip !== el) return;
+      const at = el.currentTime;
+      lightIds(track.links.find((l) => at >= l.start - 0.05 && at < l.end + 0.25)?.ids ?? []);
+      listenRaf = requestAnimationFrame(follow);
+    };
+    // Speak once the move has mostly played, so the voice names what is on screen.
+    listenTimer = window.setTimeout(() => { if (clip === el) { void el.play().catch(stopListening); follow(); } }, 700);
+  };
+  if (voice && editorial) {
+    controls.insertBefore(listenBtn, restartBtn);
+    listenBtn.addEventListener("click", () => {
+      if (listening) return stopListening();
+      sound ??= new AudioContext();
+      void sound.resume();
+      listening = true;
+      listenBtn.setAttribute("aria-pressed", "true");
+      listenBtn.textContent = "Stop";
+      listenAt(shown >= last ? 0 : Math.max(shown, 0));
+    });
+    for (const b of [prevBtn, nextBtn, playBtn, restartBtn]) b.addEventListener("click", stopListening);
+    root.addEventListener("keydown", stopListening);
+    cleanup.push(stopListening);
+  }
 
   const stepNow = () => {
     const { index, progress } = frameIndexAt(timeline, t);

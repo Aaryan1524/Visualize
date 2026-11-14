@@ -305,4 +305,11 @@ export interface Scene<S, E> {
   look?: "paper" | "clay";
   setup?: string;
   teaching?: (state: S, event: E | null, index: number) => Teaching;
+  /**
+   * What a voice says at each step, written to be heard (numbers in words).
+   * Mark phrases that name parts as [words|key key…]; while a phrase is spoken
+   * those marks (by key, owner or link id) light up. `scripts/voice.mjs`
+   * records it with a local voice; the page offers "Listen" when it is built.
+   */
+  voice?: (state: S, event: E | null, index: number) => string;
 }

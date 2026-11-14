@@ -25,6 +25,8 @@ export interface UnfoldStage extends StageRenderer {
   host: HTMLElement;
   /** Set the camera for a moment of the timeline. */
   frame(index: number, progress: number): void;
+  /** Light the marks these ids name (key, owner or link id), as a narration speaks them. */
+  highlight(ids: readonly string[]): void;
   /** Screen positions of what is drawn, for checks. */
   inspect(): { key: string; x: number; y: number; w: number; h: number; facing: boolean; occluded: boolean }[];
   destroy(): void;
@@ -136,7 +138,7 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
   function updateSolid(n: Node, m: Resolved<SolidMark>) {
     const c = m.kind === "box" ? [m.at[0] + m.size[0] / 2, m.at[1] + m.size[1] / 2, m.at[2] + m.size[2] / 2] : [m.at[0], m.at[1], m.at[2] + m.height / 2];
     n.obj.position.copy(v3(c));
-    look.paint(n.mat!, { tone: m.tone ?? "structure", role: m.role, lit: !!m.lit, emphasis: m.emphasis ?? 1, opacity: m.opacity }, n.edge);
+    look.paint(n.mat!, { tone: m.tone ?? "structure", role: m.role, lit: !!m.lit || named(m), emphasis: m.emphasis ?? 1, opacity: m.opacity }, n.edge);
     if (n.edge) n.edge.opacity = 0.85 * m.opacity;
     // Face text: an HTML label over the face it belongs to, always upright.
     if (m.label) {
@@ -184,6 +186,8 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
   }
 
   let lastMarks: readonly Resolved[] = [];
+  let spoken = new Set<string>();
+  const named = (m: Mark) => spoken.size > 0 && (spoken.has(m.key) || (!!m.owner && spoken.has(m.owner)) || (m.link ?? "").split(/\s+/).some((id) => spoken.has(id)));
   function render(marks: readonly Resolved[]) {
     lastMarks = marks;
     const seen = new Set<string>();
@@ -253,6 +257,13 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
     host,
     render,
     setViewBox() {},
+    highlight(ids) {
+      const next = new Set(ids);
+      if (next.size === spoken.size && [...next].every((i) => spoken.has(i))) return;
+      spoken = next;
+      for (const n of nodes.values()) n.label?.classList.toggle("is-spoken", false);
+      render(lastMarks);
+    },
     measureLabels: () => null,
     refreshInk() { look.theme?.(scene, document.documentElement); draw(); },
     solidOrder: () => [],
