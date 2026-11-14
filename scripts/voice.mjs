@@ -21,7 +21,8 @@ const opt = (name, fallback) => { const i = args.indexOf(`--${name}`); return i 
 const VOICE = opt("voice", "af_heart"), SPEED = Number(opt("speed", "0.95")), GAP = 0.22;
 
 const mod = await import(pathToFileURL(join(dir, "scene.ts")).href);
-const files = mod.variants ?? { [mod.default.id]: mod.default };
+const only = opt("only", null);
+const files = Object.fromEntries(Object.entries(mod.variants ?? { [mod.default.id]: mod.default }).filter(([n]) => !only || n === only));
 const { compile } = await import(pathToFileURL(join(ROOT, "src/core/scene.ts")).href);
 
 let KokoroTTS;
@@ -64,9 +65,11 @@ for (const [name, scene] of Object.entries(files)) {
       rate = audio.sampling_rate;
       const x = audio.audio;
       let a = 0, b = x.length - 1;
-      while (a < b && Math.abs(x[a]) < 0.004) a++;
-      while (b > a && Math.abs(x[b]) < 0.004) b--;
-      const clip = x.slice(Math.max(0, a - 400), Math.min(x.length, b + 1200));
+      // Trim only true silence, and keep a generous tail: a word's last sound is faint, and AAC
+      // encoding adds a short lead-in, so a tight cut clips the end of the sentence.
+      while (a < b && Math.abs(x[a]) < 0.0015) a++;
+      while (b > a && Math.abs(x[b]) < 0.0015) b--;
+      const clip = x.slice(Math.max(0, a - Math.round(0.12 * rate)), Math.min(x.length, b + Math.round(0.45 * rate)));
       const dur = clip.length / rate;
       const w = [...sentence].map((c) => (/[a-z0-9]/i.test(c) ? 1 : c === "," ? 2.5 : 0.3));
       const total = w.reduce((p, q) => p + q, 0);

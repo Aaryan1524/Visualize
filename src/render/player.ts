@@ -194,7 +194,10 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
   caption.append(count, text, meta);
   const stepHeading = h("h2",{class:"vz-step-heading", "data-role":"action"});
   // What the figure is about, top left of the stage, where the eye starts.
+  // On the opening step the concept is written out too, so it can be read as well as heard.
+  const concept = (steps[0]?.voice ?? "").replace(/\[([^\]|]+)\|[^\]]+\]/g, "$1").replace(/\bL R U\b/g, "LRU");
   const stageTitle = h("div", { class: "vz-stage-title" }, `<b>${escapeHtml(scene.title)}</b>${scene.about ? `<span>${escapeHtml(scene.about)}</span>` : ""}`);
+  const conceptEl = h("p", { class: "vz-concept" }, escapeHtml(concept));
   const prediction = h("section",{class:"vz-predict","aria-label":"Predict the next step"});
   prediction.hidden = true;
   if (editorial) {
@@ -285,6 +288,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     detailsBody.append(setup, h("h3", {}, "This step"), text, meta, foot);
     details.append(detailsBody);
     stageBox.append(stageTitle, caption);
+    if (concept) stageBox.append(conceptEl);
     controls.insertBefore(count, scrub);
     card.append(head, body, controls, details);
   } else card.append(head, question, body, caption, controls, foot);
@@ -493,6 +497,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     if (k === shown) return;
     shown = k;
     onStepShown(k);
+    root.toggleAttribute("data-opening", k === 0);
     predictionAnswered = false;
     root.dataset.step = String(k);
     count.textContent = editorial ? `${String(k).padStart(2, "0")} / ${String(last).padStart(2, "0")}` : k === 0 ? `Start · ${last} steps` : `Step ${k} of ${last}`;
@@ -754,23 +759,42 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     let voiceOn = true, armed = false, navTimer = 0, navClip: HTMLAudioElement | null = null, navRaf = 0;
     const voiceBtn = h("button", { class: "vz-btn vz-voice", type: "button", "aria-pressed": "true", "aria-label": "Voice narration" }, "Voice on");
     const stopNav = () => { clearTimeout(navTimer); cancelAnimationFrame(navRaf); navClip?.pause(); navClip = null; if (!listening) lightIds([]); };
-    const speakNav = (k: number) => {
+    const speakNav = (k: number, then?: () => void) => {
       stopNav();
       const track = voice[k];
       if (!voiceOn || !armed || listening || !track) return;
       navTimer = window.setTimeout(() => {
         const el = new Audio(`data:${track.type};base64,${track.audio}`);
         navClip = el;
-        el.onended = () => { cancelAnimationFrame(navRaf); if (!listening) lightIds([]); };
+        el.onended = () => { cancelAnimationFrame(navRaf); if (!listening) lightIds([]); then?.(); };
         const follow = () => { if (navClip !== el) return; const at = el.currentTime; lightIds(track.links.find((l) => at >= l.start - 0.05 && at < l.end + 0.25)?.ids ?? []); navRaf = requestAnimationFrame(follow); };
         void el.play().then(follow).catch(() => {});
       }, 650);
     };
     onStepShown = speakNav;
-    // Browsers only allow sound after a gesture: the first one arms the narration.
-    const arm = () => { if (!armed) { armed = true; speakNav(shown); } };
-    root.addEventListener("pointerdown", () => arm(), { once: true });
-    root.addEventListener("keydown", () => arm(), { once: true });
+    // Browsers only allow sound after a gesture: the first one arms the narration. If that
+    // gesture is "go on" from the opening step, the concept is said first and the move waits for it.
+    let introHeld = false;
+    const holdForIntro = (go: () => void) => {
+      introHeld = true;
+      armed = true;
+      root.dataset.intro = "playing";
+      speakNav(0, () => { introHeld = false; delete root.dataset.intro; go(); });
+    };
+    root.addEventListener("click", (e) => {
+      if (armed || introHeld) return;
+      const t = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-action="next"],[data-action="play"]') : null;
+      if (!t || shown !== 0 || !voiceOn || !voice[0]) { armed = true; speakNav(shown); return; }
+      e.stopImmediatePropagation(); e.preventDefault();
+      holdForIntro(() => t.click());
+    }, true);
+    root.addEventListener("keydown", (e) => {
+      if (armed || introHeld) return;
+      const go = e.key === "ArrowRight" || e.key === " ";
+      if (!go || shown !== 0 || !voiceOn || !voice[0]) { armed = true; speakNav(shown); return; }
+      e.stopImmediatePropagation(); e.preventDefault();
+      holdForIntro(() => nextBtn.click());
+    }, true);
     voiceBtn.addEventListener("click", () => {
       voiceOn = !voiceOn;
       voiceBtn.setAttribute("aria-pressed", String(voiceOn));

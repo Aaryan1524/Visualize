@@ -442,7 +442,9 @@ async function verifyUnfold(browser, { name, scene, file, shotsDir, plant, hash 
     // Coverage, not span: one stray far-off part makes the span wide while the subject shrinks.
     // Projected boxes are summed (overlaps count twice); clean figures sit well above 40%.
     const cover = view.solids.reduce((a, v) => a + Math.max(0, v.w) * Math.max(0, v.h), 0) / (view.stage.w * view.stage.h);
-    if (view.solids.length && cover < 0.4) frameProblems.push(`step ${k}: the parts cover only ${Math.round(cover * 100)}% of the stage (min 40%)`);
+    // The flat opening and closing views leave air for the title and the concept card: 30% there.
+    const min = k === 0 || k === last ? 0.3 : 0.4;
+    if (view.solids.length && cover < min) frameProblems.push(`step ${k}: the parts cover only ${Math.round(cover * 100)}% of the stage (min ${min * 100}%)`);
     // Labels: none overlap, none leave the stage.
     for (const l of view.labels) {
       if (l.x < -1 || l.y < -1 || l.x + l.w > view.stage.w + 1 || l.y + l.h > view.stage.h + 1) labelProblems.push(`step ${k}: "${l.text}" is cut off by the stage edge`);
@@ -455,7 +457,7 @@ async function verifyUnfold(browser, { name, scene, file, shotsDir, plant, hash 
   }
   report.add("observations", `${obsCount} declared across ${steps.length} steps${unchecked.size ? ` (${[...unchecked].join(", ")} not yet checked on the 3D stage)` : ""}`, obsProblems);
   report.add("captions", `caption, readout and action at ${steps.length} steps`, capProblems);
-  report.add("framing", "the parts cover at least 40% of the stage at every step", frameProblems);
+  report.add("framing", "the parts cover at least 40% of the stage (30% in the flat opening and closing views)", frameProblems);
   report.add("labels", "no overlaps; none cut off by the stage edge", [...new Set(labelProblems)]);
   // Determinism: a step looks the same however you arrive at it.
   {

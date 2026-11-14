@@ -88,7 +88,12 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
   const plan = new THREE.Vector3(0, 1, 0.06);
   const angle = (k: number) => new THREE.Vector3(k % 4 < 2 ? 0.55 : 1.05, 1.1, 1.25);
   let shots: Shot[] = [];
-  const planShot = (b: THREE.Box3) => fit(b, plan, 0.95);
+  // The plan view sits a little lower, so the title block at the stage's top left stays clear of the parts.
+  const planShot = (b: THREE.Box3) => {
+    const shot = fit(b, plan, 0.86), drop = b.getSize(new THREE.Vector3()).z * 0.045;
+    shot.pos.z -= drop; shot.look.z -= drop;
+    return shot;
+  };
   const computeShots = () => {
     shots = steps.map((s, k) => {
       const shot = s.teaching?.shot;
