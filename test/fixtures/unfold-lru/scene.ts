@@ -5,9 +5,9 @@ import { defineScene } from "../../../src/core/scene.ts";
 import type { GetEvent, LruState } from "../../../examples/lru/model.ts";
 
 function voice(s: LruState, e: GetEvent | null, k: number): string {
-  if (!e) return "An L R U cache is a small, fast store that keeps the things you used most recently, and throws away the one you haven't touched for the longest. Here's one with room for three keys. When a fourth arrives, which one should go?";
+  if (!e) return "An {L} {R} {U} cache is a small, fast store that keeps the things you used most recently, and throws away the one you haven't touched for the longest. Here's one with room for three keys. When a fourth arrives, which one should go?";
   const at = (key: string) => `[${key}|entry-${key}]`;
-  if (e.result === "hit") return `${at(e.key)} is already here. That's a hit, so ${e.key} moves to the most recent end.`;
+  if (e.result === "hit") return `${at(e.key)} is already here. That's a hit, so {${e.key}} moves to the most recent end.`;
   if (e.evicted) {
     const first = s.evictions === 1;
     return first

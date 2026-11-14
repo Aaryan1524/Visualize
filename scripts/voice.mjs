@@ -18,7 +18,7 @@ const ROOT = resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
 const dir = resolve(args.find((a) => !a.startsWith("--")) ?? "");
 const opt = (name, fallback) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : fallback; };
-const VOICE = opt("voice", "af_heart"), SPEED = Number(opt("speed", "0.95")), GAP = 0.22;
+const VOICE = opt("voice", "af_heart"), SPEED = Number(opt("speed", "0.95"));
 
 const mod = await import(pathToFileURL(join(dir, "scene.ts")).href);
 const only = opt("only", null);
@@ -43,6 +43,15 @@ const parse = (say) => {
 };
 
 mkdirSync(join(dir, "voice"), { recursive: true });
+
+// Single letters are a weak spot of the voice model ("A" comes out "uh", "B" as "ba"), so a letter
+// that stands for a name is spoken as its sound. Authors mark it: [A|entry-A] or {A}.
+const LETTER = { A: "ay", B: "bee", C: "see", D: "dee", E: "ee", F: "eff", G: "jee", H: "aitch", I: "eye", J: "jay", K: "kay", L: "ell", M: "em", N: "en", O: "oh", P: "pee", Q: "cue", R: "ar", S: "ess", T: "tee", U: "you", V: "vee", W: "double you", X: "ex", Y: "why", Z: "zee" };
+const speak = (text, linked) => text
+  .replace(/\{([A-Z])\}/g, (_, l) => LETTER[l])
+  .replace(/\{([^}]+)\}/g, "$1")
+  .replace(linked ? /^([A-Z])$/ : /(?!)/, (l) => LETTER[l]);
+
 for (const [name, scene] of Object.entries(files)) {
   const steps = compile(scene).steps;
   if (!steps.some((s) => s.voice)) { console.log(`${name}: no voice() in the scene, skipped`); continue; }
@@ -51,38 +60,27 @@ for (const [name, scene] of Object.entries(files)) {
     let plain = "";
     const links = [];
     for (const seg of parse(step.voice ?? "")) {
-      if (seg.ids.length) links.push({ from: plain.length, to: plain.length + seg.text.length, ids: seg.ids });
-      plain += seg.text;
+      const said = speak(seg.text, seg.ids.length > 0);
+      if (seg.ids.length) links.push({ from: plain.length, to: plain.length + said.length, ids: seg.ids });
+      plain += said;
     }
     if (!plain.trim()) { tracks.push(null); continue; }
-    const sentences = plain.match(/[^.!?:]+(?:\.\.\.|[.!?:])?\s*/g) ?? [plain];
-    const pcm = [], marks = [];
-    let rate = 24000, t = 0, cursor = 0;
-    for (const sentence of sentences) {
-      const text = sentence.trim();
-      if (!text) { cursor += sentence.length; continue; }
-      const audio = await tts.generate(text, { voice: VOICE, speed: SPEED });
-      rate = audio.sampling_rate;
-      const x = audio.audio;
-      let a = 0, b = x.length - 1;
-      // Trim only true silence, and keep a generous tail: a word's last sound is faint, and AAC
-      // encoding adds a short lead-in, so a tight cut clips the end of the sentence.
-      while (a < b && Math.abs(x[a]) < 0.0015) a++;
-      while (b > a && Math.abs(x[b]) < 0.0015) b--;
-      const clip = x.slice(Math.max(0, a - Math.round(0.12 * rate)), Math.min(x.length, b + Math.round(0.45 * rate)));
-      const dur = clip.length / rate;
-      const w = [...sentence].map((c) => (/[a-z0-9]/i.test(c) ? 1 : c === "," ? 2.5 : 0.3));
-      const total = w.reduce((p, q) => p + q, 0);
-      let acc = 0;
-      [...sentence].forEach((_, i) => { marks[cursor + i] = t + (acc / total) * dur; acc += w[i]; });
-      pcm.push(clip, new Float32Array(Math.round(GAP * rate)));
-      t += dur + GAP;
-      cursor += sentence.length;
-    }
-    marks[plain.length] = t;
-    const all = new Float32Array(pcm.reduce((n, c) => n + c.length, 0));
-    let o = 0;
-    for (const c of pcm) { all.set(c, o); o += c.length; }
+    // One pass for the whole step, so the voice keeps its own rhythm and sentence melody.
+    const audio = await tts.generate(plain, { voice: VOICE, speed: SPEED });
+    const rate = audio.sampling_rate, x = audio.audio;
+    // Nothing is trimmed. A little silence at each end keeps the encoder's lead-in off the speech,
+    // and a short fade keeps the edges free of clicks.
+    const lead = Math.round(0.15 * rate), tail = Math.round(0.35 * rate), fade = Math.round(0.02 * rate);
+    const all = new Float32Array(lead + x.length + tail);
+    all.set(x, lead);
+    for (let i = 0; i < fade; i++) { all[lead + i] *= i / fade; all[lead + x.length - 1 - i] *= i / fade; }
+    const t = all.length / rate;
+    // When each phrase is spoken: letters share the speech time, pauses weigh more than letters.
+    const weight = (c) => (/[a-z0-9]/i.test(c) ? 1 : c === "," ? 3 : /[.!?:]/.test(c) ? 7 : 0.4);
+    const w = [...plain].map(weight), total = w.reduce((a, b) => a + b, 0), speech = x.length / rate;
+    const at = []; let acc = 0;
+    [...plain].forEach((_, i) => { at[i] = 0.15 + (acc / total) * speech; acc += w[i]; });
+    at[plain.length] = 0.15 + speech;
     const wav = Buffer.alloc(44 + all.length * 2);
     wav.write("RIFF", 0); wav.writeUInt32LE(36 + all.length * 2, 4); wav.write("WAVEfmt ", 8);
     wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(rate, 24);
@@ -90,12 +88,11 @@ for (const [name, scene] of Object.entries(files)) {
     all.forEach((v, i) => wav.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(v * 32767))), 44 + i * 2));
     const tmp = join(dir, "voice", `.${name}-${k}`);
     writeFileSync(`${tmp}.wav`, wav);
-    // AAC through the system encoder where there is one (macOS); otherwise keep WAV.
-    let audio, type;
-    try { execFileSync("afconvert", ["-f", "m4af", "-d", "aac", "-b", "64000", `${tmp}.wav`, `${tmp}.m4a`], { stdio: "ignore" }); audio = readFileSync(`${tmp}.m4a`); type = "audio/mp4"; }
-    catch { audio = wav; type = "audio/wav"; }
+    let encoded, type;
+    try { execFileSync("afconvert", ["-f", "m4af", "-d", "aac", "-b", "96000", `${tmp}.wav`, `${tmp}.m4a`], { stdio: "ignore" }); encoded = readFileSync(`${tmp}.m4a`); type = "audio/mp4"; }
+    catch { encoded = wav; type = "audio/wav"; }
     rmSync(`${tmp}.wav`, { force: true }); rmSync(`${tmp}.m4a`, { force: true });
-    tracks.push({ duration: t, type, audio: audio.toString("base64"), links: links.map((l) => ({ start: marks[l.from], end: marks[l.to] ?? t, ids: l.ids })), text: plain });
+    tracks.push({ duration: t, type, audio: encoded.toString("base64"), links: links.map((l) => ({ start: at[l.from], end: at[l.to] ?? t, ids: l.ids })), text: plain });
     process.stdout.write(`${name} step ${k}: ${t.toFixed(1)} s\n`);
   }
   writeFileSync(join(dir, "voice", `${name}.json`), JSON.stringify({ voice: VOICE, steps: tracks }));

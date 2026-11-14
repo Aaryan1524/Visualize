@@ -195,7 +195,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
   const stepHeading = h("h2",{class:"vz-step-heading", "data-role":"action"});
   // What the figure is about, top left of the stage, where the eye starts.
   // On the opening step the concept is written out too, so it can be read as well as heard.
-  const concept = (steps[0]?.voice ?? "").replace(/\[([^\]|]+)\|[^\]]+\]/g, "$1").replace(/\bL R U\b/g, "LRU");
+  const concept = (steps[0]?.voice ?? "").replace(/\[([^\]|]+)\|[^\]]+\]/g, "$1").replace(/\{([^}]+)\}/g, "$1").replace(/\bL R U\b/g, "LRU");
   const stageTitle = h("div", { class: "vz-stage-title" }, `<b>${escapeHtml(scene.title)}</b>${scene.about ? `<span>${escapeHtml(scene.about)}</span>` : ""}`);
   const conceptEl = h("p", { class: "vz-concept" }, escapeHtml(concept));
   const prediction = h("section",{class:"vz-predict","aria-label":"Predict the next step"});
