@@ -139,27 +139,45 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
   };
   /** The opening plan view, lifted (and if need be drawn smaller) so the written concept covers none of it. */
   const openingShot = (b: THREE.Box3): Shot => {
-    const shot = planShot(b);
+    const plan0 = planShot(b);
     const { width: W, height: H } = host.getBoundingClientRect();
     const box = W && H ? conceptBox(W, H) : null;
-    if (!box) return shot;
-    let rect = screenRect(solidBox, shot, W, H);
-    if (rect.left >= box.right || rect.bottom <= box.top) return shot;
-    const ceiling = 0.05 * H;
-    const room = box.top - ceiling;
-    if (rect.bottom - rect.top > room) {
-      // Too tall to clear by lifting alone: step back until it fits the room above the concept.
-      const dir = shot.pos.clone().sub(shot.look);
-      shot.pos.copy(shot.look).add(dir.multiplyScalar((rect.bottom - rect.top) / room));
-      rect = screenRect(solidBox, shot, W, H);
-    }
-    const lift = Math.max(0, rect.bottom - box.top);
-    const perPx = (2 * shot.pos.distanceTo(shot.look) * Math.tan((camera.fov * Math.PI) / 360)) / H;
-    const cam = camera.clone(); cam.position.copy(shot.pos); cam.lookAt(shot.look);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
-    // Moving the camera down the screen moves the picture up it.
-    const move = up.multiplyScalar(-lift * perPx);
-    return { pos: shot.pos.clone().add(move), look: shot.look.clone().add(move) };
+    if (!box) return plan0;
+    const rect0 = screenRect(solidBox, plan0, W, H);
+    if (rect0.left >= box.right || rect0.bottom <= box.top) return plan0;
+    // Lift the figure until its bottom clears the concept; if it is too tall
+    // for the room under `ceiling`, step back first.
+    const lifted = (ceiling: number): Shot => {
+      const shot = { pos: plan0.pos.clone(), look: plan0.look.clone() };
+      let rect = rect0;
+      const room = box.top - ceiling;
+      if (rect.bottom - rect.top > room) {
+        const dir = shot.pos.clone().sub(shot.look);
+        shot.pos.copy(shot.look).add(dir.multiplyScalar((rect.bottom - rect.top) / room));
+        rect = screenRect(solidBox, shot, W, H);
+      }
+      const lift = Math.max(0, rect.bottom - box.top);
+      const perPx = (2 * shot.pos.distanceTo(shot.look) * Math.tan((camera.fov * Math.PI) / 360)) / H;
+      const cam = camera.clone(); cam.position.copy(shot.pos); cam.lookAt(shot.look);
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+      // Moving the camera down the screen moves the picture up it.
+      const move = up.multiplyScalar(-lift * perPx);
+      return { pos: shot.pos.clone().add(move), look: shot.look.clone().add(move) };
+    };
+    const shot = lifted(0.05 * H);
+    // The step heading sits over the stage's top-left (.vz-caption in editorial
+    // presentation: left 26, top 24, width min(290px, 30%), 21px/1.35 text).
+    // Only when the lift runs into it does the lift stop under it instead.
+    // Heading text sets at about 10.5 px a character.
+    const heading = steps[0]?.teaching?.heading ?? "", capWidth = Math.min(290, 0.3 * W);
+    const capRight = 26 + Math.min(heading.length * 10.5, capWidth) + 12;
+    const capBottom = 24 + Math.max(1, Math.ceil((heading.length * 10.5) / capWidth)) * 21 * 1.35 + 12;
+    // Part by part: one box round the whole figure would claim the heading's corner when no part is there.
+    const hits = steps[0]!.marks.filter(solid).some((m) => {
+      const r = screenRect(bounds([m]), shot, W, H);
+      return r.left < capRight && r.top < capBottom;
+    });
+    return hits ? lifted(capBottom) : shot;
   };
   const computeShots = () => {
     shots = steps.map((s, k) => {
