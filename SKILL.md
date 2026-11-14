@@ -96,6 +96,7 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
 |---|---|---|---|
 | `railAssembly` and `cartridge` | `src/parts/rail.ts` | Ordered slots in a line with entries that slide, hop and leave: caches, queues, arrays (up to 16), priority orders. `slotLabel` names slots; given names are never dropped; `ports` gives a cable per slot | `slot(i)`, `front(i)`, `port(i)`, `anchor.first`, `anchor.last` |
 | `ringAssembly` and `puck` | `src/parts/flow.ts` | Slots round a circle: circular buffers, hash rings, round robin, clock replacement | `slot(i)`, `outside(i)`, `side(i)`, `anchor.centre` |
+| `treeAssembly` | `src/parts/tree.ts` | A complete binary tree in array order: heaps, tournament trees, segment trees. Pair with a rail for the array | `slot(i)`, `edge(i)`, `depth(i)`, `anchor.root` |
 | `marker` | same | A pointer standing at one slot: head, tail, lo, mid, hi, next. Hops to its next slot; lanes for two on one slot | `tip`, `foot` |
 | `reservoir` | same | A countable stack with its capacity: tokens, permits, credits, free buffers | `top`, `take`, `front`, `capacity` |
 | `source` | same | Something that adds at a rate, over what it fills: refill, arrivals, a producer | `out`, `body` |

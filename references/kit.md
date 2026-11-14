@@ -82,6 +82,7 @@ marks.push(...plate("safe/plate", [-18, -20, 0], [254, 80]).marks,
 | `reservoir(key, centre, { capacity, items, unit })` | radius 17; 3.6 per item; up to 20 | `top` (where the next item lands), `take` (the top item), `front`, `capacity` (top of the capacity post). Items alternate radius so the stack can be counted; they `drop` in |
 | `source(key, over, { rate, height })` | column 36 behind `over`, hopper `height` above it | `out` (the hopper's mouth), `body`. Its rate is written beside it. Put it over a reservoir so dropped items fall from it |
 | `gate(key, at, { open, lit })` | 8 × 30, lane along +x | `in`, `out`, `reject` (where turned-away requests go), `top`. `open: true` raises the bar, `false` lowers it, `null` is idle |
+| `treeAssembly({ key, levels, at, leafPitch, levelPitch, edgeTone, slotLabel })` (`tree.ts`) | 1–4 levels; `2^(levels-1)·leafPitch` wide (default 64), levels 48 apart toward +y, root at the back | `slot(i)` (pad top in array order: children of i are 2i+1, 2i+2), `edge(i)` (key of the edge into i), `depth(i)`, `size`, `anchor.root`, `anchor.front`, `anchor.left`. Every position has a pad, so the next free leaf shows. Stand entries with `puck({ ...TREE_PUCK })`. `edgeTone(i)` tones the edge a comparison crosses |
 | `cartridge(mark)` | the size you give | adds radius, inset, seam and the subject role |
 | `terminal` | 45 × 26, body top 27 (slot top 28.2) | `port`, `outbox`, `top`, `screen` |
 | `server` | 40 × 34, 42 tall | `inPort`, `inbox`, `outPort`, `top`, `front` |
