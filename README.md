@@ -1,142 +1,192 @@
-# Visualize
+<h1 align="center">Visualize</h1>
 
-An engine for model-driven visual explanations. You write two small things:
+<p align="center"><b>An Agent Skill that turns a one-line request into a step-through explanation you can trust.</b><br>A 3D figure that moves one step at a time, a voice that explains it, and a reader who predicts and practises.<br>Every number on the page is checked against a running model of the idea.</p>
 
-- an executable **model** of the idea, which returns a trace of steps;
-- a **view**, which maps each state to keyed marks.
+<p align="center">
+  <a href="https://code.claude.com/docs/en/skills"><img src="https://img.shields.io/badge/Claude_Code-skill-1b1b19?style=flat-square&logo=claude&logoColor=white" alt="Claude Code skill"></a>
+  <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-compatible-1b1b19?style=flat-square" alt="Agent Skills compatible"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1b1b19?style=flat-square" alt="MIT license"></a>
+  <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2024-1b1b19?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node 24 or later"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.0.0-1b1b19?style=flat-square" alt="Version 1.0.0"></a>
+  <a href="https://github.com/Aaryan1524/Visualize/actions/workflows/ci.yml"><img src="https://github.com/Aaryan1524/Visualize/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
 
-The engine handles the rest:
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#gallery">Gallery</a> ·
+  <a href="#what-the-reader-gets">What the reader gets</a> ·
+  <a href="#usage">Usage</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#requirements">Requirements</a> ·
+  <a href="#limits">Limits</a>
+</p>
 
-- a **3D stage in one look, Clay**: soft matte parts, a camera that opens on the flat diagram you know, moves to what each step is about and ends flat, with lettering printed on the parts;
-- a **voice** recorded locally (open source, offline): it explains the concept first, then narrates each step and lights each part as it is named; ▶ plays the narrated tour and waits for every sentence;
-- **What if?** (the same idea on other inputs) and **Now you try** (questions the model makes and marks);
-- an isometric SVG stage, with flat panels for equations and number grids;
-- motion between steps, with step, play, scrub, rewind and `#step=` links;
-- linked highlighting across the stage and panels;
-- light and dark themes, reduced motion, and a text version of every step;
-- a single standalone HTML file per scene;
-- **checks that the rendered page shows what the model computed**, at every step.
+<p align="center">
+  <img src=".github/assets/lru-cache-predict.jpg" width="720" alt="A page titled LRU Cache. Three soft clay keys, B, C and a green A, sit in a cache tray marked least recent to most recent, with a queue of upcoming requests below. A card asks the reader to predict: D is next, which key leaves? A strip under the figure lists each request as a hit or a miss.">
+</p>
 
-Status: **v1.0.0, desktop first.** Phones work but are not yet polished. The flagship is `examples/lru-3d`.
+<p align="center"><sub><code>examples/lru-3d</code>, the flagship: an LRU cache in the Clay look, paused on a prediction before the first eviction.</sub></p>
 
-![Attention, pointing at one weight lights the vectors it came from](research/images/attention-linked.png)
- See [Plan.md](Plan.md) for the plan and [research/PROTOTYPE_FINDINGS.md](research/PROTOTYPE_FINDINGS.md) for what the prototypes showed, including what doesn't work yet.
+---
 
-## Examples
+Ask for an explanation of an algorithm, a data structure, a protocol or a mechanism, and Visualize builds it in three parts. First comes an executable **model** of the idea, tested against a separately written reference. Next, a **view** draws each state of the model in the shape the field already uses: a ring for anything circular, a tree over its array for a heap, a sequence diagram for timing. Last, **checks** open the page in headless Chrome and prove that every step shows exactly what the model computed.
 
-| Scene | What it shows |
-|---|---|
-| `examples/lru-3d` | **Flagship.** LRU Cache in Clay with the voice tour, a prediction and Now you try (a Paper variant is built too) |
-| `examples/lru` | LRU cache eviction on the isometric stage; also built flat for comparison |
-| `examples/attention` | Scaled dot-product attention (Vaswani et al. 2017, Eq. 1): scores, scaling and softmax as gauges that morph, linked to the equation and grids |
-| `examples/retries` | A payment retried after a lost response, run in two synced worlds, without and with an idempotency key |
+The result is a single HTML page. The camera opens on the flat diagram the reader knows, moves to what each step is about, and ends flat again. A recorded voice explains the concept first, then narrates each step and lights each part as it names it. Before the key moment, the reader is asked to predict what happens next. Afterwards they can try the idea on other inputs and answer questions the model writes and marks.
 
-## Use it as a skill
-
-This repository is an Agent Skill (`SKILL.md` at the root). Clone it into your agent's skills folder under the name `visualize`, which must match the skill's `name`, and install its dependencies once:
+## Quick start
 
 ```sh
-git clone https://github.com/Aaryan1524/Visualize.git <skills folder>/visualize
-cd <skills folder>/visualize && npm install
+git clone https://github.com/Aaryan1524/Visualize.git ~/.claude/skills/visualize
+cd ~/.claude/skills/visualize && npm install
 ```
 
-Then ask for an explanation: type `/visualize explain how an LRU cache works`, or just "explain a token bucket visually". To give a figure a voice, write its `voice()` script and run `node scripts/voice.mjs <scene dir>` once (it downloads an open-source voice model the first time, about 90 MB, then works offline). The skill's workflow is: write and test the model, scaffold with `npm run new-scene <name>`, assemble the view from kit parts, declare observations, then build, verify and read the screenshots. `references/` holds the kit API, craft rules and every check.
+Then, in Claude Code:
 
-## Outputs
+```text
+/visualize explain how an LRU cache works
+```
 
-| Output | Command | Checked by |
-|---|---|---|
-| Standalone HTML page | `node scripts/build.mjs <dir>` | `node scripts/verify.mjs <dir>` |
-| SVG of one step | `node scripts/export-svg.mjs dist/<id>.html --step k --out f.svg` | structural and pixel comparison with the live stage |
-| React component | `<Figure scene={scene} />` from `src/react/Figure.tsx` | `pnpm check:embed` |
+That's it. The folder must be named `visualize`, the same as the skill's `name`. For any other agent that reads Agent Skills, clone it into that agent's skills folder instead.
 
-## Requirements
+## Gallery
 
-- Node.js 24 or newer (TypeScript runs through type stripping)
-- pnpm
-- Google Chrome or Chromium for `verify` and `shoot` (set `CHROME_PATH` if it isn't found)
+<table>
+  <tr>
+    <td width="50%"><img src=".github/assets/lru-cache-evict.jpg" alt="The LRU cache a few steps later: C has been evicted and B enters as the most recent key, shown in orange. The strip reads 1 hit, 5 misses, 2 evictions."></td>
+    <td width="50%"><img src=".github/assets/lru-cache-paper.jpg" alt="The same LRU cache in the Paper look: white parts outlined in ink on a grey grid, with B outlined in red as it enters."></td>
+  </tr>
+  <tr>
+    <td><sub><b>lru-3d</b>: C leaves and B enters. The strip and the counts come from the same model that moves the keys.</sub></td>
+    <td><sub><b>lru-3d, Paper</b>: the same scene in the second look, outlined in ink. Clay is the default; Paper is on request.</sub></td>
+  </tr>
+  <tr>
+    <td><img src=".github/assets/attention.jpg" alt="Scaled dot-product attention on an isometric board: query, key and value bars for the words the, cat and sat, softmax weights 0.09, 0.77 and 0.13 as gauges, with the equation and the weight grid in linked panels."></td>
+    <td><img src=".github/assets/retries.jpg" alt="Two payment worlds side by side, with no key and with an idempotency key: a terminal retries after a lost reply, a server, a key store and a ledger. A timeline strip lists the events in milliseconds."></td>
+  </tr>
+  <tr>
+    <td><sub><b>attention</b>: softmax turns scores into weights that sum to 1. Pointing at a weight lights the vectors it came from.</sub></td>
+    <td><sub><b>retries</b>: a payment retried after a lost reply, run in two synced worlds, without and with an idempotency key.</sub></td>
+  </tr>
+</table>
 
-## Commands
+Every screenshot is the light theme of a page built from [`examples/`](examples) with `node scripts/build.mjs` and captured with [`scripts/shoot.mjs`](scripts/shoot.mjs).
+
+## What the reader gets
+
+| | What it is |
+|---|---|
+| **A checked picture** | Every value, order, size, highlight and caption is declared by the model and read back from the rendered page at every step. Planted faults prove the checks can fail. |
+| **The field's own shape** | A tree over its array, a ring, a stock with its refill and gate, a row with pointers, a sequence diagram for timing. The kit's parts never choose the picture. |
+| **A directed 3D stage** | Soft matte Clay parts, lettering printed on the parts, and a camera that opens flat, moves to each step's focus and ends flat. An isometric SVG stage is also available. |
+| **A voice** | Recorded locally by an open-source voice model, offline after one download. It explains the concept first, then narrates each step in one take and lights each part as it is named. ▶ plays the narrated tour and waits for every sentence. |
+| **Predict, What if, Now you try** | A pause to predict before the key moment, the same idea on other inputs, and questions the model makes and marks. |
+| **A page you own** | One standalone HTML file per scene, light and dark themes, reduced motion, keyboard control, `#step=` links and a text version of every step. Also an SVG of any step, or a React component. |
+
+## Usage
+
+Type `/visualize` and say what the reader should understand:
+
+```text
+/visualize explain how an LRU cache works
+```
+
+You don't have to name the skill. It also loads when you ask for an algorithm, data structure, protocol or mechanism to be explained visually, animated or step by step.
+
+<details>
+<summary><b>More prompts</b>, from the skill's <a href="evals/evals.json">evals</a></summary>
+
+<br>
+
+```text
+/visualize Explain a token-bucket rate limiter for our API docs: the bucket holds 10 tokens, refills 2 per second, each request takes one token, and requests are rejected when it is empty. Show a burst that drains it and the recovery.
+```
+
+```text
+/visualize Make an interactive explainer of a ring buffer with capacity 6: writes advance the head, reads advance the tail, and a write to a full buffer overwrites the oldest value.
+```
+
+```text
+/visualize Explain database connection pooling for our Next.js docs: a pool of 4 connections, requests borrow and return them, and extra requests wait in a queue. Give me a React component too.
+```
+
+```text
+/visualize Explain TCP retransmission: a segment is lost, the sender times out and retransmits, and duplicate ACKs trigger fast retransmit. I want an SVG of the key moment for a blog post.
+```
+
+</details>
+
+Three habits get the best pages:
+
+1. **Give the real numbers.** Capacities, rates, sizes and inputs. The model runs on them, and the reader sees them.
+2. **Say what should happen.** "A burst that drains it", "a write to a full buffer". That becomes the story and the moment the reader predicts.
+3. **Say where it will live.** A standalone page, an SVG for a post, or a React component for your docs.
+
+## How it works
+
+- **[`SKILL.md`](SKILL.md)** is what the agent reads. It sets the workflow: write and test the model, choose the shape the field draws, assemble the view from finished parts, declare what the reader should see, then build, verify and read the screenshots.
+- **[`src/`](src)** is the engine and the kit. It has the trace and step model, keyed motion, the 3D stage and its looks, the isometric stage, the player, and finished parts (rails, rings, trees, markers, reservoirs, sources, gates, servers, ledgers, cables).
+- **[`references/`](references)** are the long-form guides the agent opens when it needs them: the kit API, authoring (stage, voice, What if, Now you try), craft rules, and every check.
+- **Verification.** [`scripts/verify.mjs`](scripts/verify.mjs) runs the model in Node, separately from the page, and compares it with what Chrome draws. That covers observations, captions, depth order, framing, label overlap and cut-off, text size and contrast, determinism, keyboard, reduced motion and console errors. `--controls` plants faults and fails unless every one is caught.
+
+<details>
+<summary><b>Repository layout</b></summary>
+
+<br>
+
+```text
+visualize/
+├── SKILL.md            the skill: governing idea, decision table, workflow, parts, gates
+├── src/
+│   ├── core/           trace, steps, timeline, keyed interpolation, scene types
+│   ├── unfold/         the 3D stage, directed camera and looks (Clay, Paper)
+│   ├── iso/            the isometric projection and depth sort
+│   ├── parts/          finished parts: rail, ring, tree, network, flow
+│   ├── render/         the player, SVG stage, panels, components, styles
+│   └── react/          the React adapter
+├── references/         kit.md, authoring.md, craft.md, verify.md
+├── scripts/            build, verify, voice, shoot, export-svg, new-scene
+├── examples/           lru-3d (flagship), lru, attention, retries
+├── test/fixtures/      gallery scenes and the planted faults
+└── evals/evals.json    test prompts and what a good answer contains
+```
+
+</details>
+
+<details>
+<summary><b>Commands</b>, for working on the kit</summary>
+
+<br>
 
 ```sh
 pnpm install
-pnpm test              # models against reference implementations, engine unit tests
+pnpm test                 # models against their references, engine and part tests
 pnpm typecheck
-pnpm build             # dist/<scene>.html, one standalone file each, plus dist/index.html
-pnpm verify            # headless-browser checks of every scene against its model
-pnpm verify:controls   # planted faults: proves the checks can fail
-node scripts/shoot.mjs dist/lru.html --out shot.png --step 4 [--width 390] [--theme dark] [--hover <selector>]
+pnpm build                # dist/<scene>.html, one standalone file each
+pnpm verify               # every example and gallery, checked in headless Chrome
+pnpm verify:controls      # planted faults: proves the checks can fail
+node scripts/voice.mjs examples/lru-3d                    # record the narration
+node scripts/shoot.mjs dist/lru-3d.html --out shot.png --step 4 --scale 4
 ```
 
-## Writing a scene
+</details>
 
-```ts
-import { defineScene } from "../../src/core/scene.ts";
+## Requirements
 
-export default defineScene<State, Event>({
-  id: "my-scene",
-  title: "…",
-  question: "The question the figure answers",
-  trust: "computed", // sourced | computed | model | analogy | unverified
-  trace: () => ({ initial, intro: "…", steps: [{ event, state, caption: "…" }] }),
-  view: (state, event) => [{ kind: "box", key: "entity-1", at: [0, 0, 0], size: [24, 24, 18], tone: "subject", label: "A" }],
-  panels: (state) => [{ key: "rule", title: "The rule", html: "…" }],
-  observe: (state) => [{ type: "text", key: "entity-1", equals: "A" }],
-});
-```
+| | Needed for | Notes |
+|---|---|---|
+| **[Claude Code](https://code.claude.com/docs/en/overview)** or another agent that reads [Agent Skills](https://agentskills.io) | everything | Written for Claude Code; the skill follows the open Agent Skills format. |
+| **Node.js 24+** | builds, checks | TypeScript runs directly through type stripping. Run `npm install` (or `pnpm install`) once in the skill folder. |
+| **Chrome or Chromium** | the checks | Found in the usual places on macOS, Linux and Windows. Set `CHROME_PATH` for any other binary. |
+| **About 90 MB, once** | the voice | The open-source voice model downloads on first use, then works offline. |
 
-Keys are model entity ids, and they are how motion, linking and checks find things. The three examples are the reference.
+## Limits
 
-## Visual standard under review
+- **Desktop first.** Pages work on phones, but the phone layout is not polished yet.
+- **The voice needs one extra step.** After writing the script, run `node scripts/voice.mjs <scene>`. Clips are compressed on macOS; elsewhere they stay WAV and pages get larger. What if versions are not voiced yet.
+- **The 3D checks are not yet complete.** Sizes, tones, order, highlights, contrast and phone layout are checked on the isometric stage, not yet on the 3D one.
+- **The reader cannot type their own input yet.** What if offers prepared inputs; a free-input explorer is planned.
+- **It is slow on purpose.** A page takes a long session: the model and its reference, the view, the checks, and a read of every screenshot.
 
-The [visual specification](research/VISUAL_STANDARD.md) defines shared light/dark materials, semantic colours, bundled typography and composition rules. Run `pnpm build` and `node scripts/review-standard.mjs` for the three-moment retries review, style specimen and close-ups. This candidate awaits visual acceptance before the broader rollout.
+## License
 
-## Reusable finished parts
-
-The [rail assembly](src/parts/README.md) supplies fitted trays, guides, surface details, slot anchors and finished entries. LRU uses it directly; review fixtures reuse it at one, three and six slots with identical styles. Run `node scripts/review-rail.mjs` for the local comparison and close-ups. This is the first assembly under review, not yet a general-purpose skill package.
-
-## What `verify` checks
-
-The model runs in Node, separately from the page. Its observations, captions and readouts are compared with what Chrome actually draws:
-
-| Check | How |
-|---|---|
-| Observations | Each step declares what the reader should see: a value, an order, a drawn size, what is visible, what is lit. Each one is read from the rendered page. "Visible" means unobstructed at a real share of the mark, not merely present |
-| Captions | Caption, readout and trust label match the model at every step |
-| Depth order | Wherever solids overlap on screen, the line of sight is ray-cast against the true geometry and compared with the element the browser paints on top, at rest and inside every transition |
-| Surface finish | Actual surface paths remain inside their owning solids at resting and sampled moving states; required finishes are present |
-| Determinism | A time shows the same page whatever was seen before it |
-| Text | 11 px minimum, and WCAG contrast against the face or card behind it, in both themes |
-| Labels | No overlaps, nothing wider than its face, nothing covered, nothing outside the card |
-| Layout | No sideways scroll at 1280 and 390 px |
-| Interaction | Arrow keys, Home, End and Space; reduced motion shows no in-between frames; `#step=` links |
-| Linking | Pointing at a linked element, in the stage or a panel, lights exactly the related elements |
-| Editorial presentation | Figure scale, semantic colours, pinned callouts, a prediction pause, desktop viewport fit, copy budgets and a contained details drawer (LRU reference) |
-| Console | No errors or uncaught exceptions |
-
-It also writes screenshots and two contact sheets per scene to `shots/`: every step at rest, and every transition at five instants. Passing checks do not prove the result explains well or looks good, so read the sheets. [PROTOTYPE_FINDINGS.md](research/PROTOTYPE_FINDINGS.md) lists what the checks cannot see.
-
-## Layout
-
-```
-src/core     trace, steps, timeline, keyed interpolation, motion vocabulary, trust levels
-src/iso      projection, solids, depth sort, owned surface geometry
-src/parts    reusable finished assemblies, slot positions and anchors
-src/render   SVG stage, player, panels, KaTeX helpers, styles
-scripts      build, verify, in-page checks, screenshots
-examples     the three scenes, each a model, its tests and a scene
-test         fixtures for the planted-fault controls
-research     landscape, Anatomy analysis, engine concepts, visual grammar, prototype findings
-```
-
-## Known gaps
-
-- Attention and retries still use the original sparse visual vocabulary. LRU is the reference for a richer presentation under review.
-- Wide scenes shrink on phones instead of re-arranging.
-- The camera is fixed per scene.
-- KaTeX pages are about 690 KB because every font is inlined.
-- No paper adapter and no Agent Skill package yet.
-
-## Licence
-
-MIT
+[MIT](LICENSE) © 2026 Aaryan
