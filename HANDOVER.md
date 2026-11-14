@@ -86,7 +86,7 @@ Each item has a definition of done. Do them in order; stop and ask the builder a
 
 ### 7.1 Merge and install (ask first)
 - Branch state: `feat/unfold` (61 commits ahead of `main`) contains `feat/canonical-shapes`, `feat/focus-and-flagship` and `feat/premium-redesign`. Another agent once worked on `feat/premium-redesign`; check with the builder before rewriting anything there.
-- **Ask the builder** to approve merging `feat/unfold` into `main` (fast-forward or a merge commit; no squash unless asked).
+- **Done:** the builder approved, and `main` was fast-forwarded to `feat/unfold` (local only, 102 commits ahead of `origin/main`). **Pushing still needs the builder's OK.** Work on `main` or a new branch from it.
 - Install for local use: link or clone the repo as `~/.claude/skills/visualize` (the folder name must equal `name: visualize`), then `npm install` in it. **Ask before writing to `~/.claude`.**
 - Done when: a fresh session can run `/visualize explain how an LRU cache works`, the skill loads, and it produces a page that passes `verify`.
 
@@ -139,6 +139,6 @@ Each item has a definition of done. Do them in order; stop and ask the builder a
 
 ## 9. Open questions for the builder
 
-- Approve merging `feat/unfold` into `main`, installing to `~/.claude/skills/visualize`, and pushing for CI.
+- Approve installing to `~/.claude/skills/visualize`, and pushing `main` (102 commits ahead of `origin/main`) for CI.
 - Approve the paid sessions for the next head-to-head.
 - Does the "key A" voice sound right? (Only the builder can judge.)
