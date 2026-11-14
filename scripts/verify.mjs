@@ -381,7 +381,7 @@ class Report {
 // ---- One page on the Unfold (3D) stage ----------------------------------------------
 // The SVG checks read SVG geometry; a 3D page is read through the stage's own
 // inspection (projected bounds, ray-cast occlusion) and its HTML labels.
-async function verifyUnfold(browser, { name, scene, file, shotsDir, plant }) {
+async function verifyUnfold(browser, { name, scene, file, shotsDir, plant, hash = "" }) {
   const report = new Report(name);
   const compiled = compile(scene);
   const steps = compiled.steps;
@@ -392,7 +392,7 @@ async function verifyUnfold(browser, { name, scene, file, shotsDir, plant }) {
   page.on("console", (m) => m.type() === "error" && errors.push(`console: ${m.text()}`));
   if (plant) await page.evaluateOnNewDocument(PLANTS[plant]);
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
-  await page.goto(pathToFileURL(file).href, { waitUntil: "load" });
+  await page.goto(pathToFileURL(file).href + hash, { waitUntil: "load" });
   await page.waitForFunction(() => Boolean(window.__viz), { timeout: 8000 });
   await page.evaluate(CHECKS);
   await settle(page);
@@ -481,8 +481,8 @@ async function verifyUnfold(browser, { name, scene, file, shotsDir, plant }) {
 }
 
 // ---- One page -------------------------------------------------------------------
-async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
-  if (scene.look) return verifyUnfold(browser, { name, scene, file, shotsDir, plant });
+async function verifyPage(browser, { name, scene, file, shotsDir, plant, hash = "" }) {
+  if (scene.look) return verifyUnfold(browser, { name, scene, file, shotsDir, plant, hash });
   const report = new Report(name);
   const typographyProblems = new Set();
   const compiled = compile(scene);
@@ -501,7 +501,9 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
       { name: "prefers-color-scheme", value: opts.theme ?? "light" },
       { name: "prefers-reduced-motion", value: opts.reduced ? "reduce" : "no-preference" },
     ]);
-    await page.goto(pathToFileURL(file).href + (opts.hash ?? ""), { waitUntil: "load" });
+    // A What if version is opened by #what=k, combined with any step link under test.
+    const fragment = [hash.slice(1), (opts.hash ?? "").slice(1)].filter(Boolean).join("&");
+    await page.goto(pathToFileURL(file).href + (fragment ? `#${fragment}` : ""), { waitUntil: "load" });
     await page.waitForFunction(() => Boolean(window.__viz), { timeout: 5000 });
     await page.evaluate(CHECKS);
     await settle(page);
@@ -1031,9 +1033,29 @@ try {
         const shotsDir = join(out, name);
         mkdirSync(shotsDir, { recursive: true });
         const report = await verifyPage(browser, { name, scene, file: join(out, `${name}.html`), shotsDir, plant: plantArg });
+        // Now you try: every question the model makes has its answer among the choices.
+        if (scene.practice) {
+          const problems = [];
+          for (let seed = 0; seed < 40; seed++) {
+            const q = scene.practice(seed);
+            if (!q.choices.includes(q.answer)) problems.push(`seed ${seed}: the answer "${q.answer}" is not a choice`);
+            if (new Set(q.choices).size !== q.choices.length) problems.push(`seed ${seed}: repeated choices`);
+            if (!q.question.trim() || !q.explanation.trim()) problems.push(`seed ${seed}: empty question or explanation`);
+          }
+          report.add("practice", "40 model-made questions: one right answer among distinct choices, each explained", problems);
+        }
         report.print();
         writeFileSync(join(shotsDir, "report.json"), JSON.stringify(report.rows, null, 2));
         if (report.failed.length) failedReports++;
+        // What if: every version is a full figure, verified like the first.
+        for (const [k, alt] of (scene.whatIf ?? []).entries()) {
+          const altName = `${name} · what if: ${alt.label}`;
+          const altShots = join(out, `${name}-what-${k + 1}`);
+          mkdirSync(altShots, { recursive: true });
+          const r = await verifyPage(browser, { name: altName, scene: alt.scene, file: join(out, `${name}.html`), shotsDir: altShots, plant: plantArg, hash: `#what=${k + 1}` });
+          r.print();
+          if (r.failed.length) failedReports++;
+        }
       }
     }
     if (failedReports) process.exitCode = 1;
