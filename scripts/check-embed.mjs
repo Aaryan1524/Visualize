@@ -45,7 +45,10 @@ try {
     maths: [...document.querySelectorAll(".vz .katex-html")].filter((k) => k.getBoundingClientRect().width > 20).length,
     katexFont: (() => { const k = document.querySelector(".vz .katex"); return k ? getComputedStyle(k).fontFamily : ""; })(),
   }));
-  if (s.fonts.length !== 2 || s.fonts.some(f => f.status !== "loaded")) problems.push("bundled figure fonts did not load");
+  // Sans and Mono must load; the display face (titles) loads only when a figure shows a title.
+  const need = ["Visualize Sans", "Visualize Mono"];
+  const ok = need.every((n) => s.fonts.some((f) => f.family.replace(/["']/g, "") === n && f.status === "loaded"));
+  if (!ok || s.fonts.length < 2 || s.fonts.some((f) => /Sans|Mono/.test(f.family) && f.status !== "loaded")) problems.push("bundled figure fonts did not load");
   if (s.figures !== expected || s.svgs !== expected) problems.push(`expected ${expected} figures, found ${s.figures}`);
   if (s.themes.slice(0, 3).join() !== "light,dark,light") problems.push(`themes ${s.themes.join()}`);
   if (s.maths < 1) problems.push("the attention figure's equations did not render");

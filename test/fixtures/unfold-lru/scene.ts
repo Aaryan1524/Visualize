@@ -19,6 +19,6 @@ function voice(s: LruState, e: GetEvent | null, k: number): string {
   return k === 3 ? `[The new key|${key}] fills the last slot. Now the cache is full.` : `[The new key|${key}] is new. There's room, so it takes an empty slot.`;
 }
 
-const clay = defineScene({ ...lru, id: "unfold-lru", look: "clay", voice, about: "Keeps what you used lately and drops what you haven't." });
+const clay = defineScene({ ...lru, id: "unfold-lru", title: "LRU Cache", look: "clay", voice, about: "Keeps what you used lately and drops what you haven't." });
 export const variants = { "unfold-lru": clay, "unfold-lru-paper": defineScene({ ...clay, id: "unfold-lru-paper", look: "paper" }) };
 export default clay;

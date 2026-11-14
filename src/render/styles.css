@@ -611,3 +611,7 @@ polyline.vz-link { fill: none; }
 .vz-concept { display: none; position: absolute; left: 26px; bottom: 22px; z-index: 2; margin: 0; width: min(400px, 38%); padding: 14px 16px; border-radius: 12px; background: color-mix(in oklab, var(--card) 88%, transparent); border: 1px solid var(--hair); font: 400 14px/1.55 var(--sans); color: var(--ink); }
 .vz[data-opening] .vz-concept { display: block; }
 @media (max-width: 760px) { .vz-concept { position: static; width: auto; margin: 10px 16px; } }
+/* The figure's title: the concept's name in the display face. */
+.vz-title { margin: 0; font: 700 34px/1.1 "Visualize Display", "Playfair Display SC", Georgia, serif; letter-spacing: .01em; color: var(--ink); }
+.vz-about { margin: 4px 0 0; font: 400 14px/1.45 var(--sans); color: var(--ink-2); }
+@media (max-width: 760px) { .vz-title { font-size: 26px; } }

@@ -196,7 +196,6 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
   // What the figure is about, top left of the stage, where the eye starts.
   // On the opening step the concept is written out too, so it can be read as well as heard.
   const concept = (steps[0]?.voice ?? "").replace(/\[([^\]|]+)\|[^\]]+\]/g, "$1").replace(/\{([^}]+)\}/g, "$1").replace(/\bL R U\b/g, "LRU");
-  const stageTitle = h("div", { class: "vz-stage-title" }, `<b>${escapeHtml(scene.title)}</b>${scene.about ? `<span>${escapeHtml(scene.about)}</span>` : ""}`);
   const conceptEl = h("p", { class: "vz-concept" }, escapeHtml(concept));
   const prediction = h("section",{class:"vz-predict","aria-label":"Predict the next step"});
   prediction.hidden = true;
@@ -259,7 +258,13 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
 
   if (editorial) {
     const heading = h("div", { class: "vz-heading" });
-    heading.append(head.firstElementChild!, question);
+    // The title is the concept's name, set in the display face; the question and kicker stay
+    // in the Details drawer and the accessible name, not in the header.
+    head.firstElementChild!.remove();
+    const titleEl = h("h1", { class: "vz-title" }, escapeHtml(scene.title));
+    heading.append(titleEl);
+    if (scene.about) heading.append(h("p", { class: "vz-about" }, escapeHtml(scene.about)));
+    setup.textContent = [scene.question, scene.setup].filter(Boolean).join(" ");
     const utilities = h("div", { class: "vz-utilities" });
     utilities.append(detailsBtn, themeBtn);
     head.append(heading, chapters, utilities);
@@ -287,7 +292,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     const detailsBody = h("div", { class: "vz-drawer-body" });
     detailsBody.append(setup, h("h3", {}, "This step"), text, meta, foot);
     details.append(detailsBody);
-    stageBox.append(stageTitle, caption);
+    stageBox.append(caption);
     if (concept) stageBox.append(conceptEl);
     controls.insertBefore(count, scrub);
     card.append(head, body, controls, details);
@@ -729,6 +734,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     lightIds([]);
     listenBtn.setAttribute("aria-pressed", "false");
     listenBtn.textContent = "Play tour";
+    if (voice) { playBtn.innerHTML = ICONS.play; playBtn.setAttribute("aria-label", "Play"); }
   };
   const listenAt = (k: number) => {
     const track = voice?.[k];
@@ -781,12 +787,12 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     onStepShown = speakNav;
     // Browsers only allow sound after a gesture: the first one arms the narration. If that
     // gesture is "go on" from the opening step, the concept is said first and the move waits for it.
-    let introHeld = false;
+    let introHeld = false, introPlayed = false;
     const holdForIntro = (go: () => void) => {
       introHeld = true;
       armed = true;
       root.dataset.intro = "playing";
-      speakNav(0, () => { introHeld = false; delete root.dataset.intro; go(); });
+      speakNav(0, () => { introHeld = false; introPlayed = true; delete root.dataset.intro; go(); });
     };
     root.addEventListener("click", (e) => {
       if (armed || introHeld) return;
@@ -811,18 +817,28 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     });
     cleanup.push(stopNav);
     controls.insertBefore(voiceBtn, restartBtn);
-    controls.insertBefore(listenBtn, restartBtn);
-    listenBtn.addEventListener("click", () => {
-      if (listening) return stopListening();
+    // ▶ is the tour while the voice is on, so there is no separate tour button.
+    const startTour = (from: number) => {
       sound ??= new AudioContext();
       void sound.resume();
       listening = true;
       listenBtn.setAttribute("aria-pressed", "true");
       listenBtn.textContent = "Stop";
-      listenAt(shown >= last ? 0 : Math.max(shown, 0));
-    });
-    for (const b of [prevBtn, nextBtn, playBtn, restartBtn]) b.addEventListener("click", stopListening);
-    root.addEventListener("keydown", stopListening);
+      playBtn.innerHTML = ICONS.pause;
+      playBtn.setAttribute("aria-label", "Pause");
+      listenAt(from);
+    };
+    listenBtn.addEventListener("click", () => (listening ? stopListening() : startTour(shown >= last ? 0 : Math.max(shown, 0))));
+    // While the voice is on, ▶ is the narrated tour: a step moves on only when its sentence has
+    // been said. Timed autoplay cut each sentence as the next part came in.
+    root.addEventListener("click", (e) => {
+      if (!voiceOn || !(e.target instanceof Element) || !e.target.closest('[data-action="play"]')) return;
+      e.stopImmediatePropagation();
+      if (listening) return stopListening();
+      startTour(shown >= last ? 0 : shown === 0 && introPlayed ? 1 : shown);
+    }, true);
+    for (const b of [prevBtn, nextBtn, restartBtn]) b.addEventListener("click", stopListening);
+    root.addEventListener("keydown", (e) => { if (e.key !== " ") stopListening(); });
     cleanup.push(stopListening);
   }
 
