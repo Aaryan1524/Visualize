@@ -265,6 +265,8 @@ export interface Teaching {
    * rest recede. `"all"` keeps everything at full strength.
    */
   focus?: readonly string[] | "all";
+  /** Unfold stage only: "plan" shows the flat top-down view for this step. */
+  shot?: "plan" | "focus";
   prediction?: {
     question: string;
     choices: string[];

@@ -24,6 +24,7 @@
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/three": "0.169.0",
     "esbuild": "^0.28.2",
     "puppeteer-core": "^25.17.0",
     "react": "^19.3.1",
@@ -31,6 +32,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "katex": "^0.19.1"
+    "katex": "^0.19.1",
+    "three": "0.169.0"
   }
 }
