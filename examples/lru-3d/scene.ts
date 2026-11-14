@@ -1,8 +1,8 @@
-// The LRU example drawn on the Unfold stage in the paper look, with a spoken
+// The flagship: LRU drawn on the Unfold stage in the paper look, with a spoken
 // script: the voice says why, while the parts it names light up.
-import lru from "../../../examples/lru/scene.ts";
-import { defineScene } from "../../../src/core/scene.ts";
-import type { GetEvent, LruState } from "../../../examples/lru/model.ts";
+import lru from "../lru/scene.ts";
+import { defineScene } from "../../src/core/scene.ts";
+import type { GetEvent, LruState } from "../lru/model.ts";
 
 function voice(s: LruState, e: GetEvent | null, k: number): string {
   if (!e) return "A least recently used cache is a small, fast store that keeps the things you used most recently, and throws away the one you haven't touched for the longest. Here's one with room for three keys. When a fourth arrives, which one should go?";
@@ -17,6 +17,6 @@ function voice(s: LruState, e: GetEvent | null, k: number): string {
   return k === 3 ? `[${name}|${key}] fills the last slot. Now the cache is full.` : `[${name}|${key}] is new. There's room, so it takes an empty slot.`;
 }
 
-const clay = defineScene({ ...lru, id: "unfold-lru", title: "LRU Cache", look: "clay", voice, about: "Keeps what you used lately and drops what you haven't." });
-export const variants = { "unfold-lru": clay, "unfold-lru-paper": defineScene({ ...clay, id: "unfold-lru-paper", look: "paper" }) };
+const clay = defineScene({ ...lru, id: "lru-3d", title: "LRU Cache", look: "clay", voice, about: "Keeps what you used lately and drops what you haven't." });
+export const variants = { "lru-3d": clay, "lru-3d-paper": defineScene({ ...clay, id: "lru-3d-paper", look: "paper" }) };
 export default clay;

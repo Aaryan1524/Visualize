@@ -2,7 +2,19 @@
 
 One version covers the kit and the skill (`package.json` `version` and `SKILL.md` `metadata.version` move together). Each entry names the failure that caused it, so the reason for a rule is never lost.
 
-## 0.5.0 (unreleased)
+## 1.0.0
+
+First release, desktop first.
+
+- **The flagship is `examples/lru-3d`:** LRU Cache in Clay, with the voice tour, a prediction and Now you try.
+- **The title is the concept's name**, set in Playfair Display SC (bundled, OFL), with one line under it; the question moves to Details.
+- **The voice explains the concept first.** The first Next or ▶ waits for it, and it is also written on the opening step.
+- **▶ is the narrated tour while the voice is on**, moving on only after each sentence. Timed autoplay had cut sentences as the next part came in.
+- **Each step is recorded in one pass** with silence at both ends; the first version stitched sentences together and cut words. Keys are named in context ("key A").
+- **Lettering is printed on the parts**, not floated above them.
+- Clay is the one default look.
+
+## 0.5.0
 
 What a drawing cannot do. The builder found the isometric look too close to Anatomy and "boring", and asked for an edge a one-line prompt to a plain agent cannot match, with the goal that the reader understands.
 

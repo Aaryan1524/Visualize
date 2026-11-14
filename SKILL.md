@@ -4,7 +4,7 @@ description: Build step-through visual explanations whose picture is checked aga
 license: MIT
 compatibility: Node.js 24+ (runs TypeScript directly) and Google Chrome or Chromium for verification. Run `npm install` (or `pnpm install`) once in this folder.
 metadata:
-  version: "0.5.0"
+  version: "1.0.0"
 ---
 
 # Visualize
@@ -17,7 +17,7 @@ Three reference explanations ship in `examples/`. Open the closest one before st
 - `examples/retries/`: two payment systems on two plates (terminal, server, key store, ledger), run on the same faults. The ledger without idempotency keys ends with two coins, the one with keys with one.
 - `examples/attention/`: scaled dot-product attention. Gauges morph from score to scaled score to weight, linked to the equation and grids in a side column.
 
-`test/fixtures/gallery-ring/` and `test/fixtures/gallery-flow/` show the ring, marker, reservoir, source, gate and sequence parts on their own.
+`examples/lru-3d/` is the flagship in the 3D Clay look with a voice. `test/fixtures/gallery-ring/` and `test/fixtures/gallery-flow/` show the ring, marker, reservoir, source, gate and sequence parts on their own.
 
 ## The one idea that matters
 

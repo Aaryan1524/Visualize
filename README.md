@@ -7,6 +7,9 @@ An engine for model-driven visual explanations. You write two small things:
 
 The engine handles the rest:
 
+- a **3D stage in one look, Clay**: soft matte parts, a camera that opens on the flat diagram you know, moves to what each step is about and ends flat, with lettering printed on the parts;
+- a **voice** recorded locally (open source, offline): it explains the concept first, then narrates each step and lights each part as it is named; ▶ plays the narrated tour and waits for every sentence;
+- **What if?** (the same idea on other inputs) and **Now you try** (questions the model makes and marks);
 - an isometric SVG stage, with flat panels for equations and number grids;
 - motion between steps, with step, play, scrub, rewind and `#step=` links;
 - linked highlighting across the stage and panels;
@@ -14,7 +17,7 @@ The engine handles the rest:
 - a single standalone HTML file per scene;
 - **checks that the rendered page shows what the model computed**, at every step.
 
-Status: a working prototype with three example scenes. The LRU desktop layout and first reusable finished rail are ready for review on `feat/premium-redesign`; see [the review notes](research/PREMIUM_REDESIGN.md).
+Status: **v1.0.0, desktop first.** Phones work but are not yet polished. The flagship is `examples/lru-3d`.
 
 ![Attention, pointing at one weight lights the vectors it came from](research/images/attention-linked.png)
  See [Plan.md](Plan.md) for the plan and [research/PROTOTYPE_FINDINGS.md](research/PROTOTYPE_FINDINGS.md) for what the prototypes showed, including what doesn't work yet.
@@ -23,7 +26,8 @@ Status: a working prototype with three example scenes. The LRU desktop layout an
 
 | Scene | What it shows |
 |---|---|
-| `examples/lru` | LRU cache eviction on a recency rail; also built flat for comparison |
+| `examples/lru-3d` | **Flagship.** LRU Cache in Clay with the voice tour, a prediction and Now you try (a Paper variant is built too) |
+| `examples/lru` | LRU cache eviction on the isometric stage; also built flat for comparison |
 | `examples/attention` | Scaled dot-product attention (Vaswani et al. 2017, Eq. 1): scores, scaling and softmax as gauges that morph, linked to the equation and grids |
 | `examples/retries` | A payment retried after a lost response, run in two synced worlds, without and with an idempotency key |
 
@@ -36,7 +40,7 @@ git clone https://github.com/Aaryan1524/Visualize.git <skills folder>/visualize
 cd <skills folder>/visualize && npm install
 ```
 
-Then ask for an explanation ("explain a token bucket visually"). The skill's workflow is: write and test the model, scaffold with `npm run new-scene <name>`, assemble the view from kit parts, declare observations, then build, verify and read the screenshots. `references/` holds the kit API, craft rules and every check.
+Then ask for an explanation: type `/visualize explain how an LRU cache works`, or just "explain a token bucket visually". To give a figure a voice, write its `voice()` script and run `node scripts/voice.mjs <scene dir>` once (it downloads an open-source voice model the first time, about 90 MB, then works offline). The skill's workflow is: write and test the model, scaffold with `npm run new-scene <name>`, assemble the view from kit parts, declare observations, then build, verify and read the screenshots. `references/` holds the kit API, craft rules and every check.
 
 ## Outputs
 
