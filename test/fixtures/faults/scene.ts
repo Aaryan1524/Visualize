@@ -137,7 +137,17 @@ const labelOnPart = defineScene({
   view: (s, e) => [...stack.view(s, e), { kind: "label", key: "stray", at: [12, 12, 30], text: "stray label" }],
 });
 
+/** The 3D stage: a clean fixture and three broken ones. */
+const unfold = defineScene({ ...lru, id: "unfold", look: "paper" });
+const unfoldWrongValue = defineScene({ ...unfold, id: "unfold-wrong-value", view: (s, e) => lru.view(s, e).map((m) => (m.kind === "box" && m.key.startsWith("entry-") ? { ...m, label: (m.label ?? "").toLowerCase() } : m)) });
+const unfoldTiny = defineScene({ ...unfold, id: "unfold-tiny", view: (s, e) => [...lru.view(s, e), { kind: "box", key: "far-post", at: [900, 0, 0], size: [4, 4, 4], tone: "structure" }] });
+const unfoldCrowd = defineScene({ ...unfold, id: "unfold-crowd", view: (s, e) => [...lru.view(s, e), ...Array.from({ length: 6 }, (_, i) => ({ kind: "label" as const, key: `crowd-${i}`, at: [60, 10, 20 + i * 0.2] as const, text: `crowded label ${i}` }))] });
+
 export const variants = {
+  unfold,
+  "unfold-wrong-value": unfoldWrongValue,
+  "unfold-tiny": unfoldTiny,
+  "unfold-crowd": unfoldCrowd,
   "face-label": faceLabel,
   clean,
   editorial,

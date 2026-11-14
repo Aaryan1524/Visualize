@@ -305,6 +305,9 @@ const CONTROLS = [
   { variant: "wrong-mount", expect: "mounts" },
   { variant: "oversized-plate", expect: "composition" },
   { variant: "wide-label", expect: "labels" },
+  { variant: "unfold-wrong-value", expect: "observations" },
+  { variant: "unfold-tiny", expect: "framing" },
+  { variant: "unfold-crowd", expect: "labels" },
   { variant: "editorial", plant: "caption-cover", expect: "caption clear" },
   { variant: "editorial", plant: "clipped-chip", expect: "layout" },
   { variant: "editorial", plant: "no-focus", expect: "focus" },
@@ -375,8 +378,111 @@ class Report {
   }
 }
 
+// ---- One page on the Unfold (3D) stage ----------------------------------------------
+// The SVG checks read SVG geometry; a 3D page is read through the stage's own
+// inspection (projected bounds, ray-cast occlusion) and its HTML labels.
+async function verifyUnfold(browser, { name, scene, file, shotsDir, plant }) {
+  const report = new Report(name);
+  const compiled = compile(scene);
+  const steps = compiled.steps;
+  const last = steps.length - 1;
+  const page = await browser.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(`exception: ${e.message ?? e}`));
+  page.on("console", (m) => m.type() === "error" && errors.push(`console: ${m.text()}`));
+  if (plant) await page.evaluateOnNewDocument(PLANTS[plant]);
+  await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+  await page.goto(pathToFileURL(file).href, { waitUntil: "load" });
+  await page.waitForFunction(() => Boolean(window.__viz), { timeout: 8000 });
+  await page.evaluate(CHECKS);
+  await settle(page);
+  const atStep = async (k) => { await page.evaluate((k) => window.__viz.seekStep(k), k); await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); };
+  const read = () => page.evaluate(() => {
+    const stage = document.querySelector(".vz-unfold").getBoundingClientRect();
+    const labels = [...document.querySelectorAll(".vz-unfold-labels > div")].filter((e) => !e.hidden && e.textContent.trim() && Number(getComputedStyle(e).opacity) > 0.3).map((e) => {
+      const r = e.getBoundingClientRect();
+      return { key: e.dataset.key, text: e.textContent.trim(), x: r.left - stage.left, y: r.top - stage.top, w: r.width, h: r.height };
+    });
+    // Compared by key: the order labels were created in is not visible state.
+    const byKey = (a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+    return { stage: { w: stage.width, h: stage.height }, solids: window.__viz.stage.inspect().sort(byKey), labels: labels.sort(byKey) };
+  });
+
+  const obsProblems = [], capProblems = [], frameProblems = [], labelProblems = [], unchecked = new Set();
+  let obsCount = 0;
+  const snapshots = [];
+  for (let k = 0; k <= last; k++) {
+    await atStep(k);
+    const s = steps[k];
+    const shown = await page.evaluate(() => window.__vzCheck.shown());
+    if (shown.caption !== norm(s.caption)) capProblems.push(`step ${k}: caption "${shown.caption}" ≠ model "${norm(s.caption)}"`);
+    if (shown.readout !== norm(s.readout)) capProblems.push(`step ${k}: readout differs from the model`);
+    if (s.teaching && shown.action !== norm(s.teaching.heading)) capProblems.push(`step ${k}: action differs from the teaching beat`);
+    const view = await read();
+    snapshots.push(JSON.stringify(view));
+    const byKey = new Map(view.solids.map((v) => [v.key, v]));
+    // Observations: text from the drawn labels and panels, visibility from the ray cast.
+    for (const o of s.observations) {
+      obsCount++;
+      if (o.type === "text") {
+        const got = await page.evaluate((key) => {
+          const e = document.querySelector(`.vz-unfold-labels [data-key="${CSS.escape(key)}"], .vz-panels [data-key="${CSS.escape(key)}"], .vz-side [data-key="${CSS.escape(key)}"]`);
+          return e && !e.hidden ? e.textContent.trim().replace(/\s+/g, " ") : null;
+        }, o.key);
+        if (got === null) obsProblems.push(`step ${k}: ${o.key} shows no text (expected "${o.equals}")`);
+        else if (got !== String(o.equals)) obsProblems.push(`step ${k}: ${o.key} shows "${got}", model says "${o.equals}"`);
+      } else if (o.type === "visible") {
+        const v = byKey.get(o.key);
+        const on = !!v && !v.occluded && v.x + v.w > 0 && v.y + v.h > 0 && v.x < view.stage.w && v.y < view.stage.h;
+        if (o.visible && !on) obsProblems.push(`step ${k}: ${o.key} should be visible but is ${v ? (v.occluded ? "hidden behind another part" : "out of frame") : "not drawn"}`);
+        if (!o.visible && v) obsProblems.push(`step ${k}: ${o.key} should be gone but is drawn`);
+      } else unchecked.add(o.type);
+    }
+    // Framing: the subject fills enough of the stage and stays inside it.
+    // Coverage, not span: one stray far-off part makes the span wide while the subject shrinks.
+    // Projected boxes are summed (overlaps count twice); clean figures sit well above 40%.
+    const cover = view.solids.reduce((a, v) => a + Math.max(0, v.w) * Math.max(0, v.h), 0) / (view.stage.w * view.stage.h);
+    if (view.solids.length && cover < 0.4) frameProblems.push(`step ${k}: the parts cover only ${Math.round(cover * 100)}% of the stage (min 40%)`);
+    // Labels: none overlap, none leave the stage.
+    for (const l of view.labels) {
+      if (l.x < -1 || l.y < -1 || l.x + l.w > view.stage.w + 1 || l.y + l.h > view.stage.h + 1) labelProblems.push(`step ${k}: "${l.text}" is cut off by the stage edge`);
+    }
+    for (let i = 0; i < view.labels.length; i++) for (let j = i + 1; j < view.labels.length; j++) {
+      const a = view.labels[i], b = view.labels[j];
+      const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      if (ox > 2 && oy > 2) labelProblems.push(`step ${k}: "${a.text}" overlaps "${b.text}"`);
+    }
+  }
+  report.add("observations", `${obsCount} declared across ${steps.length} steps${unchecked.size ? ` (${[...unchecked].join(", ")} not yet checked on the 3D stage)` : ""}`, obsProblems);
+  report.add("captions", `caption, readout and action at ${steps.length} steps`, capProblems);
+  report.add("framing", "the parts cover at least 40% of the stage at every step", frameProblems);
+  report.add("labels", "no overlaps; none cut off by the stage edge", [...new Set(labelProblems)]);
+  // Determinism: a step looks the same however you arrive at it.
+  {
+    const problems = [];
+    const r = rng(7);
+    for (let n = 0; n < 6; n++) {
+      const k = Math.floor(r() * steps.length);
+      await atStep(Math.floor(r() * steps.length));
+      await page.evaluate((t) => window.__viz.seek(t), r() * compiled.timeline.total);
+      await atStep(k);
+      if (JSON.stringify(await read()) !== snapshots[k]) problems.push(`step ${k} differs after seeking around`);
+    }
+    report.add("determinism", "6 steps, each revisited after random seeks", problems);
+  }
+  report.add("console", "no errors or uncaught exceptions", errors);
+  if (shotsDir) {
+    mkdirSync(shotsDir, { recursive: true });
+    for (const k of [0, Math.floor(last / 2), last]) { await atStep(k); await page.screenshot({ path: join(shotsDir, `unfold-${k}.png`) }); }
+    report.add("screenshots", `${shotsDir}/unfold-{0,${Math.floor(last / 2)},${last}}.png`);
+  }
+  await page.close();
+  return report;
+}
+
 // ---- One page -------------------------------------------------------------------
 async function verifyPage(browser, { name, scene, file, shotsDir, plant }) {
+  if (scene.look) return verifyUnfold(browser, { name, scene, file, shotsDir, plant });
   const report = new Report(name);
   const typographyProblems = new Set();
   const compiled = compile(scene);
@@ -897,14 +1003,16 @@ try {
     // The clean fixture itself must pass, or the controls prove nothing.
     const clean = await verifyPage(browser, { name: "clean fixture", scene: variants.clean, file: join(out, "clean.html"), shotsDir: out });
     const editorial = await verifyPage(browser,{name:"clean editorial fixture",scene:variants.editorial,file:join(out,"editorial.html"),shotsDir:out});
+    const unfoldClean = await verifyPage(browser,{name:"clean 3D fixture",scene:variants.unfold,file:join(out,"unfold.html"),shotsDir:out});
     console.log("\nplanted-fault controls");
     for (const r of results) {
       console.log(`  ${r.caught ? "caught " : "MISSED "} ${r.control.padEnd(16)} expected "${r.expect}"; failing: ${r.failing.join(", ") || "none"}`);
     }
     clean.print();
     editorial.print();
+    unfoldClean.print();
     const missed = results.filter((r) => !r.caught).length;
-    if (missed || clean.failed.length || editorial.failed.length) {
+    if (missed || clean.failed.length || editorial.failed.length || unfoldClean.failed.length) {
       console.log(`\ncontrols: ${missed} missed${clean.failed.length ? ", clean fixture failed" : ""}`);
       process.exitCode = 1;
     } else console.log(`\ncontrols: all ${results.length} planted faults caught; clean fixture passes`);
