@@ -71,7 +71,8 @@ Every step carries a trust level shown with the action. Use `sourced` only with 
 ```ts
 export default defineScene({
   ...scene,
-  look: "paper",                       // or "clay"; omit for the isometric SVG stage
+  look: "clay",                        // the default look; "paper" on request; omit for the isometric SVG stage
+  about: "Keeps what you used lately and drops what you haven't.",   // top-left, under the title
   voice: (s, e, k) => !e ? "Here's a cache with room for three keys..." : `[${e.key}|entry-${e.key}] is new...`,
   practice: (seed) => ({ question, choices, answer, explanation }),   // all computed by the model
   whatIf: [{ label: "Four slots", scene: makeScene({ capacity: 4 }) }],
@@ -79,6 +80,6 @@ export default defineScene({
 ```
 
 - **look:** the camera is directed from the model: step 0 and the last step are the plan view, every other step frames the marks still in focus with some of the whole. `teaching.shot: "plan"` forces the flat view on a step.
-- **voice:** write for the ear: short sentences, numbers in words, a reason in every step. `[phrase|ids]` lights the marks with that key, owner or link id while the phrase is spoken. Record with `node scripts/voice.mjs <dir>`; the clips land in `<dir>/voice/` and travel inside the built page.
+- **voice:** step 0 explains the concept briefly, before the demo. Voice is on by default with a mute button; Play tour runs it hands-free. Write for the ear: short sentences, numbers in words, a reason in every step. `[phrase|ids]` lights the marks with that key, owner or link id while the phrase is spoken. Record with `node scripts/voice.mjs <dir>`; the clips land in `<dir>/voice/` and travel inside the built page.
 - **practice:** draw a random case from `seed`, run the model, and ask about its outcome. Never type an answer: verify asks 40 seeds and rejects an answer that is not a choice.
 - **whatIf:** build each version with the same scene factory, so every one is computed and verified (verify opens each at `#what=k`). Keep labels to the one input that changes.

@@ -104,11 +104,30 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
   };
 
   // ---- Meshes, kept by mark key ---------------------------------------------------
-  interface Node { obj: THREE.Object3D; mat?: THREE.MeshStandardMaterial; edge?: THREE.LineBasicMaterial; label?: HTMLDivElement; leader?: SVGLineElement; geomKey?: string }
+  interface Node { decal?: THREE.Mesh; decalText?: string; obj: THREE.Object3D; mat?: THREE.MeshStandardMaterial; edge?: THREE.LineBasicMaterial; label?: HTMLDivElement; leader?: SVGLineElement; geomKey?: string }
   const nodes = new Map<string, Node>();
   const geoms = new Map<string, THREE.BufferGeometry>();
   const geometry = (k: string, make: () => THREE.BufferGeometry) => { let g = geoms.get(k); if (!g) { g = make(); geoms.set(k, g); } return g; };
   const htmlLabel = (cls: string) => { const d = document.createElement("div"); d.className = cls; labels.append(d); return d; };
+
+  /** Lettering as a flat textured plane lying on a top face (kept sharp with a large canvas). */
+  function decalFor(text: string, size: number, role?: string): THREE.Mesh {
+    const c = document.createElement("canvas");
+    c.width = c.height = 256;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#fff";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    const px = text.length > 3 ? 70 : text.length > 1 ? 110 : 150;
+    g.font = `${role === "value" ? 600 : 700} ${px}px ${look.font}`;
+    g.fillText(text, 128, 138);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    mesh.rotation.x = -Math.PI / 2;
+    return mesh;
+  }
 
   function solidNode(m: SolidMark): Node {
     const mat = look.material(m.tone ?? "structure", m.role);
@@ -141,13 +160,31 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
     // a subject that falls out of the step sinks back into its place.
     const h = m.kind === "box" ? m.size[2] : m.height;
     const e = m.emphasis ?? 1;
-    if (m.role === "subject") c[2] = c[2]! + (m.lit || named(m) ? h * 0.35 : 0) - (1 - e) / (1 - 0.42) * h * 0.3;
+    let lift = 0;
+    if (m.role === "subject") { lift = (m.lit || named(m) ? h * 0.35 : 0) - (1 - e) / (1 - 0.42) * h * 0.3; c[2] = c[2]! + lift; }
     n.obj.position.copy(v3(c));
     look.paint(n.mat!, { tone: m.tone ?? "structure", role: m.role, lit: !!m.lit || named(m), emphasis: m.emphasis ?? 1, opacity: m.opacity }, n.edge);
     if (n.edge) n.edge.opacity = 0.85 * m.opacity;
-    // Face text: an HTML label over the face it belongs to, always upright.
+    // Face text on a top face is printed on it, like lettering on a key: a decal lying on
+    // the surface, so it can never float. Side-face text stays an upright HTML label.
+    const onTop = !!m.label && (m.labelFace ?? "top") === "top";
+    if (onTop) {
+      const top = (m.kind === "box" ? m.at[2] + m.size[2] : m.at[2] + m.height) + lift;
+      const [w, d] = m.kind === "box" ? [m.size[0], m.size[1]] : [m.radius * 2, m.radius * 2];
+      if (!n.decal || n.decalText !== m.label) {
+        if (n.decal) { n.obj.parent?.remove(n.decal); }
+        n.decal = decalFor(m.label!, Math.min(w, d) * 0.78, m.textRole);
+        n.decalText = m.label;
+        scene.add(n.decal);
+      }
+      n.decal.position.copy(v3([c[0]!, c[1]!, top + 0.06]));
+      look.paintDecal?.(n.decal.material as THREE.MeshBasicMaterial, m.tone ?? "structure", m.emphasis ?? 1, !!m.lit || named(m), m.opacity);
+      n.decal.visible = n.obj.visible;
+    } else if (n.decal) { scene.remove(n.decal); n.decal = undefined; }
     if (m.label) {
       n.label ??= htmlLabel("vz-unfold-face");
+      n.label.hidden = false;
+      n.label.classList.toggle("is-decal", onTop);
       n.label.textContent = m.label;
       n.label.dataset.key = m.key;
       n.label.dataset.role = m.textRole ?? "name";
@@ -217,7 +254,7 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
       } else if (m.kind === "link") updateLink(n, m as Resolved<LinkMark>);
       else updateLabel(n, m as Resolved<LabelMark>);
     }
-    for (const [k, n] of nodes) if (!seen.has(k)) { scene.remove(n.obj); n.label?.remove(); n.leader?.remove(); nodes.delete(k); }
+    for (const [k, n] of nodes) if (!seen.has(k)) { scene.remove(n.obj); if (n.decal) scene.remove(n.decal); n.label?.remove(); n.leader?.remove(); nodes.delete(k); }
     draw();
   }
 

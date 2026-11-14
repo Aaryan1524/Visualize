@@ -278,6 +278,8 @@ export interface Teaching {
 export interface Scene<S, E> {
   id: string;
   title: string;
+  /** One line saying what the thing is, shown under the title on the stage ("Keeps what you used lately, drops what you haven't"). */
+  about?: string;
   /** The question the figure answers. */
   question: string;
   /** Default trust for every step. */

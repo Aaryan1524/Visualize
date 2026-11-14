@@ -193,6 +193,8 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
   meta.append(trust, readout, source);
   caption.append(count, text, meta);
   const stepHeading = h("h2",{class:"vz-step-heading", "data-role":"action"});
+  // What the figure is about, top left of the stage, where the eye starts.
+  const stageTitle = h("div", { class: "vz-stage-title" }, `<b>${escapeHtml(scene.title)}</b>${scene.about ? `<span>${escapeHtml(scene.about)}</span>` : ""}`);
   const prediction = h("section",{class:"vz-predict","aria-label":"Predict the next step"});
   prediction.hidden = true;
   if (editorial) {
@@ -282,7 +284,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     const detailsBody = h("div", { class: "vz-drawer-body" });
     detailsBody.append(setup, h("h3", {}, "This step"), text, meta, foot);
     details.append(detailsBody);
-    stageBox.append(caption);
+    stageBox.append(stageTitle, caption);
     controls.insertBefore(count, scrub);
     card.append(head, body, controls, details);
   } else card.append(head, question, body, caption, controls, foot);
@@ -486,9 +488,11 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
   // ---- Step info ------------------------------------------------------------
   let shown = -1;
   let predictionAnswered = false;
+  let onStepShown: (k: number) => void = () => {};
   const showStep = (k: number, info: StepInfo) => {
     if (k === shown) return;
     shown = k;
+    onStepShown(k);
     predictionAnswered = false;
     root.dataset.step = String(k);
     count.textContent = editorial ? `${String(k).padStart(2, "0")} / ${String(last).padStart(2, "0")}` : k === 0 ? `Start · ${last} steps` : `Step ${k} of ${last}`;
@@ -699,7 +703,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
   const voice: Track[] | null = (page ? (window as unknown as { __VZ_VOICE?: { steps: Track[] } }).__VZ_VOICE?.steps : null) ?? null;
   let listening = false, clip: HTMLAudioElement | null = null, listenTimer = 0, listenRaf = 0;
   let sound: AudioContext | null = null;
-  const listenBtn = h("button", { class: "vz-btn vz-listen", type: "button", "aria-pressed": "false" }, "Listen");
+  const listenBtn = h("button", { class: "vz-btn vz-listen", type: "button", "aria-pressed": "false" }, "Play tour");
   const lightIds = (ids: string[]) => {
     activeLink = ids.length ? ids.join(" ") : null;
     applyLink();
@@ -719,7 +723,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     clip = null;
     lightIds([]);
     listenBtn.setAttribute("aria-pressed", "false");
-    listenBtn.textContent = "Listen";
+    listenBtn.textContent = "Play tour";
   };
   const listenAt = (k: number) => {
     const track = voice?.[k];
@@ -745,6 +749,36 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     listenTimer = window.setTimeout(() => { if (clip === el) { void el.play().catch(stopListening); follow(); } }, 700);
   };
   if (voice && editorial) {
+    // Voice is always available and on by default: each step the reader goes to is spoken once the
+    // move settles. "Voice" mutes it; "Listen" plays the whole tour without clicking.
+    let voiceOn = true, armed = false, navTimer = 0, navClip: HTMLAudioElement | null = null, navRaf = 0;
+    const voiceBtn = h("button", { class: "vz-btn vz-voice", type: "button", "aria-pressed": "true", "aria-label": "Voice narration" }, "Voice on");
+    const stopNav = () => { clearTimeout(navTimer); cancelAnimationFrame(navRaf); navClip?.pause(); navClip = null; if (!listening) lightIds([]); };
+    const speakNav = (k: number) => {
+      stopNav();
+      const track = voice[k];
+      if (!voiceOn || !armed || listening || !track) return;
+      navTimer = window.setTimeout(() => {
+        const el = new Audio(`data:${track.type};base64,${track.audio}`);
+        navClip = el;
+        el.onended = () => { cancelAnimationFrame(navRaf); if (!listening) lightIds([]); };
+        const follow = () => { if (navClip !== el) return; const at = el.currentTime; lightIds(track.links.find((l) => at >= l.start - 0.05 && at < l.end + 0.25)?.ids ?? []); navRaf = requestAnimationFrame(follow); };
+        void el.play().then(follow).catch(() => {});
+      }, 650);
+    };
+    onStepShown = speakNav;
+    // Browsers only allow sound after a gesture: the first one arms the narration.
+    const arm = () => { if (!armed) { armed = true; speakNav(shown); } };
+    root.addEventListener("pointerdown", () => arm(), { once: true });
+    root.addEventListener("keydown", () => arm(), { once: true });
+    voiceBtn.addEventListener("click", () => {
+      voiceOn = !voiceOn;
+      voiceBtn.setAttribute("aria-pressed", String(voiceOn));
+      voiceBtn.textContent = voiceOn ? "Voice on" : "Voice off";
+      if (!voiceOn) { stopNav(); if (listening) stopListening(); } else speakNav(shown);
+    });
+    cleanup.push(stopNav);
+    controls.insertBefore(voiceBtn, restartBtn);
     controls.insertBefore(listenBtn, restartBtn);
     listenBtn.addEventListener("click", () => {
       if (listening) return stopListening();

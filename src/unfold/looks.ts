@@ -15,6 +15,10 @@ export interface Look {
   setup(scene: THREE.Scene, renderer: THREE.WebGLRenderer, figure: { floor: number; span: number; centre: THREE.Vector3 }): void;
   material(tone: Tone, role?: "foundation" | "subject"): THREE.MeshStandardMaterial;
   paint(mat: THREE.MeshStandardMaterial, s: PaintState, edge?: THREE.LineBasicMaterial | THREE.MeshBasicMaterial): void;
+  /** Typeface for lettering printed on parts. */
+  font: string;
+  /** Colour a printed decal for the tone and strength of the part it sits on. */
+  paintDecal?(mat: THREE.MeshBasicMaterial, tone: Tone, emphasis: number, lit: boolean, opacity: number): void;
   /** Ink outlines on every solid (paper) or none (clay). */
   edges: boolean;
   ink: THREE.ColorRepresentation;
@@ -76,6 +80,11 @@ const PAPER_TONE: Record<Tone, { fill: string; ink: string }> = {
 };
 
 const paper: Look = {
+  font: "'Iowan Old Style', Palatino, Georgia, serif",
+  paintDecal(mat, tone, emphasis, lit, opacity) {
+    mat.color.set(lit ? "#c63d2f" : PAPER_TONE[tone].ink).lerp(new THREE.Color("#c9c2b2"), 1 - emphasis);
+    mat.opacity = opacity * (0.5 + 0.5 * emphasis);
+  },
   edges: true,
   ink: INK,
   lit: "#c63d2f",
@@ -116,6 +125,12 @@ const CLAY_TONE: Record<Tone, string> = {
   bad: "#cf5a49",
 };
 const clay: Look = {
+  font: "Manrope, 'Visualize Sans', system-ui, sans-serif",
+  paintDecal(mat, tone, emphasis, lit, opacity) {
+    // Dark on light clay, white on the saturated tones.
+    mat.color.set(["accent", "good", "bad", "cold"].includes(tone) || lit ? "#ffffff" : "#33291f");
+    mat.opacity = opacity * (0.55 + 0.45 * emphasis);
+  },
   edges: false,
   ink: "#3b3027",
   lit: "#e0714c",

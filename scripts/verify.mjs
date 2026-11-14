@@ -399,7 +399,7 @@ async function verifyUnfold(browser, { name, scene, file, shotsDir, plant, hash 
   const atStep = async (k) => { await page.evaluate((k) => window.__viz.seekStep(k), k); await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); };
   const read = () => page.evaluate(() => {
     const stage = document.querySelector(".vz-unfold").getBoundingClientRect();
-    const labels = [...document.querySelectorAll(".vz-unfold-labels > div")].filter((e) => !e.hidden && e.textContent.trim() && Number(getComputedStyle(e).opacity) > 0.3).map((e) => {
+    const labels = [...document.querySelectorAll(".vz-unfold-labels > div")].filter((e) => !e.hidden && !e.classList.contains("is-decal") && e.textContent.trim() && Number(getComputedStyle(e).opacity) > 0.3).map((e) => {
       const r = e.getBoundingClientRect();
       return { key: e.dataset.key, text: e.textContent.trim(), x: r.left - stage.left, y: r.top - stage.top, w: r.width, h: r.height };
     });

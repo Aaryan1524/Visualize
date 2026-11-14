@@ -599,3 +599,12 @@ polyline.vz-link { fill: none; }
 .vz-unfold .vz-unfold-face { font-size: 19px; font-weight: 700; }
 .vz-unfold[data-look="clay"] .vz-unfold-face { color: #2f261f; }
 .vz-unfold[data-look="paper"] .vz-unfold-face { font-size: 20px; }
+.vz-unfold-face.is-decal { visibility: hidden; }
+/* The title block, top left of the stage: what we are describing. */
+.vz-stage-title { position: absolute; left: 26px; top: 20px; z-index: 2; display: grid; gap: 2px; max-width: min(340px, 34%); pointer-events: none; }
+.vz-stage-title b { font: 650 26px/1.15 var(--sans); letter-spacing: -.03em; color: var(--ink); }
+.vz-stage-title span { font: 400 13px/1.4 var(--sans); color: var(--ink-2); }
+.vz[data-presentation="editorial"] .vz-stage:has(.vz-stage-title) .vz-caption { top: 92px; }
+.vz-btn.vz-voice { width: auto; min-width: 0; padding: 0 12px; white-space: nowrap; font: 500 13px var(--sans); color: var(--ink); }
+.vz-btn.vz-voice[aria-pressed="false"] { color: var(--ink-2); }
+@media (max-width: 760px) { .vz-stage-title { position: static; max-width: none; padding: 14px 16px 0; } .vz[data-presentation="editorial"] .vz-stage:has(.vz-stage-title) .vz-caption { top: auto; } }

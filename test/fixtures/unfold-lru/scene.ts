@@ -5,7 +5,7 @@ import { defineScene } from "../../../src/core/scene.ts";
 import type { GetEvent, LruState } from "../../../examples/lru/model.ts";
 
 function voice(s: LruState, e: GetEvent | null, k: number): string {
-  if (!e) return "Here's a cache with room for three keys. Requests arrive one at a time, and when it's full, one key has to go. The question is: which one?";
+  if (!e) return "An L R U cache is a small, fast store that keeps the things you used most recently, and throws away the one you haven't touched for the longest. Here's one with room for three keys. When a fourth arrives, which one should go?";
   const at = (key: string) => `[${key}|entry-${key}]`;
   if (e.result === "hit") return `${at(e.key)} is already here. That's a hit, so ${e.key} moves to the most recent end.`;
   if (e.evicted) {
@@ -17,6 +17,6 @@ function voice(s: LruState, e: GetEvent | null, k: number): string {
   return k === 3 ? `${at(e.key)} fills the last slot. Now the cache is full.` : `${at(e.key)} is new. There's room, so it takes an empty slot.`;
 }
 
-const paper = defineScene({ ...lru, id: "unfold-lru", look: "paper", voice });
-export const variants = { "unfold-lru": paper, "unfold-lru-clay": defineScene({ ...paper, id: "unfold-lru-clay", look: "clay" }) };
-export default paper;
+const clay = defineScene({ ...lru, id: "unfold-lru", look: "clay", voice, about: "Keeps what you used lately and drops what you haven't." });
+export const variants = { "unfold-lru": clay, "unfold-lru-paper": defineScene({ ...clay, id: "unfold-lru-paper", look: "paper" }) };
+export default clay;
