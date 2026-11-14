@@ -341,16 +341,22 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     for (const st of steps) for (const m of st.marks) if (m.kind === "label" && !m.transient && !m.leaving) seen.set(`${m.key}|${m.text}|${m.at.join(",")}`, m);
     return [...seen.values()];
   })();
+  // Set the view box and size labels for the scale it is actually drawn at.
+  const sizeLabels = (vb: [number, number, number, number]) => {
+    stage.setViewBox(vb);
+    const r = stage.svg.getBoundingClientRect();
+    // The viewBox is fitted with "meet", so the drawn scale is the smaller of the two fits.
+    const scale = Math.min(r.width / vb[2], r.height / vb[3]);
+    if (!(scale > 0)) return null;
+    const px = Math.min(LABEL_MAX, Math.max(LABEL_MIN, LABEL_UNITS * scale));
+    stage.svg.style.setProperty("--label-size", `${px / scale}px`);
+    return scale;
+  };
   const fitLabels = (g: [number, number, number, number]) => {
     let vb = g;
     for (let i = 0; i < 5; i++) {
-      stage.setViewBox(vb);
-      const r = stage.svg.getBoundingClientRect();
-      // The viewBox is fitted with "meet", so the drawn scale is the smaller of the two fits.
-      const scale = Math.min(r.width / vb[2], r.height / vb[3]);
-      if (!(scale > 0)) return null;
-      const px = Math.min(LABEL_MAX, Math.max(LABEL_MIN, LABEL_UNITS * scale));
-      stage.svg.style.setProperty("--label-size", `${px / scale}px`);
+      const scale = sizeLabels(vb);
+      if (scale === null) return null;
       const m = stage.measureLabels(stageLabels);
       if (!m) break;
       const pad = 4 / scale;
@@ -422,7 +428,9 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
       base = cleared;
       vb = fitLabels(cleared) ?? cleared;
     }
-    stage.setViewBox(vb);
+    // The last fit round can end on a view box its labels were not sized for,
+    // and the stage can change size with the view box: size them for the final one.
+    sizeLabels(vb);
     viewBox = vb;
   };
   const resize = new ResizeObserver(fit);
