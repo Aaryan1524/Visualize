@@ -724,7 +724,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     listening = false;
     clearTimeout(listenTimer);
     cancelAnimationFrame(listenRaf);
-    clip?.pause();
+    if (clip && !clip.paused) { const c = clip, t0 = performance.now(); const f = () => { const u = (performance.now() - t0) / 200; if (u >= 1) c.pause(); else { c.volume = 1 - u; requestAnimationFrame(f); } }; f(); }
     clip = null;
     lightIds([]);
     listenBtn.setAttribute("aria-pressed", "false");
@@ -758,7 +758,14 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     // move settles. "Voice" mutes it; "Listen" plays the whole tour without clicking.
     let voiceOn = true, armed = false, navTimer = 0, navClip: HTMLAudioElement | null = null, navRaf = 0;
     const voiceBtn = h("button", { class: "vz-btn vz-voice", type: "button", "aria-pressed": "true", "aria-label": "Voice narration" }, "Voice on");
-    const stopNav = () => { clearTimeout(navTimer); cancelAnimationFrame(navRaf); navClip?.pause(); navClip = null; if (!listening) lightIds([]); };
+    // A stopped clip fades out over 0.2 s: a hard stop in mid-word sounds like a cut.
+    const fadeOut = (el: HTMLAudioElement | null) => {
+      if (!el || el.paused || el.ended) return;
+      const t0 = performance.now(), v0 = el.volume;
+      const step = () => { const u = (performance.now() - t0) / 200; if (u >= 1) { el.pause(); return; } el.volume = v0 * (1 - u); requestAnimationFrame(step); };
+      step();
+    };
+    const stopNav = () => { clearTimeout(navTimer); cancelAnimationFrame(navRaf); fadeOut(navClip); navClip = null; if (!listening) lightIds([]); };
     const speakNav = (k: number, then?: () => void) => {
       stopNav();
       const track = voice[k];
@@ -784,6 +791,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     root.addEventListener("click", (e) => {
       if (armed || introHeld) return;
       const t = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-action="next"],[data-action="play"]') : null;
+      if (e.target instanceof Element && e.target.closest(".vz-listen, .vz-voice")) { armed = true; return; }
       if (!t || shown !== 0 || !voiceOn || !voice[0]) { armed = true; speakNav(shown); return; }
       e.stopImmediatePropagation(); e.preventDefault();
       holdForIntro(() => t.click());
