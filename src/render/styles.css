@@ -615,3 +615,15 @@ polyline.vz-link { fill: none; }
 .vz-title { margin: 0; font: 700 34px/1.1 "Visualize Display", "Playfair Display SC", Georgia, serif; letter-spacing: .01em; color: var(--ink); }
 .vz-about { margin: 4px 0 0; font: 400 14px/1.45 var(--sans); color: var(--ink-2); }
 @media (max-width: 760px) { .vz-title { font-size: 26px; } }
+/* Phone: the 3D picture takes its own block with the step caption under it, and the controls wrap. */
+@media (max-width: 760px) {
+  .vz-stage[data-renderer="unfold"] { min-height: 0; display: flex; flex-direction: column; }
+  .vz-stage[data-renderer="unfold"] .vz-unfold { position: relative; inset: auto; height: 340px; order: 2; }
+  .vz-stage[data-renderer="unfold"] .vz-caption { order: 1; }
+  .vz-stage[data-renderer="unfold"] .vz-concept { order: 3; }
+  .vz-controls { flex-wrap: wrap; row-gap: 10px; }
+  .vz-btn.vz-try, .vz-btn.vz-voice { flex: 1 1 40%; height: 40px; }
+}
+@media (max-width: 760px) {
+  .vz .vz-controls .vz-btn.vz-try, .vz .vz-controls .vz-btn.vz-voice { order: 10; flex: 1 1 calc(50% - 6px); width: auto; }
+}

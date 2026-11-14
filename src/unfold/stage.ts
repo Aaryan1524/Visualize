@@ -75,7 +75,9 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
   look.setup(scene, renderer, { floor: all.min.y, span, centre });
 
   // ---- Camera: plan view at the ends, the focus of each step in between ---------
-  const fit = (b: THREE.Box3, dir: THREE.Vector3, share: number): Shot => {
+  const fit = (b: THREE.Box3, dir: THREE.Vector3, shareIn: number): Shot => {
+    // Labels are a fixed pixel size, so on a narrow stage they take more of it: leave more room.
+    const share = shareIn * (host.clientWidth && host.clientWidth < 600 ? 0.8 : 1);
     const c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3());
     const vfov = (camera.fov * Math.PI) / 180, hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
     // Fit the box's footprint seen from this direction.
