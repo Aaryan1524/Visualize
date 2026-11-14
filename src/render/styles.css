@@ -596,3 +596,6 @@ polyline.vz-link { fill: none; }
 .vz-practice[hidden] { display: none; }
 .vz-btn.vz-try, .vz-btn.vz-listen { width: auto; min-width: 0; padding: 0 14px; white-space: nowrap; font: 500 13px var(--sans); color: var(--ink); }
 .vz-btn.vz-listen[aria-pressed="true"] { background: var(--ink); color: var(--card); }
+.vz-unfold .vz-unfold-face { font-size: 19px; font-weight: 700; }
+.vz-unfold[data-look="clay"] .vz-unfold-face { color: #2f261f; }
+.vz-unfold[data-look="paper"] .vz-unfold-face { font-size: 20px; }

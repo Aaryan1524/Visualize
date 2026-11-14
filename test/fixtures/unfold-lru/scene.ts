@@ -17,4 +17,6 @@ function voice(s: LruState, e: GetEvent | null, k: number): string {
   return k === 3 ? `${at(e.key)} fills the last slot. Now the cache is full.` : `${at(e.key)} is new. There's room, so it takes an empty slot.`;
 }
 
-export default defineScene({ ...lru, id: "unfold-lru", look: "paper", voice });
+const paper = defineScene({ ...lru, id: "unfold-lru", look: "paper", voice });
+export const variants = { "unfold-lru": paper, "unfold-lru-clay": defineScene({ ...paper, id: "unfold-lru-clay", look: "clay" }) };
+export default paper;

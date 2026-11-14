@@ -39,7 +39,7 @@ function bounds(marks: readonly Mark[]): THREE.Box3 {
     else if (m.kind === "cylinder") { b.expandByPoint(v3([m.at[0] - m.radius, m.at[1] - m.radius, m.at[2]])); b.expandByPoint(v3([m.at[0] + m.radius, m.at[1] + m.radius, m.at[2] + m.height])); }
     else if (m.kind === "link") { b.expandByPoint(v3(m.from)); b.expandByPoint(v3(m.to)); }
     // A label's point, with room for its text either side.
-    else if (m.kind === "label") { const p = v3(m.at); const w = m.text.length * 2.2; b.expandByPoint(p.clone().add(new THREE.Vector3(w, 4, 0))); b.expandByPoint(p.clone().add(new THREE.Vector3(-w, -4, 0))); }
+    else if (m.kind === "label") { const p = v3(m.at); const w = m.text.length * 2.2; b.expandByPoint(p.clone().add(new THREE.Vector3(w, 4, 7))); b.expandByPoint(p.clone().add(new THREE.Vector3(-w, -4, -7))); }
   }
   return b;
 }
@@ -88,7 +88,7 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
   const plan = new THREE.Vector3(0, 1, 0.06);
   const angle = (k: number) => new THREE.Vector3(k % 4 < 2 ? 0.55 : 1.05, 1.1, 1.25);
   let shots: Shot[] = [];
-  const planShot = (b: THREE.Box3) => fit(b, plan, 0.8);
+  const planShot = (b: THREE.Box3) => fit(b, plan, 0.95);
   const computeShots = () => {
     shots = steps.map((s, k) => {
       const shot = s.teaching?.shot;
@@ -137,6 +137,11 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
 
   function updateSolid(n: Node, m: Resolved<SolidMark>) {
     const c = m.kind === "box" ? [m.at[0] + m.size[0] / 2, m.at[1] + m.size[1] / 2, m.at[2] + m.size[2] / 2] : [m.at[0], m.at[1], m.at[2] + m.height / 2];
+    // Depth carries meaning, as in a hand-made model: the part to watch rises,
+    // a subject that falls out of the step sinks back into its place.
+    const h = m.kind === "box" ? m.size[2] : m.height;
+    const e = m.emphasis ?? 1;
+    if (m.role === "subject") c[2] = c[2]! + (m.lit || named(m) ? h * 0.35 : 0) - (1 - e) / (1 - 0.42) * h * 0.3;
     n.obj.position.copy(v3(c));
     look.paint(n.mat!, { tone: m.tone ?? "structure", role: m.role, lit: !!m.lit || named(m), emphasis: m.emphasis ?? 1, opacity: m.opacity }, n.edge);
     if (n.edge) n.edge.opacity = 0.85 * m.opacity;
@@ -185,6 +190,10 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
     } else if (n.leader) { n.leader.remove(); n.leader = undefined; }
   }
 
+  // Lips, guides and stops gave the flat isometric drawing its finish; in real 3D
+  // with shadows they read as clutter. Thin structural pieces are left out.
+  const fineDetail = (m: SolidMark) => m.role !== "subject" && m.role !== "foundation" && !m.label
+    && (m.kind === "box" ? Math.min(...m.size) < 2.5 : m.height < 1.2 && m.radius < 4);
   let lastMarks: readonly Resolved[] = [];
   let spoken = new Set<string>();
   const named = (m: Mark) => spoken.size > 0 && (spoken.has(m.key) || (!!m.owner && spoken.has(m.owner)) || (m.link ?? "").split(/\s+/).some((id) => spoken.has(id)));
@@ -200,6 +209,7 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
         scene.add(n.obj);
         nodes.set(m.key, n);
       }
+      if (solid(m) && fineDetail(m)) { n.obj.visible = false; continue; }
       if (solid(m)) {
         const key = m.kind === "box" ? `b${m.size.join(",")},${m.radius ?? 0}` : `c${m.radius},${m.height}`;
         if (key !== n.geomKey) { scene.remove(n.obj); n = solidNode(m); n.obj.userData.key = m.key; scene.add(n.obj); nodes.set(m.key, n); }
@@ -242,7 +252,7 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
     svg.setAttribute("viewBox", `0 0 ${r.width} ${r.height}`);
     camera.aspect = r.width / r.height;
     // The step heading sits over the stage's top-left: move the picture right and down to clear it.
-    if (r.width > 700) camera.setViewOffset(r.width, r.height, -r.width * 0.045, -r.height * 0.04, r.width, r.height);
+    if (r.width > 700) camera.setViewOffset(r.width, r.height, -r.width * 0.045, 0, r.width, r.height);
     else camera.clearViewOffset();
     camera.updateProjectionMatrix();
     computeShots();
@@ -280,9 +290,9 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
       const ray = new THREE.Raycaster();
       const out: ReturnType<UnfoldStage["inspect"]> = [];
       const meshes: THREE.Object3D[] = [];
-      for (const n of nodes.values()) if (!n.label || n.obj.children.length) meshes.push(n.obj);
+      for (const n of nodes.values()) if (n.obj.visible && (!n.label || n.obj.children.length)) meshes.push(n.obj);
       for (const m of lastMarks) {
-        if (!solid(m) || m.opacity < 0.3) continue;
+        if (!solid(m) || m.opacity < 0.3 || fineDetail(m)) continue;
         const n = nodes.get(m.key)!;
         const box = new THREE.Box3().setFromObject(n.obj);
         const corners = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => toScreen(new THREE.Vector3(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z), r));
