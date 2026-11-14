@@ -120,7 +120,9 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
     let edge: THREE.LineBasicMaterial | undefined;
     if (look.edges) {
       edge = new THREE.LineBasicMaterial({ color: look.ink, transparent: true, opacity: 0.9 });
-      group.add(new THREE.LineSegments(geometry(`e${key}`, () => new THREE.EdgesGeometry(g, 28)), edge));
+      // Ink outlines follow the box's silhouette edges; a rounded mesh has no sharp edges to find.
+      const outline = m.kind === "box" ? new THREE.BoxGeometry(m.size[0] * 0.995, m.size[2] * 0.995, m.size[1] * 0.995) : new THREE.CylinderGeometry(m.radius, m.radius, m.height, 48);
+      group.add(new THREE.LineSegments(geometry(`e${key}`, () => new THREE.EdgesGeometry(outline, 40)), edge));
     }
     return { obj: group, mat, edge, geomKey: key };
   }

@@ -297,6 +297,12 @@ export interface Scene<S, E> {
   projection?: Projection;
   /** Opt into the figure-first presentation without changing existing scenes. */
   presentation?: "editorial";
+  /**
+   * Draw the figure in real 3D with a directed camera (the Unfold stage):
+   * "paper" for the textbook page, "clay" for soft matte solids. Omit for the
+   * isometric SVG stage.
+   */
+  look?: "paper" | "clay";
   setup?: string;
   teaching?: (state: S, event: E | null, index: number) => Teaching;
 }

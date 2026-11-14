@@ -569,3 +569,19 @@ polyline.vz-link { fill: none; }
 .vz-seq-mark circle { fill: var(--card); stroke: var(--ink-2); stroke-width: 1.4; }
 .vz-seq-mark[data-status="bad"] circle { stroke: var(--t-bad); } .vz-seq-mark[data-status="good"] circle { stroke: var(--t-good); } .vz-seq-mark[data-status="accent"] circle { stroke: var(--t-accent); }
 .vz-seq-mark[data-ghost] { opacity: .5; }
+/* Unfold stage (src/unfold/): a WebGL canvas, an overlay for leaders, HTML labels on top. */
+.vz-unfold { position: absolute; inset: 0; }
+.vz-stage[data-renderer="unfold"] { position: relative; min-height: 560px; }
+.vz-unfold > canvas, .vz-unfold > .vz-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.vz-unfold > .vz-svg { pointer-events: none; overflow: visible; }
+.vz-unfold-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.vz-unfold-labels > div { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform; font: 500 13px var(--sans); color: var(--ink); }
+.vz-unfold-label[data-size="small"] { font-size: 12px; color: var(--ink-2); }
+.vz-unfold-label[data-size="large"] { font-size: 16px; font-weight: 600; }
+.vz-unfold-face { font-weight: 600; font-size: 15px; }
+.vz-unfold-face[data-role="value"] { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.vz-unfold-leader { stroke: var(--ink-2); stroke-width: 1; stroke-opacity: .6; }
+.vz-unfold[data-look="paper"] .vz-unfold-labels > div { color: #25304a; font-family: "Iowan Old Style", Palatino, Georgia, serif; }
+.vz-unfold[data-look="paper"] .vz-unfold-face { font-size: 17px; }
+.vz-unfold[data-look="clay"] .vz-unfold-labels > div { color: #3b3027; }
+.vz[data-presentation="editorial"] .vz-stage:has(.vz-unfold) .vz-svg { height: 100%; }

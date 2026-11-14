@@ -4,6 +4,7 @@ import { TRUST_LABEL, TRUST_MEANING } from "../core/trust.ts";
 import type { LabelMark, Panel, Resolved, Scene } from "../core/types.ts";
 import { createStage, fitViewBox, type StageRenderer } from "./svg.ts";
 import { clearOf, silhouettes } from "./clear.ts";
+import { createUnfoldStage, type UnfoldStage } from "../unfold/stage.ts";
 
 /**
  * Labels scale with the drawing but stay readable: LABEL_UNITS world units
@@ -82,7 +83,9 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
     editorial ? 10 : 18,
   );
   let viewBox = geometryBox;
-  const stage = createStage(viewBox, projection, `${scene.title}. ${scene.question} Use the step controls or the arrow keys.`);
+  const stageLabel = `${scene.title}. ${scene.question} Use the step controls or the arrow keys.`;
+  const unfold: UnfoldStage | null = scene.look ? createUnfoldStage(steps, scene.look, stageLabel) : null;
+  const stage: StageRenderer = unfold ?? createStage(viewBox, projection, stageLabel);
 
   // ---- DOM -------------------------------------------------------------
   const root = h("div", { class: "vz", "data-scene": scene.id });
@@ -126,7 +129,8 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
     "aria-roledescription": "step-through figure",
     "aria-label": `${scene.title}. Left and right arrows step through the explanation; space plays and pauses.`,
   });
-  stageBox.append(stage.svg);
+  stageBox.append(unfold ? unfold.host : stage.svg);
+  if (unfold) stageBox.dataset.renderer = "unfold";
   const panelsBox = h("aside", { class: "vz-panels", "aria-label": "Details for the current step" });
   const sideBox = h("aside", { class: "vz-side", "aria-label": "Linked mathematics for the current step" });
   const anySide = steps.some((s) => s.panels.some((p) => p.place === "side"));
@@ -320,6 +324,8 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
     }
   };
   const fit = () => {
+    // The Unfold stage frames itself with its camera.
+    if (unfold) return;
     const cap = captionFootprint();
     let base = geometryBox;
     let vb = geometryBox;
@@ -486,6 +492,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
 
   const draw = () => {
     current = compiled.frameAt(displayTime(t));
+    unfold?.frame(current.index, current.progress);
     stage.render(current.marks as Resolved[]);
     const k = current.index === 0 || current.progress >= 0.5 ? current.index : current.index - 1;
     showStep(k, current.shown);
@@ -659,6 +666,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
       raf = 0;
       playing = false;
       for (const undo of cleanup.splice(0)) undo();
+      unfold?.destroy();
       root.remove();
       const w = window as unknown as { __viz?: PlayerApi };
       if (w.__viz === api) delete w.__viz;
