@@ -72,10 +72,12 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
   const all = bounds(steps.flatMap((s) => s.marks));
   const size = all.getSize(new THREE.Vector3()), centre = all.getCenter(new THREE.Vector3());
   const span = Math.max(size.x, size.z, 40);
+  // The solids alone, without the room left for labels: what the plan view must never crop.
+  const solidBox = bounds(steps.flatMap((s) => s.marks.filter(solid)));
   look.setup(scene, renderer, { floor: all.min.y, span, centre });
 
   // ---- Camera: plan view at the ends, the focus of each step in between ---------
-  const fit = (b: THREE.Box3, dir: THREE.Vector3, shareIn: number): Shot => {
+  const fit = (b: THREE.Box3, dir: THREE.Vector3, shareIn: number, exactBox: THREE.Box3 = b, margin = 0): Shot => {
     // Labels are a fixed pixel size, so on a narrow stage they take more of it: leave more room.
     const share = shareIn * (host.clientWidth && host.clientWidth < 600 ? 0.8 : 1);
     const c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3());
@@ -84,22 +86,86 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
     const w = Math.max(s.x, 1) * Math.abs(Math.cos(Math.atan2(dir.z, dir.x))) + Math.max(s.z, 1) * Math.abs(Math.sin(Math.atan2(dir.z, dir.x)));
     const width = Math.max(w, Math.hypot(s.x, s.z) * 0.8);
     const height = Math.max(s.y + s.z * Math.abs(dir.y) * 0.6, 1);
-    const d = Math.max(width / share / 2 / Math.tan(hfov / 2), height / share / 2 / Math.tan(vfov / 2));
-    return { pos: c.clone().add(dir.clone().normalize().multiplyScalar(d)), look: c };
+    const heuristic = Math.max(width / share / 2 / Math.tan(hfov / 2), height / share / 2 / Math.tan(vfov / 2));
+    // A floor under the estimate: never so close that an exact perspective fit
+    // of `exactBox` would leave the frame (with `margin` to spare). The estimate, whose shares were
+    // tuned with it, decides everywhere else; it undercounts a figure that is
+    // deep rather than wide (a tree over an array) and cropped its front.
+    const n = dir.clone().normalize(), f = n.clone().negate();
+    const edge = (1 - margin) * (host.clientWidth && host.clientWidth < 600 ? 0.8 : 1);
+    const right = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0));
+    if (right.lengthSq() < 1e-9) right.set(1, 0, 0);
+    right.normalize();
+    const up = new THREE.Vector3().crossVectors(right, f).normalize();
+    let exact = 0;
+    for (const x of [exactBox.min.x, exactBox.max.x]) for (const y of [exactBox.min.y, exactBox.max.y]) for (const z of [exactBox.min.z, exactBox.max.z]) {
+      const o = new THREE.Vector3(x, y, z).sub(c);
+      exact = Math.max(exact, Math.abs(o.dot(right)) / edge / Math.tan(hfov / 2) + o.dot(n), Math.abs(o.dot(up)) / edge / Math.tan(vfov / 2) + o.dot(n));
+    }
+    const d = Math.max(heuristic, exact);
+    return { pos: c.clone().add(n.multiplyScalar(d)), look: c };
   };
   const plan = new THREE.Vector3(0, 1, 0.06);
   const angle = (k: number) => new THREE.Vector3(k % 4 < 2 ? 0.55 : 1.05, 1.1, 1.25);
   let shots: Shot[] = [];
   // The plan view sits a little lower, so the title block at the stage's top left stays clear of the parts.
   const planShot = (b: THREE.Box3) => {
-    const shot = fit(b, plan, 0.86), drop = b.getSize(new THREE.Vector3()).z * 0.045;
+    const shot = fit(b, plan, 0.86, solidBox, 0.05), drop = b.getSize(new THREE.Vector3()).z * 0.045;
     shot.pos.z -= drop; shot.look.z -= drop;
     return shot;
+  };
+  // On the opening step the concept is written over the stage's bottom-left
+  // (.vz-concept, styles.css: left 26, bottom 22, width min(400px, 38%), 14px/1.55
+  // text). Its size is estimated from the text, not measured, so every step's
+  // framing stays a function of the stage size alone.
+  const conceptText = (steps[0]?.voice ?? "").replace(/\[([^\]|]+)\|[^\]]+\]/g, "$1").replace(/\{([^}]+)\}/g, "$1");
+  const conceptBox = (W: number, H: number) => {
+    if (!conceptText || typeof matchMedia === "undefined" || matchMedia("(max-width: 760px)").matches) return null;
+    const width = Math.min(400, 0.38 * W);
+    // 14px text sets at about 6 px a character; 6.4 errs toward a taller box.
+    const lines = Math.ceil((conceptText.length * 6.4) / (width - 32));
+    return { right: 26 + width + 12, top: H - 22 - (lines * 14 * 1.55 + 30) - 12 };
+  };
+  const screenRect = (b: THREE.Box3, shot: Shot, W: number, H: number) => {
+    const cam = camera.clone();
+    cam.position.copy(shot.pos); cam.lookAt(shot.look); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
+    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+    for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+      const p = new THREE.Vector3(x, y, z).project(cam);
+      const sx = ((p.x + 1) / 2) * W, sy = ((1 - p.y) / 2) * H;
+      left = Math.min(left, sx); right = Math.max(right, sx); top = Math.min(top, sy); bottom = Math.max(bottom, sy);
+    }
+    return { left, right, top, bottom };
+  };
+  /** The opening plan view, lifted (and if need be drawn smaller) so the written concept covers none of it. */
+  const openingShot = (b: THREE.Box3): Shot => {
+    const shot = planShot(b);
+    const { width: W, height: H } = host.getBoundingClientRect();
+    const box = W && H ? conceptBox(W, H) : null;
+    if (!box) return shot;
+    let rect = screenRect(solidBox, shot, W, H);
+    if (rect.left >= box.right || rect.bottom <= box.top) return shot;
+    const ceiling = 0.05 * H;
+    const room = box.top - ceiling;
+    if (rect.bottom - rect.top > room) {
+      // Too tall to clear by lifting alone: step back until it fits the room above the concept.
+      const dir = shot.pos.clone().sub(shot.look);
+      shot.pos.copy(shot.look).add(dir.multiplyScalar((rect.bottom - rect.top) / room));
+      rect = screenRect(solidBox, shot, W, H);
+    }
+    const lift = Math.max(0, rect.bottom - box.top);
+    const perPx = (2 * shot.pos.distanceTo(shot.look) * Math.tan((camera.fov * Math.PI) / 360)) / H;
+    const cam = camera.clone(); cam.position.copy(shot.pos); cam.lookAt(shot.look);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+    // Moving the camera down the screen moves the picture up it.
+    const move = up.multiplyScalar(-lift * perPx);
+    return { pos: shot.pos.clone().add(move), look: shot.look.clone().add(move) };
   };
   const computeShots = () => {
     shots = steps.map((s, k) => {
       const shot = s.teaching?.shot;
-      if (shot === "plan" || k === 0 || (shot === undefined && k === steps.length - 1)) return planShot(all);
+      if (k === 0) return openingShot(all);
+      if (shot === "plan" || (shot === undefined && k === steps.length - 1)) return planShot(all);
       // What the step is about: solids still at full strength, among those that recede.
       const focus = s.marks.filter((m) => solid(m) && m.role !== "foundation" && (m.emphasis ?? 1) >= 0.99);
       const anyReceded = s.marks.some((m) => solid(m) && (m.emphasis ?? 1) < 0.99);

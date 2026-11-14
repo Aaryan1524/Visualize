@@ -718,7 +718,8 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
   // phrase names while it is spoken, and moves on. It stops at a prediction,
   // so the reader answers before hearing the answer.
   type Track = { duration: number; type: string; audio: string; links: { start: number; end: number; ids: string[] }[] } | null;
-  const voice: Track[] | null = (page ? (window as unknown as { __VZ_VOICE?: { steps: Track[] } }).__VZ_VOICE?.steps : null) ?? null;
+  // The clips are recorded for the scene as told; a what-if version has other steps, so it plays none.
+  const voice: Track[] | null = (page && chosen === 0 ? (window as unknown as { __VZ_VOICE?: { steps: Track[] } }).__VZ_VOICE?.steps : null) ?? null;
   let listening = false, clip: HTMLAudioElement | null = null, listenTimer = 0, listenRaf = 0;
   let sound: AudioContext | null = null;
   const listenBtn = h("button", { class: "vz-btn vz-listen", type: "button", "aria-pressed": "false" }, "Play tour");
