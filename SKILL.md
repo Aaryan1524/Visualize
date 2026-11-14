@@ -4,7 +4,7 @@ description: Build step-through visual explanations whose picture is checked aga
 license: MIT
 compatibility: Node.js 24+ (runs TypeScript directly) and Google Chrome or Chromium for verification. Run `npm install` (or `pnpm install`) once in this folder.
 metadata:
-  version: "0.4.0"
+  version: "0.5.0"
 ---
 
 # Visualize
@@ -61,6 +61,9 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
 | Words | Title 8 words or fewer; one action of 12 words or fewer per step; part names of 1–3 words, in a row with leaders | Paragraphs get read instead of the figure |
 | Flat maths | Only when the concept has equations or matrices; terms linked to solids | Maths on a tilted face is unreadable |
 | Theme | Follow the reader's preference; review in light first, then dark | Both are checked |
+| Stage | `look: "paper"` (the textbook page in 3D: ink-outlined paper parts on graph paper, a camera that opens flat, moves to each step and ends flat) for algorithms, data and maths; `look: "clay"` for systems and physical things; leave `look` out only for a still SVG or a dense isometric machine | Readers recognise the flat diagram first and see depth only where it explains; the evals showed a plain agent cannot match the camera and the checks |
+| Learning | Always `practice(seed)`: a fresh question the model makes and marks. Add `whatIf` when one input changes the outcome (capacity, a fault, a size) | A reader who answers a new case has understood; a figure that only plays has not proved it |
+| Voice | Write `voice()` for any figure meant to be watched: spoken sentences, numbers in words, parts linked as [phrase|key]. Record with `scripts/voice.mjs` | The tour talks while it points; captions still teach without sound |
 | Trust | `computed` for exact models, `model` for simplified ones, `sourced` only with an exact location | The badge must be true |
 | Where files go | In the user's project: the scene in an explanations folder, the built page in its public or static folder, screenshots beside the scene (verify puts them there) | Keeps the skill folder clean |
 
@@ -83,7 +86,8 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
    verify: passed (<n> observations; depth, focus, labels, layout, both themes). Files: <page>, <scene dir>.
    Open: <page>#step=<the key step>. Not verified by machine: <whatever you judged only by eye>.
    ```
-8. **Export** if needed: `node <skill>/scripts/export-svg.mjs <built page> --step k --out f.svg --frame` (checked against the live stage; `--frame` adds the title, the step's action and the legend, so an image in a post reads on its own; leave it off only when the host page supplies them), or `<Figure scene={…} />` from `<skill>/src/react/Figure.tsx` (see `references/authoring.md`).
+8. **Teach back and narrate.** Add `practice(seed)` from the model (the answer must be computed, never typed), `whatIf` versions built by the same scene factory, and `voice()`. Record the voice: `node <skill>/scripts/voice.mjs <dir>` (a local open-source voice; one model download, then offline). Rebuild; the page now has Listen, What if and Now you try, and verify checks every version and 40 practice questions.
+9. **Export** if needed: `node <skill>/scripts/export-svg.mjs <built page> --step k --out f.svg --frame` (checked against the live stage; `--frame` adds the title, the step's action and the legend, so an image in a post reads on its own; leave it off only when the host page supplies them), or `<Figure scene={…} />` from `<skill>/src/react/Figure.tsx` (see `references/authoring.md`).
 
 ## Parts
 

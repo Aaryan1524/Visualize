@@ -65,3 +65,20 @@ Every step carries a trust level shown with the action. Use `sourced` only with 
 
   Load `<skill>/src/render/styles.css` once. Scenes with equations also need `katex/dist/katex.min.css`, served with its `fonts/` folder beside it. Figures are scoped to their own root: several can share a page, they do not touch the URL or globals, and unmounting removes them. `pnpm check:embed` proves this with three figures, one of them with maths, and a planted page-mode figure that must fail. The package is not published to npm.
 - **Plain DOM:** `mount(host, scene, { theme? })` returns a player with `seek`, `seekStep`, `play`, `pause` and `destroy`. Pass `{ page: true }` only for a standalone page that owns the URL.
+
+## The Unfold stage, voice and teach-back
+
+```ts
+export default defineScene({
+  ...scene,
+  look: "paper",                       // or "clay"; omit for the isometric SVG stage
+  voice: (s, e, k) => !e ? "Here's a cache with room for three keys..." : `[${e.key}|entry-${e.key}] is new...`,
+  practice: (seed) => ({ question, choices, answer, explanation }),   // all computed by the model
+  whatIf: [{ label: "Four slots", scene: makeScene({ capacity: 4 }) }],
+});
+```
+
+- **look:** the camera is directed from the model: step 0 and the last step are the plan view, every other step frames the marks still in focus with some of the whole. `teaching.shot: "plan"` forces the flat view on a step.
+- **voice:** write for the ear: short sentences, numbers in words, a reason in every step. `[phrase|ids]` lights the marks with that key, owner or link id while the phrase is spoken. Record with `node scripts/voice.mjs <dir>`; the clips land in `<dir>/voice/` and travel inside the built page.
+- **practice:** draw a random case from `seed`, run the model, and ask about its outcome. Never type an answer: verify asks 40 seeds and rejects an answer that is not a choice.
+- **whatIf:** build each version with the same scene factory, so every one is computed and verified (verify opens each at `#what=k`). Keep labels to the one input that changes.

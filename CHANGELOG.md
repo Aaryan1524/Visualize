@@ -2,7 +2,17 @@
 
 One version covers the kit and the skill (`package.json` `version` and `SKILL.md` `metadata.version` move together). Each entry names the failure that caused it, so the reason for a rule is never lost.
 
-## 0.4.0 (unreleased)
+## 0.5.0 (unreleased)
+
+What a drawing cannot do. The builder found the isometric look too close to Anatomy and "boring", and asked for an edge a one-line prompt to a plain agent cannot match, with the goal that the reader understands.
+
+- **The Unfold stage.** `look: "paper" | "clay"` draws the same marks in real 3D. The camera opens on the plan view (the flat diagram readers know), moves to each step's focus and ends flat; labels are HTML, crisp and upright. Paper outlines each part in ink by its own silhouette; clay is soft matte with shadows. Glass was tried and rejected.
+- **Voice.** `voice()` scripts are recorded by a local open-source voice (Kokoro, offline after one download). Listen plays each clip after the move settles, lights each part as it is named, pauses at a prediction, and adds quiet cues. The browser's own speech was rejected as robotic.
+- **What if?** Versions of the figure on other inputs, each a full scene from the same model, switched in place and verified like the first.
+- **Now you try.** Questions the model makes and marks, with a score.
+- **Checks for 3D pages.** Observations from projected bounds, ray-cast occlusion and HTML labels; framing by coverage (span was fooled by one stray part); label overlap and cut-off; determinism after random seeks. Three planted faults are caught.
+
+## 0.4.0
 
 The shape the field draws. Ten eval sessions on 0.3 (five prompts, with and without the skill) found that the skill won on finish and proof every time but taught worse in four of five: the kit's parts chose the picture.
 
