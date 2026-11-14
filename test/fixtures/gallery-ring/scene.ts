@@ -2,20 +2,20 @@
 // It shows the parts in a story a reader gets at first glance, and keeps them
 // passing every check (verify runs the galleries with the examples).
 import { defineScene } from "../../../src/core/scene.ts";
-import type { Mark } from "../../../src/core/types.ts";
+import type { Mark, Scene } from "../../../src/core/types.ts";
 import { strip } from "../../../src/render/components.ts";
 import { marker, puck, ringAssembly } from "../../../src/parts/flow.ts";
 
-const WORKERS = 6;
-const REQUESTS = 7;
 const worker = (i: number) => `W${i + 1}`;
+const COUNT = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+const cap = (t: string) => t[0]!.toUpperCase() + t.slice(1);
 
 interface State { serving: (number | null)[]; next: number; sent: number }
 // The workers are the entities on the ring; a worker shows whether it has work.
 type Event = { request: number; to: number; wrapped: boolean };
 
 /** Round robin: request r goes to the worker the pointer is on, then the pointer moves one on. */
-export function run(): { event: Event; state: State }[] {
+export function run(WORKERS = 6, REQUESTS = 7): { event: Event; state: State }[] {
   const serving: (number | null)[] = Array(WORKERS).fill(null);
   let next = 0;
   const out: { event: Event; state: State }[] = [];
@@ -28,28 +28,29 @@ export function run(): { event: Event; state: State }[] {
   return out;
 }
 
-export default defineScene<State, Event>({
-  id: "gallery-ring",
+function make(WORKERS: number, REQUESTS: number, id: string): Scene<State, Event> {
+  return defineScene<State, Event>({
+  id,
   title: "Round robin",
   question: "Which worker gets the next request?",
   presentation: "editorial",
   trust: "computed",
-  setup: "Six workers sit in a ring. A pointer marks whose turn it is; each request goes there and the pointer moves one step clockwise.",
+  setup: "Workers sit in a ring. A pointer marks whose turn it is; each request goes there and the pointer moves one step clockwise.",
   assumptions: [
     "Every request takes the same time, so a worker is free again by its next turn.",
     "A worker shows only its latest request.",
   ],
   trace: () => ({
     initial: { serving: Array(WORKERS).fill(null), next: 0, sent: 0 },
-    intro: "Six idle workers. The pointer starts at W1.",
-    steps: run().map(({ event, state }) => ({
+    intro: `${cap(COUNT[WORKERS]!)} idle workers. The pointer starts at W1.`,
+    steps: run(WORKERS, REQUESTS).map(({ event, state }) => ({
       event, state,
       caption: `R${event.request} goes to ${worker(event.to)}; the pointer moves on to ${worker(state.next)}.`,
     })),
   }),
   teaching: (s, e) => ({
     chapter: !e ? "Ring" : e.wrapped ? "Wrap" : e.request <= 3 ? "Turns" : "Round",
-    heading: !e ? "Six workers. Next: W1." : e.wrapped ? `Past ${worker(WORKERS - 1)}, back to ${worker(e.to)}.` : `R${e.request} to ${worker(e.to)}. Next: ${worker(s.next)}.`,
+    heading: !e ? `${cap(COUNT[WORKERS]!)} workers. Next: W1.` : e.wrapped ? `Past ${worker(WORKERS - 1)}, back to ${worker(e.to)}.` : `R${e.request} to ${worker(e.to)}. Next: ${worker(s.next)}.`,
     ...(e?.request === WORKERS ? { prediction: { question: `R${WORKERS + 1} arrives next. Which worker gets it?`, choices: [worker(0), worker(WORKERS - 1), "None"], answer: worker(0), explanation: `The ring wraps: after ${worker(WORKERS - 1)} comes ${worker(0)}.` } } : {}),
   }),
   view: (s, e) => {
@@ -77,3 +78,7 @@ export default defineScene<State, Event>({
     { type: "visible", key: "next/cap", visible: true },
   ],
 });
+}
+
+const asTold = make(6, 7, "gallery-ring");
+export default defineScene({ ...asTold, whatIf: [{ label: "Four workers", scene: make(4, 7, "gallery-ring-4") }, { label: "Twelve requests", scene: make(6, 12, "gallery-ring-12") }] });

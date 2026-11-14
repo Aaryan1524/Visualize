@@ -312,4 +312,15 @@ export interface Scene<S, E> {
    * records it with a local voice; the page offers "Listen" when it is built.
    */
   voice?: (state: S, event: E | null, index: number) => string;
+  /**
+   * "What if?": the same idea run on other inputs. Each is a full scene built
+   * from the same model (another capacity, another fault), so every version is
+   * computed and checked like the first. The reader switches between them.
+   */
+  whatIf?: { label: string; scene: Scene<any, any> }[];
+  /**
+   * "Now you try": a fresh question made by the model, so the answer is
+   * computed, not written. `seed` varies the case; the page marks the reply.
+   */
+  practice?: (seed: number) => { question: string; choices: string[]; answer: string; explanation: string };
 }

@@ -82,6 +82,10 @@ export interface MountOptions {
   page?: boolean;
   /** Force a theme instead of following the reader's preference. */
   theme?: "light" | "dark";
+  /** Internal: the "What if?" family this scene was switched to from. */
+  family?: { label: string; scene: Scene<any, any> }[];
+  /** Internal: which member of the family is shown. */
+  chosen?: number;
 }
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, html = ""): HTMLElementTagNameMap[K] {
@@ -100,8 +104,14 @@ function readHashStep(): number | null {
   return m ? Number(m[1]) : null;
 }
 
-export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: MountOptions = {}): PlayerApi {
+export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: MountOptions = {}): PlayerApi {
   const page = options.page ?? false;
+  // "What if?": the scene as told, then its alternatives. A page link can open one (#what=k).
+  const family = options.family ?? (sceneIn.whatIf?.length ? [{ label: "As told", scene: sceneIn }, ...sceneIn.whatIf] : []);
+  const whatHash = page && options.chosen === undefined ? Number(new URLSearchParams(location.hash.slice(1)).get("what") ?? 0) : 0;
+  const chosen = options.chosen ?? (Number.isInteger(whatHash) && whatHash > 0 && whatHash < family.length ? whatHash : 0);
+  if (chosen > 0 && options.chosen === undefined) return mount(host, family[chosen]!.scene as Scene<S, E>, { ...options, family, chosen });
+  const scene = sceneIn;
   const cleanup: (() => void)[] = [];
   const compiled = compile(scene);
   const { steps, timeline } = compiled;
@@ -248,6 +258,24 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
     const utilities = h("div", { class: "vz-utilities" });
     utilities.append(detailsBtn, themeBtn);
     head.append(heading, chapters, utilities);
+    if (family.length > 1) {
+      // "What if?": switching re-runs the model on other inputs; every version is computed.
+      const bar = h("nav", { class: "vz-whatif", "aria-label": "What if" }, '<span>What if</span>');
+      family.forEach((f, k) => {
+        const b = h("button", { type: "button", "aria-pressed": String(k === chosen) }, escapeHtml(f.label));
+        b.addEventListener("click", () => {
+          if (k === chosen) return;
+          const parent = root.parentElement!;
+          api.destroy();
+          if (page) try { history.replaceState(null, "", k ? `#what=${k}` : "#step=0"); } catch { /* sandboxed frames */ }
+          const next = mount(parent, family[k]!.scene, { ...options, family, chosen: k });
+          if (page) window.dispatchEvent(new Event("visualize:ready"));
+          void next;
+        });
+        bar.append(b);
+      });
+      heading.append(bar);
+    }
 
     // The primary view has one action. Longer evidence stays available in a
     // contained native dialog, with keyboard focus and Escape handled natively.
@@ -535,7 +563,7 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
   const writeHash = () => {
     if (!page) return;
     try {
-      history.replaceState(null, "", `#step=${shown}`);
+      history.replaceState(null, "", `#${chosen ? `what=${chosen}&` : ""}step=${shown}`);
     } catch {
       /* file:// in some browsers */
     }
@@ -621,6 +649,47 @@ export function mount<S, E>(host: HTMLElement, scene: Scene<S, E>, options: Moun
     target = goal;
     setPlaying(true);
   };
+
+  // ---- Now you try: a fresh case from the model, marked by the model -------------
+  if (scene.practice && editorial) {
+    const tryBtn = h("button", { class: "vz-btn vz-try", type: "button" }, "Now you try");
+    const card = h("section", { class: "vz-predict vz-practice", "aria-label": "Now you try" });
+    card.hidden = true;
+    caption.append(card);
+    let seed = 0, right = 0, asked = 0;
+    const ask = () => {
+      const q = scene.practice!(seed++);
+      asked++;
+      card.replaceChildren();
+      const options = h("div", { class: "vz-predict-options" });
+      const feedback = h("p", { class: "vz-predict-feedback", "aria-live": "polite" });
+      const score = h("span", { class: "vz-practice-score" });
+      const another = h("button", { type: "button", class: "vz-practice-next" }, "Another");
+      another.hidden = true;
+      for (const choice of q.choices) {
+        const b = h("button", { type: "button", "aria-pressed": "false" }, escapeHtml(choice));
+        b.addEventListener("click", () => {
+          if (!another.hidden) return;
+          const ok = choice === q.answer;
+          if (ok) right++;
+          for (const o of options.querySelectorAll("button")) { o.setAttribute("aria-pressed", String(o === b)); o.dataset.correct = String(o.textContent === q.answer); }
+          feedback.textContent = `${ok ? "Right." : `Not quite: ${q.answer}.`} ${q.explanation}`;
+          score.textContent = `${right} of ${asked} right`;
+          another.hidden = false;
+          another.focus();
+        });
+        options.append(b);
+      }
+      another.addEventListener("click", ask);
+      card.append(h("span", { class: "vz-predict-kicker" }, "Now you try"), h("p", {}, escapeHtml(q.question)), options, feedback, h("div", { class: "vz-practice-foot" }), );
+      card.lastElementChild!.append(score, another);
+      card.hidden = false;
+      prediction.hidden = true;
+      (options.querySelector("button") as HTMLButtonElement | null)?.focus();
+    };
+    tryBtn.addEventListener("click", () => { if (!card.hidden) { card.hidden = true; return; } goTo(last); ask(); });
+    controls.insertBefore(tryBtn, restartBtn);
+  }
 
   // ---- Listen: recorded narration that lights what it names -------------------
   // A tour plays each step's clip after the camera settles, lights the parts a

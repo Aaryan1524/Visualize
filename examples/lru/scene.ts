@@ -121,12 +121,38 @@ function observe(s: LruState, e: GetEvent | null): Observation[] {
   return obs;
 }
 
+/**
+ * Now you try: a fresh request history, run through the same model. The
+ * question only appears when the next request would evict, so there is
+ * always one right answer, and the model says which.
+ */
+export function practice(seed: number) {
+  let x = seed * 2654435761 % 4294967296 || 1;
+  const rand = () => ((x = (x * 1103515245 + 12345) % 2147483648) / 2147483648);
+  for (;;) {
+    const keys = ["A", "B", "C", "D", "E"];
+    const history = Array.from({ length: 5 + Math.floor(rand() * 3) }, () => keys[Math.floor(rand() * keys.length)]!);
+    const before = run(CAPACITY, history).steps.at(-1)?.state;
+    if (!before || before.order.length < CAPACITY) continue;
+    const next = keys.find((k) => !before.order.includes(k) && rand() < 0.7) ?? keys.find((k) => !before.order.includes(k));
+    if (!next) continue;
+    const evicted = run(CAPACITY, [...history, next]).steps.at(-1)!.event.evicted!;
+    return {
+      question: `Requests so far: ${history.join(" ")}. Next comes ${next}. Which key leaves?`,
+      choices: [...before.order].sort(),
+      answer: evicted,
+      explanation: `Of ${before.order.join(", ")}, ${evicted} was used least recently.`,
+    };
+  }
+}
+
 function makeScene(flat: boolean): Scene<LruState, GetEvent> {
   return defineScene<LruState, GetEvent>({
     id: flat ? "lru-flat" : "lru",
     title: flat ? "LRU cache (flat)" : "LRU cache",
     question: "Why not drop the oldest?",
     presentation: "editorial",
+    practice,
     setup: "The first key stored can still be the one you need. Follow a read, then decide what deserves to stay.",
     teaching,
     trust: "computed",

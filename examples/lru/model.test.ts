@@ -122,3 +122,17 @@ test("the prediction precedes the first eviction and answers from the current re
   assert.ok(prompt.choices.includes(prompt.answer));
   assert.match(compiled.steps.at(-1)!.caption,/last read, not the first arrival/);
 });
+
+test("practice questions: the model's answer is one of the choices, and it is the key used least recently", async () => {
+  const { practice } = await import("./scene.ts");
+  for (let seed = 0; seed < 50; seed++) {
+    const q = practice(seed);
+    assert.ok(q.choices.includes(q.answer), `seed ${seed}`);
+    assert.equal(new Set(q.choices).size, q.choices.length);
+    // Independently: the least recently used of the choices, by last position in the history.
+    const history = q.question.match(/so far: ([A-E ]+)\./)![1]!.split(" ");
+    const lastUse = (k: string) => history.lastIndexOf(k);
+    const lru = [...q.choices].sort((a, b) => lastUse(a) - lastUse(b))[0];
+    assert.equal(q.answer, lru, `seed ${seed}: ${q.question}`);
+  }
+});
