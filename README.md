@@ -15,6 +15,7 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#gallery">Gallery</a> ·
   <a href="#what-the-reader-gets">What the reader gets</a> ·
+  <a href="#install">Install</a> ·
   <a href="#usage">Usage</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#requirements">Requirements</a> ·
@@ -46,7 +47,7 @@ Then, in Claude Code:
 /visualize explain how an LRU cache works
 ```
 
-That's it. The folder must be named `visualize`, the same as the skill's `name`. For any other agent that reads Agent Skills, clone it into that agent's skills folder instead.
+That's it. For Codex or Antigravity, clone into that agent's folder instead (see [Install](#install)); in Codex, type `$visualize`.
 
 ## Gallery
 
@@ -82,9 +83,56 @@ Every screenshot is the light theme of a page built from [`examples/`](examples)
 | **Predict, What if, Now you try** | A pause to predict before the key moment, the same idea on other inputs, and questions the model makes and marks. |
 | **A page you own** | One standalone HTML file per scene, light and dark themes, reduced motion, keyboard control, `#step=` links and a text version of every step. Also an SVG of any step, or a React component. |
 
+## Install
+
+Visualize is a standard [Agent Skill](https://agentskills.io): a folder with a `SKILL.md` at its root. This repository is that folder. Clone it into your agent's skills folder under the name `visualize`, then run `npm install` in it once.
+
+| Agent | Command | Run it with |
+|---|---|---|
+| **Claude Code** | `git clone https://github.com/Aaryan1524/Visualize.git ~/.claude/skills/visualize` | `/visualize …` |
+| **Codex** | `git clone https://github.com/Aaryan1524/Visualize.git ~/.agents/skills/visualize` | `$visualize …` |
+| **Antigravity** (CLI) | `git clone https://github.com/Aaryan1524/Visualize.git ~/.gemini/config/skills/visualize` | `/visualize …` |
+| **Antigravity** (app) | `git clone https://github.com/Aaryan1524/Visualize.git ~/.gemini/antigravity/skills/visualize` | `/visualize …` |
+| **One project, any agent** | clone into `.claude/skills/visualize` or `.agents/skills/visualize` in the project | as above |
+
+Then, in the folder you cloned into:
+
+```sh
+npm install
+```
+
+Each agent picks the skill up in a new session. To update later, `git pull` in that folder.
+
+<details>
+<summary><b>Codex: if the checks can't start Chrome</b></summary>
+
+<br>
+
+The skill checks every page in headless Chrome. Codex's sandbox can stop Chrome from starting; the page is still built, and only the checks fail, with a message that says so. When Codex asks to run the check outside the sandbox, approve it for that command (this needs the default `approval_policy = "on-request"`). Or run the check yourself in a normal terminal: `node ~/.agents/skills/visualize/scripts/verify.mjs <scene folder>`.
+
+</details>
+
+<details>
+<summary><b>Antigravity: running without prompts</b></summary>
+
+<br>
+
+In headless mode (`agy -p`), Antigravity can't ask for permission, so it needs allow rules for the skill folder and for `node`. Add them under `permissions.allow` in its `settings.json`, or pass them for one session with `--settings`:
+
+```json
+{ "permissions": { "allow": [
+  "read_file(~/.gemini/config/skills/visualize)",
+  "command(node ~/.gemini/config/skills/visualize/scripts/)"
+] } }
+```
+
+Add `read_file` and `write_file` rules for your project folder too. In the interactive app, approve each command when asked.
+
+</details>
+
 ## Usage
 
-Type `/visualize` and say what the reader should understand:
+Type `/visualize` (in Codex, `$visualize`) and say what the reader should understand:
 
 ```text
 /visualize explain how an LRU cache works
@@ -174,7 +222,7 @@ node scripts/shoot.mjs dist/lru-3d.html --out shot.png --step 4 --scale 4
 
 | | Needed for | Notes |
 |---|---|---|
-| **[Claude Code](https://code.claude.com/docs/en/overview)** or another agent that reads [Agent Skills](https://agentskills.io) | everything | Written for Claude Code; the skill follows the open Agent Skills format. |
+| **[Claude Code](https://code.claude.com/docs/en/overview)**, [Codex](https://developers.openai.com/codex/skills) or [Antigravity](https://antigravity.google) | everything | The skill follows the open Agent Skills format, so any agent that reads it can load it. Tested end to end in all three. |
 | **Node.js 24+** | builds, checks | TypeScript runs directly through type stripping. Run `npm install` (or `pnpm install`) once in the skill folder. |
 | **Chrome or Chromium** | the checks | Found in the usual places on macOS, Linux and Windows. Set `CHROME_PATH` for any other binary. |
 | **About 90 MB, once** | the voice | The open-source voice model downloads on first use, then works offline. |

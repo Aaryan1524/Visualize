@@ -22,11 +22,18 @@ export function chromePath() {
 }
 
 export async function launch() {
-  return puppeteer.launch({
-    executablePath: chromePath(),
-    headless: true,
-    args: ["--allow-file-access-from-files", "--font-render-hinting=none"],
-  });
+  try {
+    return await puppeteer.launch({
+      executablePath: chromePath(),
+      headless: true,
+      args: ["--allow-file-access-from-files", "--font-render-hinting=none"],
+    });
+  } catch (e) {
+    // Agent sandboxes (Codex's, for one) stop Chrome from starting; the error alone does not say so.
+    const hint = "Chrome could not start. If this runs inside an agent's sandbox, run this command outside it " +
+      "(approve it when the agent asks), or run it yourself in a normal terminal. The page itself is built; only the checks need Chrome.";
+    throw new Error(`${e?.message ?? e}\n${hint}`, { cause: e });
+  }
 }
 
 /**

@@ -2,7 +2,7 @@
 name: visualize
 description: Build step-through visual explanations whose picture is checked against an executable model, drawn in one constrained isometric style from finished parts (rails, rings, markers, reservoirs, sources, gates, terminals, servers, ledgers, cables, plates) in the shape the field already draws, with flat linked panels for equations, grids and sequence diagrams. Use whenever someone wants an algorithm, data structure, protocol, distributed-system behaviour, ML mechanism or paper method explained visually, animated or step by step, for docs, a blog, a course, onboarding or a paper companion, even if they never say "visualize". Outputs a standalone HTML page, a standalone SVG of any step, or a React component; every number on the page is verified against the model in headless Chrome.
 license: MIT
-compatibility: Node.js 24+ (runs TypeScript directly) and Google Chrome or Chromium for verification. Run `npm install` (or `pnpm install`) once in this folder.
+compatibility: Works in Claude Code, Codex and Antigravity. Needs Node.js 24+ (runs TypeScript directly) and Google Chrome or Chromium for verification. Run `npm install` (or `pnpm install`) once in this folder.
 metadata:
   version: "1.0.0"
 ---
