@@ -1,14 +1,13 @@
 // node explore/escalator/cutaway/build.mjs  ->  escalator-cutaway.html next to this file.
 // No dependencies. The page runs the same model.mjs the tests run (inlined below).
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import * as M from "./model.mjs";
+import { MODELS, VARIANTS, arcPts as modelArcPts } from "./model.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "../../..");
-const { P, STEP, PATH, LAND, STRUCT, DRIVE, Rs } = M;
 
 // ---------------------------------------------------------------- helpers
 const f1 = (v) => (Math.round(v * 10) / 10).toString();
@@ -16,7 +15,7 @@ const pt = (p) => `${f1(p[0])},${f1(-p[1])}`; // world (y up) -> svg (y down)
 const poly = (pts, close = true) => "M" + pts.map(pt).join("L") + (close ? "Z" : "");
 const line = (a, b) => `M${pt(a)}L${pt(b)}`;
 const circ = (c, r) => `M${f1(c[0] - r)},${f1(-c[1])}a${f1(r)},${f1(r)} 0 1,0 ${f1(2 * r)},0a${f1(r)},${f1(r)} 0 1,0 ${f1(-2 * r)},0Z`;
-const arcPts = (c, r, a0, a1, n = 48) => M.arcPts(c, r, a0, a1, n);
+const arcPts = (c, r, a0, a1, n = 48) => modelArcPts(c, r, a0, a1, n);
 const add = (a, b) => [a[0] + b[0], a[1] + b[1]];
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
@@ -79,10 +78,14 @@ const offsetPolyline = (pts, d) =>
     return [p[0] + (ty / m) * d, p[1] - (tx / m) * d];
   });
 
-// ---------------------------------------------------------------- frame of the drawing (mm)
+// ---------------------------------------------------------------- frame of the drawing (mm), shared by every variant
 const VB = { x0: -2450, x1: 11750, y0: -1700, y1: 4850 };
 const viewBox = `${VB.x0} ${-VB.y1} ${VB.x1 - VB.x0} ${VB.y1 - VB.y0}`;
-const FS = 128; // label font size in mm (about 12.5 px at 1440 wide)
+const FS = 150; // label font size in mm (about 12 px in the 1440 x 900 stage)
+
+// Everything drawn for one escalator. Called once per variant; the page swaps between them.
+function makeDrawing(M) {
+const { P, STEP, PATH, LAND, STRUCT, DRIVE, Rs } = M;
 
 // ---------------------------------------------------------------- the step symbol (local frame)
 const { t, f, rc, rt } = STEP;
@@ -157,8 +160,9 @@ const BLD = (() => {
   const xFlatBot = knee + (-1550 + 1589) / k;
   const lower = [[VB.x0, ffl0], [-1250, ffl0], [-1250, -1300], [knee, -1300], [xBedTop, ffl0], [VB.x1, ffl0], [VB.x1, ffl0 - th], [xBedBot, ffl0 - th], [xFlatBot, -1550], [-1500, -1550], [-1500, ffl0 - th], [VB.x0, ffl0 - th]];
   const pitWall = xS + 2050;
-  const upper = [[7400, 1380], [pitWall, 1380], [pitWall, ffl1], [VB.x1, ffl1], [VB.x1, ffl1 - th], [pitWall + th, ffl1 - th], [pitWall + th, 1130], [7400, 1130]];
-  return { lower, upper, bedTop, xBedTop, pitWall, ffl0, ffl1, th };
+  const xSlab = VB.x1 - 640; // the upper slab stops short: the rise is dimensioned beyond it
+  const upper = [[xS - 1360, 1380], [pitWall, 1380], [pitWall, ffl1], [xSlab, ffl1], [xSlab, ffl1 - th], [pitWall + th, ffl1 - th], [pitWall + th, 1130], [xS - 1360, 1130]];
+  return { lower, upper, bedTop, xBedTop, pitWall, ffl0, ffl1, th, xSlab };
 })();
 
 function breakLine(x, y0, y1) {
@@ -193,7 +197,7 @@ const TRUSS = (() => {
 // ---------------------------------------------------------------- rails and chain band
 const RAILS = M.rails();
 const pl = (pts) => "M" + pts.map(pt).join("L");
-const chainLoop = M.sampleLocus((s) => M.chainPoint(s), PATH, 12);
+const chainLoop = M.sampleLocus((s) => M.chainPoint(s), 12);
 const chainBand = (() => {
   const n = chainLoop.length;
   const off = (d) =>
@@ -314,11 +318,11 @@ const HRD = (() => {
 
 // ---------------------------------------------------------------- detail A
 const DET = (() => {
-  const k = 2.6, R = 1450;
+  const k = 2.6, R = 1380;
   const sIn = PATH.by.incline.s0 + 1560;
   const c0 = M.chainPoint(sIn);
-  const src = [c0[0] - 40, c0[1] + 225];
-  const at = [930, 3360];
+  const src = [c0[0] + 20, c0[1] + 225];
+  const at = [2100, 3440];
   return { k, R, r: R / k, src, at, sIn };
 })();
 const toA = (p) => [DET.at[0] + DET.k * (p[0] - DET.src[0]), DET.at[1] + DET.k * (p[1] - DET.src[1])];
@@ -332,25 +336,25 @@ const retAt = (x) => {
   return [x, a[1] + u * (b[1] - a[1])];
 };
 const passRailAt = (rail, x) => [x, yOn(rail, x)];
-const RC = 10080; // right column, above the upper floor
+const RC = xS + 1320; // right column, above the upper floor
 const LABELS = [
   // beat 1: the loop
   { id: "dchain", text: "Drive chain", at: [RC, 4600], to: DRV.chain[0][0].map((v, i) => (v + DRV.chain[0][1][i]) / 2), beats: [1] },
   { id: "gear", text: "Gearbox", at: [RC, 4370], to: [DRV.G[0] + 120, DRV.G[1] + 330], beats: [1] },
-  { id: "motor", text: "Drive motor", at: [RC, 4140], to: [DRV.G[0] + 720, DRV.yW + 190], beats: [1, 5] },
-  { id: "chain", text: "Step chain", at: [6700, 560], to: null, beats: [1] },
-  { id: "dsprocket", text: "Drive sprocket", at: [7600, 900], to: [xS - Rs * 0.5, yS - Rs * 0.87], beats: [1], anchor: "end" },
+  { id: "motor", text: "Drive motor", at: [RC, 4140], to: [DRV.G[0] + 820, DRV.yW + 150], beats: [1, 5] },
+  { id: "chain", text: "Step chain", at: [xS - 2060, 560], to: null, beats: [1] },
+  { id: "dsprocket", text: "Drive sprocket", at: [xS - 1160, 900], to: [xS - Rs * 0.5, yS - Rs * 0.87], beats: [1], anchor: "end" },
   { id: "truss", text: "Truss", at: [-2380, -1250], to: null, beats: [1] },
   { id: "tsprocket", text: "Tension sprocket", at: [-2380, -760], to: [-Rs * 0.7, -Rs - Rs * 0.72], beats: [1, 4] },
   // beat 3: the landing
-  { id: "converge", text: "Tracks converge", at: [7100, 4700], to: null, beats: [3], anchor: "end" },
+  { id: "converge", text: "Tracks converge", at: [xS - 1660, 4700], to: null, beats: [3], anchor: "end" },
 
   // beat 4: turn and return
 
-  { id: "inverted", text: "Return run, steps upside down", at: [6700, 560], to: null, beats: [4] },
+  { id: "inverted", text: "Return run, steps upside down", at: [xS - 2060, 560], to: null, beats: [4] },
   // beat 5: the handrail
-  { id: "balustrade", text: "Balustrade", at: [3600, 4300], to: null, beats: [5], anchor: "end" },
-  { id: "handrail", text: "Handrail", at: [3600, 3990], to: null, beats: [5], anchor: "end" },
+  { id: "balustrade", text: "Balustrade", at: [4300, 4560], to: null, beats: [5], anchor: "end" },
+  { id: "handrail", text: "Handrail", at: [4300, 4250], to: null, beats: [5], anchor: "end" },
   { id: "sheave", text: "Handrail sheave", at: [RC, 4600], to: [HR.Cu[0] + HR.rN * 0.72, HR.Cu[1] + HR.rN * 0.66], beats: [5] },
   { id: "hrchain", text: "Handrail drive chain", at: [RC, 4370], to: null, beats: [5] },
 ];
@@ -370,13 +374,13 @@ function D() {
   void upOut;
   // convergence: the trailer rail in the upper transition
   const tp = RAILS.trailer.pass;
-  L.converge.to = passRailAt(tp, 7330);
+  L.converge.to = passRailAt(tp, xS - 1430);
   // an inverted step on the return incline: its tread underside
   const sRet = retInc.s0 + 2400;
   const pose = M.stepPose(sRet);
   L.inverted.to = M.toWorld(pose, [-150, t - 4]);
-  L.handrail.to = [4250, yOn(HR.outer.filter((p, i) => i < HR.loop.length / 2), 4250) - 2];
-  L.balustrade.to = [4750, yOn(profile(640), 4750)];
+  L.handrail.to = [4450, yOn(HR.outer.filter((p, i) => i < HR.loop.length / 2), 4450) - 2];
+  L.balustrade.to = [4900, yOn(profile(640), 4900)];
   const [a, b] = HRD.tl[0];
   L.hrchain.to = [a[0] + 0.62 * (b[0] - a[0]), a[1] + 0.62 * (b[1] - a[1])];
 }
@@ -396,19 +400,18 @@ function arrow(at, dir) {
 }
 function dims() {
   let s = "";
-  // rise 3000, at the left edge, between the two finished floor levels
-  const xd = -2160;
+  // rise, at the right edge: from the lower floor up to the upper floor level, carried out past the slab end
+  const xd = VB.x1 - 300;
   const y0 = LAND.fflLow, y1 = LAND.fflUp;
-  s += `<path class="dim" d="${line([xd, y0 + 4], [xd, y1 - 4])}${line([xd - 160, y1], [-1500, y1])}"/>`;
+  s += `<path class="dim" d="${line([xd, y0 + 4], [xd, y1 - 4])}${line([BLD.xSlab + 50, y1], [xd + 160, y1])}"/>`;
   s += `<path class="dimhead" d="${arrow([xd, y1], [0, 1])}${arrow([xd, y0], [0, -1])}"/>`;
-  s += `<text class="dimtext" transform="translate(${f1(xd - 50)},${f1(-(y0 + y1) / 2)}) rotate(-90)" text-anchor="middle">3000 rise</text>`;
+  s += `<text class="dimtext" transform="translate(${f1(xd - 60)},${f1(-(y0 + y1) / 2)}) rotate(-90)" text-anchor="middle">${P.rise} rise</text>`;
   // level marks
   const level = (x, y, txt, anchor = "start") =>
     `<path class="dim" d="M${pt([x - 55, y + 95])}L${pt([x + 55, y + 95])}L${pt([x, y])}Z"/>` +
     `<text class="lvltext" x="${f1(x + (anchor === "start" ? 110 : -110))}" y="${f1(-(y + 40))}" text-anchor="${anchor}">${txt}</text>`;
   s += level(-1700, y0, "±0 lower floor");
-  s += level(-1900, y1, "+3000 upper floor");
-  s += level(11520, y1, "+3000", "end");
+  s += `<text class="lvltext" x="${f1(BLD.xSlab + 60)}" y="${f1(-(y1 + 50))}">+${P.rise}</text>`;
   // 30 degrees, at the upper knee of the handrail, in open air above the balustrade
   const th = PATH.th;
   const yu = HR.Cu[1] + HR.rN; // upper handrail flat (centre line)
@@ -421,24 +424,24 @@ function dims() {
   s += `<path class="dim" d="M${arc.map(pt).join("L")}"/>`;
   s += `<path class="dimhead" d="${arrow(arc[0], [0, 1])}${arrow(arc[30], [Math.sin(th), -Math.cos(th)])}"/>`;
   const tp = [K[0] - (R + 170) * Math.cos(th / 2), K[1] - (R + 170) * Math.sin(th / 2)];
-  s += `<text class="dimtext" x="${f1(tp[0])}" y="${f1(-tp[1] + 45)}" text-anchor="end">30°</text>`;
+  s += `<text class="dimtext" x="${f1(tp[0])}" y="${f1(-tp[1] + 45)}" text-anchor="end">${P.incline}°</text>`;
   return s;
 }
 function titleBlock() {
-  const x0 = 6900, x1 = VB.x1 - 60, y1 = -170, y0 = -1640;
+  const x0 = 6750, x1 = VB.x1 - 60, y1 = -170, y0 = -1640;
   let s = `<g class="tblock"><path class="tb-frame" d="${poly([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])}"/>`;
   s += `<path class="tb-rule" d="${line([x0, y1 - 400], [x1, y1 - 400])}${line([x0, y1 - 1080], [x1, y1 - 1080])}"/>`;
   s += `<text class="tb-title" x="${x0 + 110}" y="${-(y1 - 260)}">ESCALATOR · SIDE ELEVATION, CUTAWAY</text>`;
   s += `<text class="tb-small" x="${x1 - 110}" y="${-(y1 - 260)}" text-anchor="end">dimensions in mm</text>`;
   const facts = [
-    `Rise 3000 · incline 30° · step pitch 400 · step rise 400 sin 30° = 200 · going 346.4`,
+    `Rise ${P.rise} · incline ${P.incline}° · step pitch ${P.pitch} · step rise ${P.pitch} sin ${P.incline}° = ${M.stepRise.toFixed(1).replace(/\.0$/, "")} · going ${M.stepGoing.toFixed(1)}`,
     `${PATH.N} steps · step width 1000 (not drawn) · steps and handrail at 0.5 m/s`,
     `Sprockets ${P.teeth} T, pitch Ø ${(2 * Rs).toFixed(0)} · main shaft ${DRIVE.shaftRpm.toFixed(2)} rpm · near-side truss removed`,
   ];
   facts.forEach((txt, i) => (s += `<text class="tb-text" x="${x0 + 110}" y="${-(y1 - 600 - i * 200)}">${esc(txt)}</text>`));
-  const key = [["k-blue", "Step chain and chain-wheel track"], ["k-teal", "Trailer-wheel track"], ["k-orange", "Followed step"]];
+  const key = [["k-blue", "Chain and chain-wheel track"], ["k-teal", "Trailer-wheel track"], ["k-orange", "Followed step"]];
   s += `<g id="tbkey" data-x0="${x0 + 110}" data-x1="${x1 - 110}">`;
-  for (const [cls, txt] of key) s += `<g class="tbk"><path class="${cls}" d="M0,${-(y1 - 1290)}h260"/><text class="tb-text" x="0" y="${-(y1 - 1330)}">${txt}</text></g>`;
+  for (const [cls, txt] of key) s += `<g class="tbk"><path class="${cls}" d="M0,${-(y1 - 1290)}h240"/><text class="tb-text tb-key" x="0" y="${-(y1 - 1330)}">${txt}</text></g>`;
   return s + "</g></g>";
 }
 
@@ -472,9 +475,9 @@ function scene() {
   const tr = RAILS.trailer;
   S.push(`<g class="part" data-part="trailertrack"><path class="rail-teal" d="${pl(tr.pass)}${pl(tr.ret)}${pl(tr.upIn)}${pl(tr.upOut)}${pl(tr.lowIn)}${pl(tr.lowOut)}"/></g>`);
   S.push(`<g class="part" data-part="chain"><path class="chain-band" d="${chainBand}"/><g id="pins"></g></g>`);
-  S.push(`<g class="part" data-part="wheels" id="wheels"></g>`);
-  S.push(`<g class="part" data-part="handrail"><path class="hr-band" d="${poly(HR.outer)}${poly(HR.inner)}" fill-rule="evenodd"/><g id="hrticks"></g>` +
-    `<g id="sheaveU" transform="translate(${f1(HR.Cu[0])},${f1(-HR.Cu[1])})"><g class="rot"><use href="#sheave"/></g></g>` +
+  S.push(`<g class="part" data-part="twheels" id="wheelsT"></g><g class="part" data-part="cwheels" id="wheelsC"></g>`);
+  S.push(`<g class="part" data-part="handrail"><path class="hr-band" d="${poly(HR.outer)}${poly(HR.inner)}" fill-rule="evenodd"/><g id="hrticks"></g></g>` +
+    `<g class="part" data-part="sheaves"><g id="sheaveU" transform="translate(${f1(HR.Cu[0])},${f1(-HR.Cu[1])})"><g class="rot"><use href="#sheave"/></g></g>` +
     `<g id="sheaveL" transform="translate(${f1(HR.Cl[0])},${f1(-HR.Cl[1])})"><g class="rot"><use href="#sheave"/></g></g></g>`);
   S.push(`<g class="part" data-part="drive"><path class="drv-frame" d="${poly(DRV.frame)}${DRV.frameWeb}"/>` +
     `<path class="drv-body" d="${poly(DRV.box)}${poly(DRV.motor)}${poly(DRV.fan)}${poly(DRV.brake)}${poly(DRV.tbox)}"/>` +
@@ -486,7 +489,7 @@ function scene() {
     `<path class="st-line" d="${teeth(LAND.combUp, LAND.treadUp, -1)}${teeth(LAND.combLow, LAND.treadLow, 1)}"/></g>`);
   S.push(`<g class="part" data-part="building"><path class="slab" d="${poly(BLD.lower)}${poly(BLD.upper)}"/>` +
     `<path class="hatch" d="${hatch(BLD.lower, 70)}${hatch(BLD.upper, 70)}"/>` +
-    `<path class="brk" d="${breakLine(VB.x0 + 2, BLD.ffl0 - BLD.th, BLD.ffl0)}${breakLine(VB.x1 - 2, BLD.ffl0 - BLD.th, BLD.ffl0)}${breakLine(VB.x1 - 2, BLD.ffl1 - BLD.th, BLD.ffl1)}"/></g>`);
+    `<path class="brk" d="${breakLine(VB.x0 + 2, BLD.ffl0 - BLD.th, BLD.ffl0)}${breakLine(VB.x1 - 2, BLD.ffl0 - BLD.th, BLD.ffl0)}${breakLine(BLD.xSlab - 2, BLD.ffl1 - BLD.th, BLD.ffl1)}"/></g>`);
   S.push(`<g class="part" data-part="truss"><path class="slab" d="${STRUCT.members.map((m) => poly(m)).join("")}"/><path class="hatch" d="${STRUCT.members.map((m) => hatch(m, 30)).join("")}"/></g>`);
   return S.join("\n");
 }
@@ -510,6 +513,8 @@ const DETAILS = [
   { id: "B", src: [LAND.combUp - 120, LAND.treadUp - 90], k: 2.6, full: [3], dim: [], leader: false, title: "upper landing" },
   { id: "C", src: [xS + 130, yS + 10], k: 1.6, full: [4], dim: [], leader: false, title: "upper turnaround" },
 ];
+// label slots beside the inset: two on the right (r1 above r2), two on the left (l1 above l2)
+const SLOT = { r1: [DET.at[0] + DET.R + 230, 4520], r2: [DET.at[0] + DET.R + 230, 4220], l1: [DET.at[0] - DET.R - 230, 2720], l2: [DET.at[0] - DET.R - 230, 2400] };
 const toD = (d, p) => [DET.at[0] + d.k * (p[0] - d.src[0]), DET.at[1] + d.k * (p[1] - d.src[1])];
 function detailGroup(d) {
   const { at, R } = DET;
@@ -527,8 +532,8 @@ function detailGroup(d) {
 <circle class="det-bg" cx="${f1(at[0])}" cy="${f1(-at[1])}" r="${R}"/>
 <g clip-path="url(#clipA)"><use href="#scene" transform="translate(${f1(at[0])},${f1(-at[1])}) scale(${k}) translate(${f1(-src[0])},${f1(src[1])})"/></g>
 <circle class="det-ring" cx="${f1(at[0])}" cy="${f1(-at[1])}" r="${R}"/>
-${d.id === "A" ? `<rect id="detailFrame" x="${f1(-2450)}" y="${f1(-(at[1] + R + 60))}" width="${f1(at[0] + R + 2250 + 2450)}" height="${f1(2 * R + 420)}" fill="none" stroke="none"/>` : ""}
-<text class="det-title" x="${f1(at[0])}" y="${f1(-(at[1] - R - 230))}" text-anchor="middle">DETAIL ${d.id}  ·  ${k} : 1${d.title ? `  ·  ${d.title.toUpperCase()}` : ""}</text>
+${d.id === "A" ? `<rect id="detailFrame" x="${f1(at[0] - R - 1500)}" y="${f1(-(at[1] + R + 60))}" width="${f1(2 * R + 3300)}" height="${f1(2 * R + 420)}" fill="none" stroke="none"/>` : ""}
+<text class="det-title" x="${f1(at[0] + 550)}" y="${f1(-(at[1] - R - 230))}" text-anchor="end">DETAIL ${d.id}  ·  ${k} : 1${d.title ? `  ·  ${d.title.toUpperCase()}` : ""}</text>
 ${d.id === "A" ? `<g id="detLive"></g>` : ""}
 ${detailLabels(d)}
 </g>`;
@@ -539,99 +544,185 @@ function detailLabels(d) {
     const c0 = M.chainPoint(DET.sIn);
     const blue = toD(d, [c0[0] + 230, yOn(RAILS.chain.pass, c0[0] + 230)]);
     const teal = toD(d, [c0[0] - 330, yOn(RAILS.trailer.pass, c0[0] - 330)]);
-    return one("dct", "Chain-wheel track", [2600, 2960], blue, "start", 2) + one("dtt", "Trailer-wheel track", [-720, 2380], teal, "end", 2);
+    return one("dct", "Chain-wheel track", SLOT.r1, blue, "start", 2) + one("dtt", "Trailer-wheel track", SLOT.l2, teal, "end", 2);
   }
   if (d.id === "B") {
     const comb = toD(d, [LAND.combUp + 80, LAND.treadUp + 18]);
     const plate = toD(d, [LAND.combUp + 330, LAND.fflUp - 7]);
     const blue = toD(d, [LAND.combUp - 300, yOn(RAILS.chain.pass, LAND.combUp - 300)]);
     const teal = toD(d, [LAND.combUp - 520, yOn(RAILS.trailer.pass, LAND.combUp - 520)]);
-    return one("bcomb", "Comb plate", [2600, 2640], comb, "start", 3) + one("bplate", "Landing floor plate", [2600, 2960], plate, "start", 3) +
-      one("btt", "Trailer-wheel track", [-720, 2700], teal, "end", 3) + one("bct", "Chain-wheel track", [-720, 2380], blue, "end", 3);
+    return one("bcomb", "Comb plate", SLOT.r1, comb, "start", 3) + one("bplate", "Floor plate", SLOT.r2, plate, "start", 3) +
+      one("btt", "Trailer-wheel track", SLOT.l1, teal, "end", 3) + one("bct", "Chain-wheel track", SLOT.l2, blue, "end", 3);
   }
   const sp = toD(d, [xS - Rs * 0.2, yS - Rs * 1.08]);
   const upOut = RAILS.trailer.upOut;
   const g = toD(d, upOut.reduce((m, p) => (p[0] > m[0] ? p : m), upOut[0]));
   const shaft = toD(d, [xS - 60, yS + 70]);
-  return one("csp", "Drive sprocket", [-720, 2380], sp, "end", 4) + one("cguide", "Trailer-wheel guide", [2600, 2640], g, "start", 4) +
-    one("cshaft", "Main shaft (cut)", [-720, 2700], shaft, "end", 4);
+  return one("csp", "Drive sprocket", SLOT.l2, sp, "end", 4) + one("cguide", "Trailer-wheel guide", SLOT.r1, g, "start", 4) +
+    one("cshaft", "Main shaft (cut)", SLOT.l1, shaft, "end", 4);
 }
 
-const SVG = `<svg id="fig" xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Side elevation of an escalator, cut away to show the step chain, the two wheel tracks, the sprockets, the drive and the handrail">
-${defs()}
+const inner = `${defs()}
 <g id="scene">
 ${scene()}
 </g>
-<g id="dims" class="part" data-part="dims">${dims()}</g>
+<g id="dims">${dims()}</g>
 <g id="labels">${LABELS.map(labelSvg).join("")}</g>
 ${DETAILS.map(detailGroup).join("\n")}
-${titleBlock()}
-</svg>`;
+${titleBlock()}`;
+return { inner, DET, HR, SLOT, xS };
+}
 
-// ---------------------------------------------------------------- story
-const sIn = DET.sIn;
-const BEATS = [
-  { tab: "The loop", from: 19900, pose: 800, focus: ["chain", "sprockets", "drive"],
-    cap: "An endless chain carries the steps around a closed loop, and a motor turns the top sprocket that pulls it." },
-  { tab: "Two wheels, two tracks", from: 2000, pose: sIn, focus: ["steps", "wheels", "chaintrack", "trailertrack"],
-    cap: "Each step rides on a chain wheel and a trailer wheel running on separate tracks, and the offset between them keeps the tread level on the slope." },
-  { tab: "The landing", from: 6200, pose: 9150, focus: ["steps", "wheels", "chaintrack", "trailertrack", "landing"],
-    cap: "Near the top the two tracks come together, so the steps flatten into a walkway and slide under the comb plate." },
-  { tab: "Turn and return", from: 9500, pose: 10066, focus: ["steps", "wheels", "chaintrack", "trailertrack", "chain", "sprockets"],
-    cap: "Around the drive sprocket the steps turn over and travel back underneath, upside down." },
-  { tab: "The handrail", from: 13200, pose: 15500, focus: ["handrail", "hrdrive", "balustrade", "drive"],
-    cap: "The handrail is a separate loop driven from the same main shaft, so it moves at the same 0.5 m/s as the steps." },
+
+// ---------------------------------------------------------------- the story, per variant
+const STEPS = [
+  { tab: null, heading: "How does a moving staircase keep every step level?", focus: null },
+  { tab: "The loop", heading: "One endless chain carries every step.", focus: ["chain", "sprockets", "drive"] },
+  { tab: "Two wheels", heading: "Two wheels on two tracks keep each tread level.", focus: ["steps", "cwheels", "twheels", "chaintrack", "trailertrack"] },
+  { tab: "The landing", heading: "The tracks meet, and the stairs flatten.", focus: ["steps", "cwheels", "twheels", "chaintrack", "trailertrack", "landing"] },
+  { tab: "Turn and return", heading: "Each step turns over and rides back underneath.", focus: ["steps", "cwheels", "twheels", "chaintrack", "trailertrack", "chain", "sprockets"] },
+  { tab: "The handrail", heading: "The handrail is its own loop, at the same speed.", focus: ["handrail", "sheaves", "hrdrive", "balustrade", "drive"] },
 ];
-const S_START = BEATS[0].from;
-const tauOf = (s) => (((s - S_START) % PATH.L) + PATH.L) % PATH.L / P.speed;
-const focusCss = BEATS.map((b, i) => b.focus.map((p) => `#fig[data-beat="${i + 1}"] .part[data-part="${p}"]`).join(",\n") + "{opacity:1}").join("\n");
+// Longer captions for the Details drawer, with the numbers taken from the model.
+function captions(M) {
+  const P = M.P, off = -M.STEP.T[0] * Math.tan((P.incline * Math.PI) / 180) + M.STEP.T[1];
+  return [
+    `An escalator is a staircase that never stops: ${M.PATH.N} steps ride one endless loop, up the slope, round the top and back underneath. This one rises ${P.rise} mm at ${P.incline}° and runs at ${P.speed / 1000} m/s.`,
+    `The step chain is an endless loop of ${(P.pitch / P.links).toFixed(1)} mm links wrapped round a ${P.teeth}-tooth sprocket at each end. The motor drives the upper sprocket through a ${M.DRIVE.gearRatio.toFixed(1)} : 1 gearbox and a duplex chain, so the main shaft turns at ${M.DRIVE.shaftRpm.toFixed(2)} rpm and the chain moves at ${P.speed / 1000} m/s. The lower sprocket rides on a spring-loaded tension carriage.`,
+    `Each step has a chain wheel on its front axle and a trailer wheel ${-M.STEP.T[0]} mm behind it. On the incline the trailer-wheel track runs ${off.toFixed(1)} mm higher than the chain-wheel track, which lifts the back of the step by exactly the slope over that wheelbase, so the tread stays level. Neighbouring treads are ${M.stepRise.toFixed(1)} mm apart in height and ${M.stepGoing.toFixed(1)} mm apart along the floor.`,
+    `Through the upper curve the trailer-wheel track comes down to ${M.STEP.T[1]} mm above the chain-wheel track, the same as the wheels' own height difference. The rise between neighbouring treads falls to zero, two or three treads lie flat as a walkway, and they pass under the comb plate, whose teeth run in the tread grooves.`,
+    `Past the comb the chain wraps the drive sprocket. The trailer wheel runs in a closed guide that eases each step through half a turn, so it travels back under the passenger run upside down and turns upright again round the tension sprocket.`,
+    `The handrail runs over a sheave in each newel and back inside the balustrade. A chain from the main shaft (${M.DRIVE.zH1} to ${M.DRIVE.zH2} teeth) turns the upper sheave, whose radius is chosen so the rail moves at the same ${P.speed / 1000} m/s as the steps.`,
+  ];
+}
 
-// handrail loop, decimated for the runtime
-const hrPts = [], hrCum = [];
-for (let i = 0; i < HR.loop.length; i += 1) (hrPts.push(HR.loop[i].map((v) => +v.toFixed(1))), hrCum.push(+HR.cum[i].toFixed(1)));
+const VOICE = existsSync(join(HERE, "voice.json")) ? JSON.parse(readFileSync(join(HERE, "voice.json"), "utf8")) : null;
 
-const DATA = {
-  N: PATH.N, L: PATH.L, pitch: P.pitch, links: P.links, speed: P.speed, Rs,
-  sUp0: PATH.by["upper turn"].s0, sLow0: PATH.by["lower turn"].s0,
-  T: PATH.L / P.speed,
-  beats: BEATS.map((b) => ({ from: tauOf(b.from), pose: tauOf(b.pose), cap: b.cap, focus: b.focus })),
-  det: { at: DET.at, src: DET.src, k: DET.k, r: DET.r, R: DET.R },
-  hr: { pts: hrPts, cum: hrCum, len: +HR.length.toFixed(1), band: HR.band, rN: HR.rN },
-  rc, rt, t, f, FS,
-};
+function variantData(name) {
+  const v = VARIANTS[name], M = MODELS[name];
+  const dr = makeDrawing(M);
+  const by = M.PATH.by, L = M.PATH.L, v0 = M.P.speed;
+  const sIn = dr.DET.sIn;
+  const comb = by["upper landing"].s0 + (M.LAND.combUp + 60 - M.STEP.f - M.PATH.xE);
+  const turnMid = by["upper turn"].s0 + by["upper turn"].len / 2;
+  const back = by["return, incline"].s0 + 2926;
+  // from: where the beat starts on continuous play. pose: the still frame a link or a screenshot
+  // shows. key and frac: on the narrated tour, the moment the voice should meet on screen.
+  const beats = [
+    { from: by["lower turn"].s0 - 233, pose: 800, key: 800, frac: 0.75 },
+    { from: by.incline.s0 + 126, pose: sIn, key: sIn, frac: 0.55 },
+    { from: by["upper transition"].s0 - 1000, pose: comb, key: comb, frac: 0.8 },
+    { from: by["upper turn"].s0 - 33, pose: turnMid, key: turnMid, frac: 0.5 },
+    { from: by["return, incline"].s0 + 626, pose: back, key: back, frac: 0.5 },
+  ];
+  const tracks = VOICE?.variants?.[name] ?? null;
+  const tour = [];
+  if (tracks) {
+    beats.forEach((b, i) => {
+      const tr = tracks[i + 1];
+      // the moment to meet on screen is when the voice names the orange step, if it does
+      const named = tr.links.find((l) => l.ids.includes("followed"));
+      const at = named ? named.start + 0.4 : b.frac * tr.duration;
+      tour[i + 1] = b.key - v0 * at;
+    });
+    tour[0] = tour[1] - v0 * (tracks[0].duration + 0.6);
+  }
+  const hr = { pts: dr.HR.loop.map((p) => [+p[0].toFixed(1), +p[1].toFixed(1)]), cum: dr.HR.cum.map((c) => +c.toFixed(1)), len: +dr.HR.length.toFixed(1), band: dr.HR.band, rN: dr.HR.rN };
+  return {
+    name, label: v.label, over: { incline: v.incline, rise: v.rise },
+    svg: dr.inner,
+    det: { at: dr.DET.at, src: dr.DET.src, k: dr.DET.k, r: dr.DET.r, R: dr.DET.R, slot: dr.SLOT },
+    hr, beats, tour, L, start: beats[0].from,
+    captions: captions(M),
+    voice: tracks,
+    readout: { rise: M.stepRise, going: M.stepGoing, N: M.PATH.N, rpm: M.DRIVE.shaftRpm, ride: M.rideTime },
+  };
+}
+const VARIANT_DATA = Object.fromEntries(Object.keys(VARIANTS).map((n) => [n, variantData(n)]));
 
 // ---------------------------------------------------------------- runtime (runs in the page)
-function runtime(D) {
+function runtime(DATA) {
   const NS = "http://www.w3.org/2000/svg";
   const $ = (id) => document.getElementById(id);
-  const fig = $("fig");
+  const root = $("vz"), fig = $("fig"), stage = $("stage");
+  const fx = (v) => v.toFixed(1);
+  const DEGR = 180 / Math.PI;
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const STEPS = DATA.steps, LAST = STEPS.length - 1;
   const mk = (tag, attrs, parent) => {
     const e = document.createElementNS(NS, tag);
     for (const k in attrs) e.setAttribute(k, attrs[k]);
     if (parent) parent.appendChild(e);
     return e;
   };
-  const DEGR = 180 / Math.PI;
-  const fx = (v) => v.toFixed(1);
-  // dynamic parts
-  const stepEls = [], wcEls = [], wtEls = [], pinEls = [], tickEls = [];
-  for (let i = D.N - 1; i >= 0; i--) {
-    stepEls[i] = mk("use", { href: "#stepSym", class: i === 0 ? "step followed" : "step" }, $("steps"));
-  }
-  for (let i = D.N - 1; i >= 0; i--) {
-    wtEls[i] = mk("use", { href: "#wheelT", class: i === 0 ? "followed" : "" }, $("wheels"));
-    wcEls[i] = mk("use", { href: "#wheelC", class: i === 0 ? "followed" : "" }, $("wheels"));
-  }
-  for (let k = 0; k < D.N * D.links; k++) if (k % D.links) pinEls.push([k, mk("circle", { class: "pin", r: 13 }, $("pins"))]);
-  const TICK = 300, nTicks = Math.floor(D.hr.len / TICK), tickGap = D.hr.len / nTicks;
-  for (let j = 0; j < nTicks; j++) tickEls.push(mk("path", { class: "tick" }, $("hrticks")));
-  const rotUp = document.querySelector("#spUp .rot"), rotLow = document.querySelector("#spLow .rot");
-  const shU = document.querySelector("#sheaveU .rot"), shL = document.querySelector("#sheaveL .rot");
-  const live = $("detLive");
+  const S = { variant: null, step: -1, travel: 0, running: false, touring: false, voiceOn: true, armed: false, answer: null, last: 0, lit: [], heard: -1 };
+  let V = null, model = null, E = null;
 
+  // ------------------------------------------------ one drawing per variant
+  function mount(name) {
+    V = DATA.variants[name];
+    S.variant = name;
+    model = makeModel(V.over);
+    fig.innerHTML = V.svg;
+    E = { steps: [], wc: [], wt: [], pins: [], ticks: [] };
+    const N = model.PATH.N, links = model.P.links;
+    for (let i = N - 1; i >= 0; i--) E.steps[i] = mk("use", { href: "#stepSym", class: i === 0 ? "step followed" : "step" }, $("steps"));
+    for (let i = N - 1; i >= 0; i--) {
+      E.wt[i] = mk("use", { href: "#wheelT", class: i === 0 ? "followed" : "" }, $("wheelsT"));
+      E.wc[i] = mk("use", { href: "#wheelC", class: i === 0 ? "followed" : "" }, $("wheelsC"));
+    }
+    for (let k = 0; k < N * links; k++) if (k % links) E.pins.push([k, mk("circle", { class: "pin", r: 13 }, $("pins"))]);
+    E.nTicks = Math.floor(V.hr.len / 300);
+    E.tickGap = V.hr.len / E.nTicks;
+    for (let j = 0; j < E.nTicks; j++) E.ticks.push(mk("path", { class: "tick" }, $("hrticks")));
+    E.rotUp = fig.querySelector("#spUp .rot");
+    E.rotLow = fig.querySelector("#spLow .rot");
+    E.shU = fig.querySelector("#sheaveU .rot");
+    E.shL = fig.querySelector("#sheaveL .rot");
+    E.live = $("detLive");
+    E.parts = [...fig.querySelectorAll("#scene .part")];
+    E.details = [...fig.querySelectorAll(".detail")];
+    E.labels = [...fig.querySelectorAll(".label")];
+    layoutText();
+    document.fonts.ready.then(layoutText);
+    for (const b of document.querySelectorAll(".vz-whatif button")) b.setAttribute("aria-pressed", String(b.dataset.variant === name));
+    $("r-rise").textContent = V.readout.rise.toFixed(0);
+    $("r-steps").textContent = String(V.readout.N);
+    $("r-speed").textContent = String(model.P.speed / 1000);
+    scrub.max = String(V.L / DATA.speed);
+    marks.replaceChildren(...V.beats.map((b) => {
+      const m = document.createElement("span");
+      m.style.left = `${(tauOf(b.from) / (V.L / DATA.speed)) * 100}%`;
+      return m;
+    }));
+  }
+
+  // Leaders run from the measured text box to the dot on the part, and the title-block key is
+  // laid out by measured widths; both wait for the web fonts, or they measure the fallback face.
+  function layoutText() {
+    for (const g of E.labels) {
+      const bb = g.querySelector("text").getBBox();
+      const [tx, ty] = g.dataset.to.split(",").map(Number);
+      const cy = bb.y + bb.height * 0.56;
+      const right = tx > bb.x + bb.width / 2;
+      const ax = right ? bb.x + bb.width + 45 : bb.x - 45, ex = ax + (right ? 110 : -110);
+      g.querySelector(".leader").setAttribute("d", `M${fx(ax)},${fx(cy)}L${fx(ex)},${fx(cy)}L${fx(tx)},${fx(ty)}`);
+    }
+    const key = fig.querySelector("#tbkey");
+    let x = +key.dataset.x0;
+    for (const g of key.querySelectorAll(".tbk")) {
+      const t = g.querySelector("text");
+      t.setAttribute("x", "300");
+      g.setAttribute("transform", `translate(${fx(x)},0)`);
+      x += 300 + t.getComputedTextLength() + 170;
+    }
+  }
+
+  // ------------------------------------------------ drawing one moment
   function hrAt(u) {
-    const c = D.hr.cum, p = D.hr.pts;
-    u = ((u % D.hr.len) + D.hr.len) % D.hr.len;
+    const c = V.hr.cum, p = V.hr.pts, len = V.hr.len;
+    u = ((u % len) + len) % len;
     let lo = 0, hi = c.length - 1;
     while (hi - lo > 1) {
       const m = (lo + hi) >> 1;
@@ -639,282 +730,693 @@ function runtime(D) {
       else hi = m;
     }
     const a = p[lo], b = p[(lo + 1) % p.length];
-    const seg = (c[lo + 1] ?? D.hr.len) - c[lo] || 1;
+    const seg = (c[lo + 1] ?? len) - c[lo] || 1;
     const w = (u - c[lo]) / seg;
     const tx = b[0] - a[0], ty = b[1] - a[1], m = Math.hypot(tx, ty) || 1;
     return [a[0] + w * tx, a[1] + w * ty, ty / m, -tx / m];
   }
-  const A = (p) => [D.det.at[0] + D.det.k * (p[0] - D.det.src[0]), D.det.at[1] + D.det.k * (p[1] - D.det.src[1])];
+  const A = (p) => [V.det.at[0] + V.det.k * (p[0] - V.det.src[0]), V.det.at[1] + V.det.k * (p[1] - V.det.src[1])];
   const P2 = (p) => `${fx(p[0])},${fx(-p[1])}`;
-
-  function render(travel) {
-    for (let i = 0; i < D.N; i++) {
-      const s = travel - i * D.pitch;
-      const p = stepPose(s);
-      const tr = `translate(${fx(p.x)},${fx(-p.y)})`;
-      stepEls[i].setAttribute("transform", `${tr} rotate(${(-p.phi * DEGR).toFixed(2)})`);
-      wcEls[i].setAttribute("transform", `${tr} rotate(${((s / D.rc) * DEGR % 360).toFixed(1)})`);
-      const q = toWorld(p, STEP.T);
-      wtEls[i].setAttribute("transform", `translate(${fx(q[0])},${fx(-q[1])}) rotate(${((s / D.rt) * DEGR % 360).toFixed(1)})`);
-    }
-    const lp = D.pitch / D.links;
-    for (const [k, el] of pinEls) {
-      const c = chainPoint(travel - k * lp);
-      el.setAttribute("cx", fx(c[0]));
-      el.setAttribute("cy", fx(-c[1]));
-    }
-    rotUp.setAttribute("transform", `rotate(${(-90 + ((travel - D.sUp0) / D.Rs) * DEGR).toFixed(2)})`);
-    rotLow.setAttribute("transform", `rotate(${(90 + ((travel - D.sLow0) / D.Rs) * DEGR).toFixed(2)})`);
-    const hrRot = `rotate(${(((travel / D.hr.rN) * DEGR) % 360).toFixed(2)})`;
-    shU.setAttribute("transform", hrRot);
-    shL.setAttribute("transform", hrRot);
-    const b = D.hr.band - 4;
-    for (let j = 0; j < nTicks; j++) {
-      const [x, y, nx, ny] = hrAt(travel + j * tickGap);
-      tickEls[j].setAttribute("d", `M${fx(x - nx * b)},${fx(-(y - ny * b))}L${fx(x + nx * b)},${fx(-(y + ny * b))}`);
-    }
-    // Detail A: name the followed step's wheels and dimension its rise while it is in view
-    // the followed step while it is in the window; when paused, whichever step sits in the window
-    let i0 = 0, best = Infinity;
-    for (let i = 0; i < D.N; i++) {
-      const q = stepPose(travel - i * D.pitch);
-      const d = Math.hypot(q.x + 40 - D.det.src[0], q.y + 225 - D.det.src[1]);
-      if (d < best) (best = d), (i0 = i);
-    }
-    const p0 = stepPose(travel - i0 * D.pitch);
-    const onIncline = Math.abs(stepPose(travel - (i0 - 1) * D.pitch).y - p0.y - 200) < 0.5;
-    const inView = best < D.det.r * 0.5 && onIncline && (i0 === 0 || !state.playing);
-    live.style.opacity = inView ? 1 : 0;
-    if (inView) {
-      const p1 = stepPose(travel - (i0 - 1) * D.pitch); // the step ahead, one riser higher
-      const c = A([p0.x, p0.y]), tw = A(toWorld(p0, STEP.T));
-      const nose0 = A([p0.x + D.f, p0.y + D.t]), nose1 = A([p1.x + D.f, p1.y + D.t]);
-      const back0 = A([p0.x + D.f - 392, p0.y + D.t]);
-      const xd = back0[0] - 170;
-      const R = D.det.R, at = D.det.at;
-      const lab = (txt, to, tx, ty, anchor) => {
-        const dir = anchor === "end" ? 1 : -1;
-        const a1 = [tx + dir * 50, ty + D.FS * 0.33], e1 = [a1[0] + dir * 110, a1[1]];
-        return `<path class="leader" d="M${P2(a1)}L${P2(e1)}L${P2(to)}"/><circle class="ldot" cx="${fx(to[0])}" cy="${fx(-to[1])}" r="26"/><text class="ltext" x="${fx(tx)}" y="${fx(-ty)}" text-anchor="${anchor}">${txt}</text>`;
-      };
-      const yA = nose1[1], yB = nose0[1];
-      let s = `<g clip-path="url(#clipA)">`;
-      s += `<path class="dim" d="M${P2([back0[0] - 40, yB])}L${P2([xd - 110, yB])}M${P2([nose1[0] - 392 * D.det.k - 40, yA])}L${P2([xd - 110, yA])}M${P2([xd, yB + 4])}L${P2([xd, yA - 4])}"/>`;
-      s += `<path class="dimhead" d="${arrowD([xd, yA], [0, 1])}${arrowD([xd, yB], [0, -1])}"/>`;
-      s += `<text class="dimtext" x="${fx(xd + 60)}" y="${fx(-(yA + yB) / 2 + 45)}">200</text>`;
-      const yg = yA + 240;
-      s += `<path class="dim" d="M${P2([nose0[0], yB + 40])}L${P2([nose0[0], yg + 90])}M${P2([nose1[0], yA + 40])}L${P2([nose1[0], yg + 90])}M${P2([nose0[0] + 4, yg])}L${P2([nose1[0] - 4, yg])}"/>`;
-      s += `<path class="dimhead" d="${arrowD([nose0[0], yg], [-1, 0])}${arrowD([nose1[0], yg], [1, 0])}"/>`;
-      s += `<text class="dimtext" x="${fx((nose0[0] + nose1[0]) / 2)}" y="${fx(-(yg + 50))}" text-anchor="middle">346</text></g>`;
-      if (state.beat === 2 && i0 === 0) s += lab("Chain wheel", [c[0] + D.rc * 0.5 * D.det.k, c[1] - D.rc * 0.6 * D.det.k], 2600, 2640, "start");
-      if (state.beat === 2 && i0 === 0) s += lab("Trailer wheel", [tw[0] - D.rt * 0.55 * D.det.k, tw[1] - D.rt * 0.6 * D.det.k], -720, 2700, "end");
-      live.innerHTML = s;
-    }
-  }
   function arrowD(at, dir) {
     const L = 95, W = 26, b = [at[0] - dir[0] * L, at[1] - dir[1] * L], n = [-dir[1], dir[0]];
     return `M${P2(at)}L${P2([b[0] + n[0] * W, b[1] + n[1] * W])}L${P2([b[0] - n[0] * W, b[1] - n[1] * W])}Z`;
   }
-
-  // ------------------------------------------------ story state and controls
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const state = { tau: 0, playing: !reduced, beat: 1, last: 0 };
-  const tabs = [...document.querySelectorAll(".tab")];
-  const labels = [...document.querySelectorAll("#fig .label")];
-  const parts = [...document.querySelectorAll("#scene .part")];
-  const details = [...document.querySelectorAll("#fig .detail")];
-  // leaders: from the measured text box to the dot on the part
-  for (const g of labels) {
-    const bb = g.querySelector("text").getBBox();
-    const [tx, ty] = g.dataset.to.split(",").map(Number);
-    const cy = bb.y + bb.height * 0.56;
-    const right = tx > bb.x + bb.width / 2;
-    const ax = right ? bb.x + bb.width + 45 : bb.x - 45, ex = ax + (right ? 110 : -110);
-    g.querySelector(".leader").setAttribute("d", `M${fx(ax)},${fx(cy)}L${fx(ex)},${fx(cy)}L${fx(tx)},${fx(ty)}`);
-  }
-  {
-    const key = $("tbkey");
-    let x = +key.dataset.x0;
-    for (const g of key.querySelectorAll(".tbk")) {
-      const t = g.querySelector("text");
-      t.setAttribute("x", "330");
-      g.setAttribute("transform", `translate(${fx(x)},0)`);
-      x += 330 + t.getComputedTextLength() + 210;
+  const WHERE = { "lower landing": "lower landing", "lower transition": "lower curve", incline: "incline", "upper transition": "upper curve", "upper landing": "upper landing", "upper turn": "turning over", "lower turn": "turning over" };
+  function render(travel) {
+    const N = model.PATH.N, pitch = model.P.pitch, ST = model.STEP;
+    for (let i = 0; i < N; i++) {
+      const s = travel - i * pitch;
+      const p = model.stepPose(s);
+      const tr = `translate(${fx(p.x)},${fx(-p.y)})`;
+      E.steps[i].setAttribute("transform", `${tr} rotate(${(-p.phi * DEGR).toFixed(2)})`);
+      E.wc[i].setAttribute("transform", `${tr} rotate(${(((s / ST.rc) * DEGR) % 360).toFixed(1)})`);
+      const q = model.toWorld(p, ST.T);
+      E.wt[i].setAttribute("transform", `translate(${fx(q[0])},${fx(-q[1])}) rotate(${(((s / ST.rt) * DEGR) % 360).toFixed(1)})`);
     }
+    const lp = pitch / model.P.links;
+    for (const [k, el] of E.pins) {
+      const c = model.chainPoint(travel - k * lp);
+      el.setAttribute("cx", fx(c[0]));
+      el.setAttribute("cy", fx(-c[1]));
+    }
+    const by = model.PATH.by, Rs = model.Rs;
+    E.rotUp.setAttribute("transform", `rotate(${(-90 + ((travel - by["upper turn"].s0) / Rs) * DEGR).toFixed(2)})`);
+    E.rotLow.setAttribute("transform", `rotate(${(90 + ((travel - by["lower turn"].s0) / Rs) * DEGR).toFixed(2)})`);
+    const hrRot = `rotate(${(((travel / V.hr.rN) * DEGR) % 360).toFixed(2)})`;
+    E.shU.setAttribute("transform", hrRot);
+    E.shL.setAttribute("transform", hrRot);
+    const b = V.hr.band - 4;
+    for (let j = 0; j < E.nTicks; j++) {
+      const [x, y, nx, ny] = hrAt(travel + j * E.tickGap);
+      E.ticks[j].setAttribute("d", `M${fx(x - nx * b)},${fx(-(y - ny * b))}L${fx(x + nx * b)},${fx(-(y + ny * b))}`);
+    }
+    renderLive(travel);
+    readouts(travel);
   }
-  const scrub = $("scrub"), playBtn = $("play"), count = $("count"), cap = $("cap");
-  const beatAt = (tau) => {
+  // Detail A: dimension the step in the window (the followed one while it passes); name its wheels in chapter 2
+  function renderLive(travel) {
+    const N = model.PATH.N, pitch = model.P.pitch, ST = model.STEP;
+    let i0 = 0, best = Infinity;
+    for (let i = 0; i < N; i++) {
+      const q = model.stepPose(travel - i * pitch);
+      const d = Math.hypot(q.x + 20 - V.det.src[0], q.y + 225 - V.det.src[1]);
+      if (d < best) (best = d), (i0 = i);
+    }
+    const p0 = model.stepPose(travel - i0 * pitch);
+    const p1 = model.stepPose(travel - (i0 - 1) * pitch); // the step ahead, one riser higher
+    const onIncline = Math.abs(p1.y - p0.y - model.stepRise) < 0.5;
+    // only a step that sits squarely in the window gets dimensioned, so no figure is cut by the ring
+    const inView = best < V.det.r * (i0 === 0 ? 0.5 : 0.22) && onIncline && (i0 === 0 || !S.running);
+    E.live.style.opacity = inView ? 1 : 0;
+    if (!inView) return;
+    const k = V.det.k, c = A([p0.x, p0.y]), tw = A(model.toWorld(p0, ST.T));
+    const nose0 = A([p0.x + ST.f, p0.y + ST.t]), nose1 = A([p1.x + ST.f, p1.y + ST.t]);
+    const back0 = A([p0.x + ST.f - model.RISER_R, p0.y + ST.t]);
+    const xd = back0[0] - 170, yA = nose1[1], yB = nose0[1], yg = yA + 240;
+    const lab = (txt, to, at, anchor) => {
+      const dir = anchor === "end" ? 1 : -1;
+      const a1 = [at[0] + dir * 50, at[1] + DATA.FS * 0.33], e1 = [a1[0] + dir * 110, a1[1]];
+      return `<path class="leader" d="M${P2(a1)}L${P2(e1)}L${P2(to)}"/><circle class="ldot" cx="${fx(to[0])}" cy="${fx(-to[1])}" r="24"/><text class="ltext" x="${fx(at[0])}" y="${fx(-at[1])}" text-anchor="${anchor}">${txt}</text>`;
+    };
+    let s = `<g clip-path="url(#clipA)">`;
+    s += `<path class="dim" d="M${P2([back0[0] - 40, yB])}L${P2([xd - 110, yB])}M${P2([nose1[0] - (model.RISER_R) * k - 40, yA])}L${P2([xd - 110, yA])}M${P2([xd, yB + 4])}L${P2([xd, yA - 4])}"/>`;
+    s += `<path class="dimhead" d="${arrowD([xd, yA], [0, 1])}${arrowD([xd, yB], [0, -1])}"/>`;
+    s += `<text class="dimtext" x="${fx(xd + 60)}" y="${fx(-(yA + yB) / 2 + 45)}">${model.stepRise.toFixed(0)}</text>`;
+    s += `<path class="dim" d="M${P2([nose0[0], yB + 40])}L${P2([nose0[0], yg + 90])}M${P2([nose1[0], yA + 40])}L${P2([nose1[0], yg + 90])}M${P2([nose0[0] + 4, yg])}L${P2([nose1[0] - 4, yg])}"/>`;
+    s += `<path class="dimhead" d="${arrowD([nose0[0], yg], [-1, 0])}${arrowD([nose1[0], yg], [1, 0])}"/>`;
+    s += `<text class="dimtext" x="${fx((nose0[0] + nose1[0]) / 2)}" y="${fx(-(yg + 50))}" text-anchor="middle">${model.stepGoing.toFixed(0)}</text></g>`;
+    if (S.step === 2 && i0 === 0) {
+      s += lab("Chain wheel", [c[0] + ST.rc * 0.5 * k, c[1] - ST.rc * 0.6 * k], V.det.slot.r2, "start");
+      s += lab("Trailer wheel", [tw[0] - ST.rt * 0.55 * k, tw[1] - ST.rt * 0.6 * k], V.det.slot.l1, "end");
+    }
+    E.live.innerHTML = s;
+  }
+  // Readouts, all measured from the model for the followed step.
+  const R = {};
+  const setText = (id, v) => {
+    if (R[id] !== v) ((R[id] = v), ($(id).textContent = v));
+  };
+  function readouts(travel) {
+    const p = model.stepPose(travel), ST = model.STEP;
+    // tilt from the two wheel centres alone, against their angle in a level step
+    const c = [p.x, p.y], t = model.toWorld(p, ST.T);
+    let a = (Math.atan2(t[1] - c[1], t[0] - c[0]) - Math.atan2(ST.T[1], ST.T[0])) * DEGR;
+    a = Math.abs(((a % 360) + 540) % 360 - 180);
+    setText("r-tilt", `${a.toFixed(1)}°`);
+    const tread = model.toWorld(p, [ST.f - 196, ST.t])[1] - model.LAND.treadLow;
+    setText("r-height", (tread / 1000).toFixed(2));
+    setText("r-where", WHERE[model.segmentAt(travel)] ?? "return run");
+  }
+
+  // ------------------------------------------------ focus, and the parts the voice names
+  function applyFocus() {
+    const focus = STEPS[S.step]?.focus;
+    const lit = S.lit;
+    for (const el of E.parts) {
+      const part = el.dataset.part;
+      let o = !focus || focus.includes(part) ? 1 : 0.35;
+      if (lit.length) o = lit.includes(part) || (lit.includes("followed") && ["steps", "cwheels", "twheels"].includes(part)) ? 1 : 0.2;
+      el.style.opacity = String(o);
+      el.classList.toggle("lit", lit.includes(part));
+    }
+    const only = lit.includes("followed");
+    for (const u of [...E.steps, ...E.wc, ...E.wt]) u.style.opacity = only && !u.classList.contains("followed") ? "0.25" : "";
+  }
+  function light(ids) {
+    const key = ids.join(" ");
+    if (key === S.lit.join(" ")) return;
+    S.lit = ids;
+    applyFocus();
+  }
+
+  // ------------------------------------------------ steps
+  const tabs = [...document.querySelectorAll(".vz-chapters button")];
+  const heading = $("heading"), count = $("count"), concept = $("concept");
+  const predict = $("predict"), practice = $("practice");
+  const scrub = $("scrub"), marks = $("marks"), playBtn = $("play"), voiceBtn = $("voice"), tryBtn = $("try");
+  const L = () => V.L;
+  const tauOf = (s) => (((s - V.start) % L()) + L()) % L() / DATA.speed;
+  const beatAt = (travel) => {
+    const tau = tauOf(travel);
     let k = 1;
-    D.beats.forEach((b, i) => (tau >= b.from - 1e-6 ? (k = i + 1) : 0));
+    V.beats.forEach((b, i) => (tau >= tauOf(b.from) - 1e-6 ? (k = i + 1) : 0));
     return k;
   };
-  function setBeat(k) {
-    if (k === state.beat && fig.dataset.beat) return;
-    state.beat = k;
-    fig.dataset.beat = String(k);
-    tabs.forEach((t, i) => t.setAttribute("aria-selected", String(i + 1 === k)));
-    cap.textContent = D.beats[k - 1].cap;
-    count.textContent = `${k} / ${D.beats.length}`;
-    for (const l of labels) l.style.display = l.dataset.beats.split(" ").includes(String(k)) ? "" : "none";
-    for (const g of details) {
-      const full = g.dataset.full.split(" ").includes(String(k)), dim = g.dataset.dim.split(" ").includes(String(k));
+  function setStep(k) {
+    if (k === S.step) return;
+    S.step = k;
+    S.heard = -1;
+    root.dataset.step = String(k);
+    root.toggleAttribute("data-opening", k === 0);
+    heading.textContent = STEPS[k].heading;
+    count.textContent = `${pad2(k)} / ${pad2(LAST)}`;
+    tabs.forEach((t, i) => (i + 1 === k ? t.setAttribute("aria-current", "step") : t.removeAttribute("aria-current")));
+    for (const g of E.labels) g.style.display = g.dataset.beats.split(" ").includes(String(k)) ? "" : "none";
+    for (const g of E.details) {
+      const full = g.dataset.full.split(" ").includes(String(k)), dim = g.dataset.dim.split(" ").includes(String(k)) || k === 0 && g.id === "detailA";
       g.classList.toggle("dim", dim && !full);
       g.classList.toggle("off", !full && !dim);
     }
-    const focus = D.beats[k - 1].focus;
-    for (const el of parts) el.style.opacity = focus.includes(el.dataset.part) ? "1" : "0.35";
+    S.lit = [];
+    applyFocus();
+    showPredict();
+    $("d-step").textContent = V.captions[k];
+    $("d-count").textContent = `${pad2(k)} / ${pad2(LAST)}`;
+    scrub.setAttribute("aria-valuetext", `${count.textContent}: ${STEPS[k].heading}`);
+    try {
+      history.replaceState(null, "", `#step=${k}${S.variant !== "standard" ? `&what=${S.variant}` : ""}`);
+    } catch {
+      /* sandboxed frames */
+    }
   }
+  const poseOf = (k) => (k === 0 ? V.beats[0].pose : V.beats[k - 1].pose);
   function draw() {
-    render(D.beats[0] ? (state.tau * D.speed + startS) : 0);
-    scrub.value = String(state.tau);
+    render(S.travel);
+    scrub.value = String(tauOf(S.travel));
   }
-  const startS = __S_START__;
-  function seekTau(tau, beat) {
-    state.tau = ((tau % D.T) + D.T) % D.T;
-    setBeat(beat ?? beatAt(state.tau));
+  // Go to a step: paused, show its still frame; running, start the beat from its beginning.
+  function goTo(k, how = {}) {
+    k = Math.max(0, Math.min(LAST, k));
+    setStep(k);
+    S.travel = S.running && !how.pose ? (k === 0 ? V.beats[0].from : V.beats[k - 1].from) : poseOf(k);
     draw();
+    if (how.speak !== false) speakNav(k);
   }
-  // Paused (and reduced motion, and screenshots): jump to the beat's key pose.
-  // Playing: start at the beginning of the beat so it plays out in full.
-  function seekBeat(k) {
-    k = Math.max(1, Math.min(D.beats.length, k));
-    const b = D.beats[k - 1];
-    seekTau(state.playing && !reduced ? b.from + 0.01 : b.pose, k);
-  }
-  function setPlaying(on) {
-    state.playing = on;
-    playBtn.setAttribute("aria-pressed", String(on));
-    playBtn.setAttribute("aria-label", on ? "Pause" : "Play");
+  const unanswered = () => S.step === 2 && S.answer === null;
+
+  // ------------------------------------------------ time
+  let stillTimer = 0;
+  function setRunning(on) {
+    S.running = on && !reduced;
     playBtn.dataset.state = on ? "pause" : "play";
-    if (on && !reduced) {
-      state.last = performance.now();
+    playBtn.setAttribute("aria-label", on ? "Pause" : "Play");
+    clearInterval(stillTimer);
+    // Reduced motion: no continuous movement; play moves from one still pose to the next.
+    if (on && reduced && !S.touring) {
+      S.stillOn = true;
+      stillTimer = setInterval(() => {
+        if (unanswered()) return stop(true);
+        if (S.step >= LAST) return setRunning(false);
+        goTo(S.step + 1, { pose: true, speak: false });
+      }, 4000);
+    } else S.stillOn = false;
+    if (S.running) {
+      S.last = performance.now();
       requestAnimationFrame(tick);
     }
   }
-  let reducedTimer = null;
   function tick(now) {
-    if (!state.playing || reduced) return;
-    const dt = Math.min(0.1, (now - state.last) / 1000);
-    state.last = now;
-    state.tau = (state.tau + dt) % D.T;
-    setBeat(beatAt(state.tau));
+    if (!S.running) return;
+    const dt = Math.min(0.1, (now - S.last) / 1000);
+    S.last = now;
+    const before = S.travel;
+    S.travel += DATA.speed * dt;
+    if (!S.touring) {
+      const k = beatAt(S.travel);
+      const forward = k === S.step + 1 || (S.step === LAST && k === 1);
+      if (k !== S.step && S.step !== 0 && forward) {
+        // The prediction holds the story: stop where the landing chapter would begin.
+        if (S.step === 2 && k === 3 && S.answer === null) {
+          S.travel = before;
+          draw();
+          return stop(true);
+        }
+        setStep(k);
+      } else if (S.step === 0) setStep(k);
+    }
     draw();
     requestAnimationFrame(tick);
   }
+  // Continuous play runs the beat from its start if the machine is elsewhere (after a tour, say).
+  function startPlain() {
+    if (S.step >= 1 && beatAt(S.travel) !== S.step) S.travel = V.beats[S.step - 1].from;
+    setRunning(true);
+  }
+  function stop(toPredict) {
+    stopTour();
+    setRunning(false);
+    if (toPredict) predict.querySelector("button")?.focus();
+  }
+
+  // ------------------------------------------------ voice: recorded narration that lights what it names
+  let clip = null, clipRaf = 0, tourTimer = 0, navTimer = 0;
+  const hasVoice = () => !!(V && V.voice);
+  const fadeOut = (el) => {
+    if (!el || el.paused || el.ended) return;
+    const t0 = performance.now(), v0 = el.volume;
+    const f = () => {
+      const u = (performance.now() - t0) / 200;
+      if (u >= 1) return el.pause();
+      el.volume = v0 * (1 - u);
+      requestAnimationFrame(f);
+    };
+    f();
+  };
+  function stopClip() {
+    clearTimeout(navTimer);
+    cancelAnimationFrame(clipRaf);
+    fadeOut(clip);
+    clip = null;
+    light([]);
+  }
+  function playClip(k, then) {
+    stopClip();
+    const track = V.voice?.[k];
+    if (!track || !S.voiceOn) return false;
+    const el = new Audio(`data:${track.type};base64,${track.audio}`);
+    clip = el;
+    el.onended = () => {
+      cancelAnimationFrame(clipRaf);
+      if (clip === el) light([]);
+      S.heard = k;
+      then?.();
+    };
+    const follow = () => {
+      if (clip !== el) return;
+      const at = el.currentTime;
+      light(track.links.find((l) => at >= l.start - 0.05 && at < l.end + 0.25)?.ids ?? []);
+      clipRaf = requestAnimationFrame(follow);
+    };
+    el.play().then(follow).catch(() => {});
+    return true;
+  }
+  // Each step the reader goes to is spoken once the move settles (after the first gesture).
+  function speakNav(k) {
+    if (S.touring || !S.armed || !S.voiceOn || !hasVoice()) return;
+    stopClip();
+    navTimer = setTimeout(() => playClip(k), 650);
+  }
+  // With the voice on, play is the narrated tour: a step moves on only when its clip has ended.
+  function tourAt(k) {
+    setStep(k);
+    S.travel = reduced ? poseOf(k) : V.tour[k];
+    draw();
+    setRunning(true);
+    playBtn.dataset.state = "pause";
+    tourTimer = setTimeout(() => {
+      const ok = playClip(k, () => {
+        if (!S.touring) return;
+        if (k === 2 && S.answer === null) return stop(true);
+        tourTimer = setTimeout(() => (k < LAST ? tourAt(k + 1) : stopTour(true)), 600);
+      });
+      if (!ok) tourTimer = setTimeout(() => (k < LAST && S.touring ? tourAt(k + 1) : stopTour(true)), 3000);
+    }, 300);
+  }
+  function startTour(from) {
+    S.touring = true;
+    S.armed = true;
+    tourAt(from);
+  }
+  function stopTour(andMachine) {
+    if (!S.touring) return;
+    S.touring = false;
+    clearTimeout(tourTimer);
+    stopClip();
+    if (andMachine) setRunning(false);
+    playBtn.dataset.state = S.running ? "pause" : "play";
+  }
+
   playBtn.addEventListener("click", () => {
-    if (reduced) {
-      if (reducedTimer) (clearInterval(reducedTimer), (reducedTimer = null), setPlaying(false));
-      else (setPlaying(true), (reducedTimer = setInterval(() => seekBeat((state.beat % D.beats.length) + 1), 4000)));
-      return;
+    S.armed = true;
+    if (S.touring || S.running || S.stillOn) return stop(false);
+    if (unanswered()) return predict.querySelector("button")?.focus();
+    if (S.voiceOn && hasVoice()) return startTour(S.step >= LAST ? 0 : S.heard === S.step ? S.step + 1 : S.step);
+    if (S.step >= LAST) goTo(1, { speak: false });
+    startPlain();
+  });
+  voiceBtn.addEventListener("click", () => {
+    S.voiceOn = !S.voiceOn;
+    S.armed = true;
+    voiceBtn.setAttribute("aria-pressed", String(S.voiceOn));
+    voiceBtn.textContent = S.voiceOn ? "Voice on" : "Voice off";
+    if (!S.voiceOn) {
+      const wasTour = S.touring;
+      stopTour(false);
+      stopClip();
+      if (wasTour) startPlain(); // keep the machine running, now without narration
+    } else if (!S.touring) speakNav(S.step);
+  });
+  const nav = (k) => {
+    S.armed = true;
+    if (S.touring) stopTour(true);
+    goTo(k);
+  };
+  $("prev").addEventListener("click", () => nav(S.step - 1));
+  $("next").addEventListener("click", () => (unanswered() ? predict.querySelector("button")?.focus() : nav(S.step + 1)));
+  $("restart").addEventListener("click", () => {
+    stop(false);
+    S.answer = null;
+    goTo(0, { speak: false });
+  });
+  tabs.forEach((t, i) => t.addEventListener("click", () => nav(i + 1)));
+  scrub.addEventListener("input", () => {
+    S.armed = true;
+    stopTour(false);
+    S.travel = V.start + Number(scrub.value) * DATA.speed;
+    setStep(beatAt(S.travel));
+    render(S.travel);
+  });
+
+  // ------------------------------------------------ predict before the landing
+  const PRED = DATA.predict;
+  function showPredict() {
+    const k = S.step;
+    const show = !practiceOpen && (k === 2 || (k === 3 && S.answer !== null));
+    predict.hidden = !show;
+    concept.hidden = !(k === 0 && !practiceOpen);
+    syncCards();
+    if (!show) return;
+    const reveal = k === 3;
+    predict.replaceChildren();
+    const kicker = Object.assign(document.createElement("span"), { className: "vz-predict-kicker", textContent: reveal ? "Your prediction" : "Predict" });
+    const q = Object.assign(document.createElement("p"), { textContent: PRED.question });
+    const opts = Object.assign(document.createElement("div"), { className: "vz-predict-options" });
+    const fb = Object.assign(document.createElement("p"), { className: "vz-predict-feedback" });
+    fb.setAttribute("aria-live", "polite");
+    PRED.choices.forEach((c, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = c;
+      b.setAttribute("aria-pressed", String(S.answer === i));
+      if (reveal) b.dataset.correct = String(i === PRED.answer);
+      b.addEventListener("click", () => {
+        if (reveal) return;
+        S.answer = i;
+        S.armed = true;
+        for (const o of opts.children) o.setAttribute("aria-pressed", String(o === b));
+        fb.textContent = "Locked in. Press play to watch the orange step reach the top.";
+      });
+      opts.append(b);
+    });
+    if (reveal) fb.textContent = (S.answer === PRED.answer ? "Right. " : "Not quite. ") + PRED.explanation;
+    else if (S.answer !== null) fb.textContent = "Locked in. Press play to watch the orange step reach the top.";
+    predict.append(kicker, q, opts, fb);
+  }
+  // A card sits over the title block's corner; while one is up, the title block steps aside.
+  const syncCards = () => root.toggleAttribute("data-card", !predict.hidden || !concept.hidden);
+
+  // ------------------------------------------------ now you try: questions made from the model
+  let practiceOpen = false, seed = 7, right = 0, tried = 0;
+  const rng = (a) => () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const pick = (r, xs) => xs[Math.floor(r() * xs.length)];
+  const shuffle = (r, xs) => xs.map((x) => [r(), x]).sort((a, b) => a[0] - b[0]).map((p) => p[1]);
+  const rad = (d) => (d * Math.PI) / 180;
+  function question(n) {
+    const r = rng(n * 2654435761);
+    const kind = n % 4;
+    const th = pick(r, [30, 35]), H = pick(r, [3000, 4500, 6000]);
+    if (kind === 0) {
+      const m = makeModel({ incline: th });
+      const v = m.stepRise, wrong = [m.stepGoing, m.P.pitch * Math.tan(rad(th))];
+      return { q: `At a ${th}° incline with a ${m.P.pitch} mm step pitch, how high is each step?`, choices: [v, ...wrong].map((x) => `${x.toFixed(0)} mm`), explain: `Steps are one pitch apart along the slope: ${m.P.pitch} × sin ${th}° = ${v.toFixed(1)} mm. ${m.stepGoing.toFixed(0)} mm is the going (cos).` };
     }
-    setPlaying(!state.playing);
+    if (kind === 1) {
+      const m = makeModel({ incline: th, rise: H });
+      const v = m.rideTime, slopeOnly = H / Math.sin(rad(th)) / m.P.speed, upOnly = H / m.P.speed;
+      return { q: `An escalator rises ${H} mm at ${th}° and runs at 0.5 m/s. About how long is the ride from comb to comb?`, choices: [v, slopeOnly, upOnly].map((x) => `${x.toFixed(1)} s`), explain: `From comb to comb the chain path, curves and landings included, is ${(m.rideLength / 1000).toFixed(2)} m. At 0.5 m/s that is ${v.toFixed(1)} s.` };
+    }
+    if (kind === 2) {
+      const m = makeModel({ incline: th });
+      const T = m.STEP.T, v = -T[0] * Math.tan(rad(th)) + T[1], flat = T[1], noLift = -T[0] * Math.sin(rad(th));
+      return { q: `The trailer wheel sits ${-T[0]} mm behind the chain wheel and ${T[1]} mm higher. On a ${th}° slope, how much higher must its track run to keep the tread level?`, choices: [v, flat, noLift].map((x) => `${x.toFixed(0)} mm`), explain: `${-T[0]} × tan ${th}° = ${(-T[0] * Math.tan(rad(th))).toFixed(1)} mm for the slope, plus the ${T[1]} mm the wheel already sits higher: ${v.toFixed(1)} mm. On the flat only ${T[1]} mm is left, so the tracks converge.` };
+    }
+    const teeth = pick(r, [14, 16, 18, 20]);
+    const m = makeModel({ teeth });
+    const v = m.DRIVE.shaftRpm, perSec = m.P.speed / (2 * Math.PI * m.Rs), radps = m.P.speed / m.Rs;
+    return { q: `A drive sprocket with ${teeth} teeth on a ${(m.P.pitch / m.P.links).toFixed(1)} mm chain pitch moves the chain at 0.5 m/s. How fast does the main shaft turn?`, choices: [v, perSec, radps].map((x) => `${x.toFixed(2)} rpm`), explain: `One turn moves ${teeth} links, ${(teeth * m.P.pitch / m.P.links / 1000).toFixed(3)} m of chain, so 0.5 m/s is ${(m.P.speed / (teeth * m.P.pitch / m.P.links)).toFixed(4)} turns a second: ${v.toFixed(2)} rpm.` };
+  }
+  function renderPractice() {
+    const Q = question(seed);
+    const r = rng(seed * 31 + 7);
+    const order = shuffle(r, [0, 1, 2]);
+    practice.replaceChildren();
+    const kicker = Object.assign(document.createElement("span"), { className: "vz-predict-kicker", textContent: "Now you try" });
+    const q = Object.assign(document.createElement("p"), { textContent: Q.q });
+    const opts = Object.assign(document.createElement("div"), { className: "vz-predict-options" });
+    const fb = Object.assign(document.createElement("p"), { className: "vz-predict-feedback" });
+    fb.setAttribute("aria-live", "polite");
+    const foot = Object.assign(document.createElement("div"), { className: "vz-practice-foot" });
+    const score = Object.assign(document.createElement("span"), { className: "vz-practice-score", textContent: tried ? `${right} of ${tried} right` : "Worked from the model on this page" });
+    const another = Object.assign(document.createElement("button"), { type: "button", className: "vz-practice-next", textContent: "New question" });
+    another.addEventListener("click", () => {
+      seed += 1;
+      renderPractice();
+      practice.querySelector(".vz-predict-options button")?.focus();
+    });
+    let done = false;
+    for (const i of order) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = Q.choices[i];
+      b.setAttribute("aria-pressed", "false");
+      b.addEventListener("click", () => {
+        if (done) return;
+        done = true;
+        tried += 1;
+        if (i === 0) right += 1;
+        for (const o of opts.children) o.dataset.correct = String(o === opts.children[order.indexOf(0)]);
+        b.setAttribute("aria-pressed", "true");
+        fb.textContent = (i === 0 ? "Right. " : "Not quite. ") + Q.explain;
+        score.textContent = `${right} of ${tried} right`;
+      });
+      opts.append(b);
+    }
+    foot.append(score, another);
+    practice.append(kicker, q, opts, fb, foot);
+  }
+  tryBtn.addEventListener("click", () => {
+    practiceOpen = !practiceOpen;
+    root.toggleAttribute("data-practice", practiceOpen);
+    tryBtn.setAttribute("aria-pressed", String(practiceOpen));
+    practice.hidden = !practiceOpen;
+    if (practiceOpen) renderPractice();
+    showPredict();
+    syncCards();
+    if (practiceOpen) practice.querySelector(".vz-predict-options button")?.focus();
   });
-  $("prev").addEventListener("click", () => seekBeat(state.beat - 1));
-  $("next").addEventListener("click", () => seekBeat(state.beat + 1));
-  tabs.forEach((t, i) => t.addEventListener("click", () => seekBeat(i + 1)));
-  scrub.max = String(D.T);
-  scrub.addEventListener("input", () => seekTau(+scrub.value));
-  addEventListener("keydown", (e) => {
-    if (e.target && e.target.tagName === "INPUT" && e.key !== " ") return;
-    if (e.key === "ArrowRight") (seekBeat(state.beat + 1), e.preventDefault());
-    else if (e.key === "ArrowLeft") (seekBeat(state.beat - 1), e.preventDefault());
-    else if (e.key === " ") (playBtn.click(), e.preventDefault());
-  });
-  // theme: follow the system until the toggle is used
+
+  // ------------------------------------------------ what if
+  for (const b of document.querySelectorAll(".vz-whatif button")) {
+    b.addEventListener("click", () => {
+      if (b.dataset.variant === S.variant) return;
+      const k = S.step;
+      stop(false);
+      stopClip();
+      mount(b.dataset.variant);
+      S.step = -1;
+      goTo(k, { pose: true, speak: false });
+    });
+  }
+
+  // ------------------------------------------------ details, theme, keyboard
+  const drawer = $("details");
+  for (const b of document.querySelectorAll("[data-details]")) b.addEventListener("click", () => (drawer.open ? drawer.close() : drawer.showModal()));
   const themeBtn = $("theme");
-  const sysDark = matchMedia("(prefers-color-scheme: dark)").matches;
   const applyTheme = (th) => {
-    document.documentElement.dataset.theme = th;
+    root.dataset.theme = th;
+    document.body.dataset.theme = th;
     themeBtn.textContent = th === "dark" ? "Light" : "Dark";
     themeBtn.setAttribute("aria-label", `Switch to ${th === "dark" ? "light" : "dark"} theme`);
   };
-  applyTheme(sysDark ? "dark" : "light");
-  themeBtn.addEventListener("click", () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
-  // beat marks under the scrubber
-  const marks = $("marks");
-  D.beats.forEach((b) => {
-    const m = document.createElement("span");
-    m.style.left = `${(b.from / D.T) * 100}%`;
-    marks.appendChild(m);
+  applyTheme(matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  themeBtn.addEventListener("click", () => applyTheme(root.dataset.theme === "dark" ? "light" : "dark"));
+  document.addEventListener("keydown", (e) => {
+    if (drawer.open || e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key;
+    if (e.target instanceof HTMLButtonElement && (k === " " || k === "Enter")) return;
+    if (e.target instanceof HTMLInputElement && k !== " ") return;
+    if (k === "ArrowRight") $("next").click();
+    else if (k === "ArrowLeft") $("prev").click();
+    else if (k === "Home") nav(0);
+    else if (k === "End") nav(LAST);
+    else if (k === " ") playBtn.click();
+    else return;
+    e.preventDefault();
   });
 
-  seekTau(0, 1);
-  setPlaying(state.playing);
+  // ------------------------------------------------ start
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const what = DATA.variants[hash.get("what")] ? hash.get("what") : "standard";
+  const first = Math.max(0, Math.min(LAST, Number(hash.get("step") ?? 0) || 0));
+  mount(what);
+  goTo(first, { pose: true, speak: false });
+  setRunning(false);
   window.__viz = {
-    beats: D.beats.length,
+    steps: LAST + 1,
     seekStep(k) {
-      fig.classList.add("instant");
-      setPlaying(false);
-      seekBeat(Number(k) || 1);
+      root.classList.add("instant");
+      stop(false);
+      goTo(Number(k) || 0, { pose: true, speak: false });
     },
     seek(ms) {
-      fig.classList.add("instant");
-      setPlaying(false);
-      seekTau(Number(ms) / 1000);
+      root.classList.add("instant");
+      stop(false);
+      S.travel = V.start + (Number(ms) / 1000) * DATA.speed;
+      setStep(beatAt(S.travel));
+      draw();
     },
-    state: () => ({ ...state }),
+    variant(name) {
+      document.querySelector(`.vz-whatif button[data-variant="${name}"]`)?.click();
+    },
+    practice(n) {
+      if (n !== undefined) seed = n;
+      if (!practiceOpen) tryBtn.click();
+      else renderPractice();
+    },
+    state: () => ({ step: S.step, travel: S.travel, running: S.running, touring: S.touring, voiceOn: S.voiceOn, answer: S.answer, variant: S.variant, lit: S.lit.slice() }),
   };
 }
 
 // ---------------------------------------------------------------- page
-const font = readFileSync(join(ROOT, "src/render/fonts/playfair-display-sc-latin-700.woff2")).toString("base64");
+const font = (f) => readFileSync(join(ROOT, "src/render/fonts", f)).toString("base64");
 const modelSrc = readFileSync(join(HERE, "model.mjs"), "utf8").replace(/^export /gm, "");
 
+const PREDICT = {
+  question: "The two tracks meet near the top. What happens to the steps?",
+  choices: ["They tip forward", "They flatten out", "They stop"],
+  answer: 1,
+  explanation: "With both wheels at the same height, each tread lines up with its neighbours: a flat walkway before the comb.",
+};
+
+const DATA = {
+  speed: BASE_SPEED(),
+  FS,
+  steps: STEPS.map(({ heading, focus }) => ({ heading, focus })),
+  predict: PREDICT,
+  variants: VARIANT_DATA,
+};
+function BASE_SPEED() {
+  return MODELS.standard.P.speed;
+}
+
+// Visualize tokens (src/render/tokens.css, editorial presentation) and the player's page chrome
+// (src/render/styles.css), followed by the drawing's own line weights.
 const CSS = `
-@font-face{font-family:"Playfair Display SC";font-weight:700;font-style:normal;font-display:block;src:url(data:font/woff2;base64,${font}) format("woff2")}
-:root{--paper:#f6f4ee;--ink:#1d232b;--step:#ebe7dd;--slab:#ffffff;--blue:#2563eb;--teal:#0f9488;--orange:#e4572e;--orange-tint:#f6dccf;
-  --muted:color-mix(in srgb,var(--ink) 64%,var(--paper));--rule:color-mix(in srgb,var(--ink) 20%,var(--paper));color-scheme:light}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#121417;--ink:#e2dfd6;--step:#1e2227;--slab:#16191d;--orange-tint:#3a2219;color-scheme:dark}}
-:root[data-theme="dark"]{--paper:#121417;--ink:#e2dfd6;--step:#1e2227;--slab:#16191d;--orange-tint:#3a2219;color-scheme:dark}
-*{box-sizing:border-box}
-html,body{height:100%;margin:0}
-body{background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden;-webkit-font-smoothing:antialiased}
-header{display:flex;align-items:flex-end;justify-content:space-between;padding:16px 28px 10px}
-h1{font-family:"Playfair Display SC",Georgia,serif;font-weight:700;font-size:31px;line-height:1;margin:0;letter-spacing:.01em}
-.sub{margin:6px 0 0;font-size:13.5px;color:var(--muted)}
-.btn{height:30px;min-width:32px;padding:0 10px;border:1px solid var(--rule);background:transparent;color:var(--ink);font:500 12.5px system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;border-radius:0}
-.btn:hover{border-color:var(--ink)}
-.btn:focus-visible,.tab:focus-visible,input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.btn svg{width:12px;height:12px;fill:currentColor}
-nav{display:flex;padding:0 28px;border-bottom:1px solid var(--rule)}
-.tab{appearance:none;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:8px 14px 8px 0;margin-right:22px;font:500 13px system-ui,sans-serif;color:var(--muted);cursor:pointer}
-.tab .n{font-variant-numeric:tabular-nums;margin-right:7px}
-.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
-.tab:hover{color:var(--ink)}
-main{margin:14px 28px 0;border:1px solid var(--rule);display:flex;flex-direction:column;min-height:0}
-#cap{margin:0;padding:12px 18px 0;font-size:14.5px;line-height:1.4;min-height:2.6em;max-width:92ch}
-#fig{flex:1;min-height:0;width:100%;display:block;padding:2px 12px 10px}
-footer{display:flex;align-items:center;gap:8px;padding:12px 28px 16px}
+@font-face{font-family:"Visualize Sans";font-style:normal;font-weight:400 700;font-display:block;src:url(data:font/woff2;base64,${font("manrope-latin.woff2")}) format("woff2")}
+@font-face{font-family:"Visualize Mono";font-style:normal;font-weight:500;font-display:block;src:url(data:font/woff2;base64,${font("ibm-plex-mono-latin-500.woff2")}) format("woff2")}
+@font-face{font-family:"Visualize Display";font-style:normal;font-weight:700;font-display:block;src:url(data:font/woff2;base64,${font("playfair-display-sc-latin-700.woff2")}) format("woff2")}
+.vz{--radius-card:16px;--radius-stage:10px;--stage:#fffefa;--paper:#f7f5ef;--card:#fffefa;--ink:#262521;--ink-2:#625f58;--hair:#e5e1d8;--focus:#262521;
+  --t-good:#317b6c;--t-bad:#b34d49;
+  --step:#ebe7dd;--slab:#fffefa;--blue:#2563eb;--teal:#0f9488;--orange:#e4572e;--orange-tint:#f7dccf;
+  --sans:"Visualize Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Visualize Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;color-scheme:light}
+@media (prefers-color-scheme:dark){.vz:not([data-theme="light"]){--stage:#121212;--card:#121212;--ink:#f1f0eb;--ink-2:#b6b4ae;--hair:#30302e;--focus:#f1f0eb;--t-good:#74beaa;--t-bad:#e4928a;--step:#1f2328;--slab:#151719;--orange-tint:#3a2219;color-scheme:dark}}
+.vz[data-theme="dark"]{--stage:#121212;--card:#121212;--ink:#f1f0eb;--ink-2:#b6b4ae;--hair:#30302e;--focus:#f1f0eb;--t-good:#74beaa;--t-bad:#e4928a;--step:#1f2328;--slab:#151719;--orange-tint:#3a2219;color-scheme:dark}
+html,body{margin:0}
+body{padding:24px 32px;background:#f7f5ef;overflow:hidden}
+@media (prefers-color-scheme:dark){body:not([data-theme="light"]){background:#090909}}
+body[data-theme="dark"]{background:#090909}body[data-theme="light"]{background:#f7f5ef}
+.vz,.vz *,.vz *::before,.vz *::after{box-sizing:border-box}
+.vz{color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;max-width:1640px;margin:0 auto;height:calc(100dvh - 48px)}
+.vz-card{background:var(--card);border:1px solid var(--hair);border-radius:var(--radius-card);padding:22px 28px;display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100%}
+.vz-head{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:0 0 18px}
+.vz-heading{min-width:0}
+.vz-title{margin:0;font:700 34px/1.1 "Visualize Display","Playfair Display SC",Georgia,serif;letter-spacing:.01em;color:var(--ink)}
+.vz-about{margin:4px 0 0;font:400 14px/1.45 var(--sans);color:var(--ink-2)}
+.vz-chapters{display:flex;gap:22px}
+.vz-chapters button{appearance:none;background:none;border:0;border-bottom:2px solid transparent;padding:10px 0;color:var(--ink-2);font:500 12px var(--sans);cursor:pointer}
+.vz-chapters button span{font:11px var(--mono);margin-right:5px}
+.vz-chapters button[aria-current]{color:var(--ink);border-bottom-color:var(--ink)}
+.vz-chapters button:hover{color:var(--ink)}
+.vz-utilities{display:flex;align-items:center;gap:8px}
+.vz-info,.vz-theme{border:1px solid var(--hair);border-radius:7px;padding:7px 12px;background:var(--card);color:var(--ink-2);font:500 12px var(--sans);cursor:pointer}
+.vz-info:hover,.vz-theme:hover{color:var(--ink);border-color:var(--ink-2)}
+.vz-body{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;min-height:0}
+.vz-stage{position:relative;min-height:0;border:1px solid var(--hair);border-radius:var(--radius-stage);background:var(--stage);outline:none;overflow:hidden}
+.vz-stage:focus-visible{outline:2px solid var(--focus);outline-offset:4px}
+.vz-svg{position:absolute;inset:0;width:100%;height:100%;display:block;padding:10px 14px}
+.vz-caption{position:absolute;left:26px;top:24px;width:min(262px,21%);z-index:2;pointer-events:none}
+.vz[data-practice] .vz-caption{width:min(400px,32%)}
+.vz-practice{margin-top:16px;pointer-events:auto}
+.vz[data-practice] #fig .detail{visibility:hidden}
+.vz-step-heading{margin:0;font:500 21px/1.35 var(--sans);letter-spacing:-.025em;text-wrap:balance}
+.vz-cards{position:absolute;right:22px;bottom:20px;width:min(410px,35%);z-index:3;display:grid;gap:10px}
+.vz-predict{padding:13px 15px;border:1px solid var(--hair);border-radius:10px;background:var(--stage)}
+.vz-predict[hidden],.vz-concept[hidden]{display:none}
+.vz-predict-kicker{font-size:11px;color:var(--ink-2)}
+.vz-predict p{margin:5px 0 9px;font-size:14px;line-height:1.45}
+.vz-predict-options{display:flex;flex-wrap:wrap;gap:8px}
+.vz-predict button{font:600 13px var(--sans);color:var(--ink);background:var(--card);border:1px solid var(--hair);padding:6px 11px;border-radius:6px;cursor:pointer;text-align:left}
+.vz[data-card] #fig .tblock{visibility:hidden}
+.vz-predict button:hover{border-color:var(--ink-2)}
+.vz-predict button[aria-pressed="true"]{border-color:var(--ink)}
+.vz-predict button[data-correct="true"]{background:color-mix(in oklab,var(--t-good) 14%,var(--card));border-color:var(--t-good)}
+.vz-predict button[data-correct="false"][aria-pressed="true"]{background:color-mix(in oklab,var(--t-bad) 10%,var(--card));border-color:var(--t-bad)}
+.vz-predict .vz-predict-feedback{font-size:12px;color:var(--ink-2);margin:10px 0 0}
+.vz-predict-feedback:empty{display:none}
+.vz-practice-foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--ink-2)}
+.vz-practice-foot button{font:600 13px var(--sans);text-align:center;padding:6px 14px}
+.vz-concept{margin:0;padding:14px 16px;border-radius:12px;background:color-mix(in oklab,var(--card) 92%,transparent);border:1px solid var(--hair);font:400 14px/1.55 var(--sans);color:var(--ink)}
+.vz-panels{display:block;padding:14px 4px 12px;min-width:0}
+.vz-panel{display:flex;align-items:center;gap:20px}
+.vz-panel h3{flex:0 0 auto;font:500 11px var(--sans);margin:0;color:var(--ink)}
+.vz-panel-body{display:flex;align-items:center;justify-content:space-between;gap:24px;flex:1;min-width:0}
+.vz-whatif{display:flex;align-items:center;gap:6px;margin:0;font-size:12px;color:var(--ink-2)}
+.vz-whatif button{font:500 12px var(--sans);color:var(--ink);background:var(--card);border:1px solid var(--hair);border-radius:999px;padding:4px 11px;cursor:pointer}
+.vz-whatif button[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.vz-totals{display:flex;flex-wrap:wrap;gap:18px;margin:0;color:var(--ink-2);font-size:12px;justify-content:flex-end}
+.vz-totals b{color:var(--ink);font:500 19px var(--mono);margin-right:3px}
+.vz-controls{display:flex;align-items:center;gap:8px;border-top:1px solid var(--hair);padding-top:14px}
+.vz-btn{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:9px;border:1px solid var(--hair);background:var(--card);color:var(--ink);cursor:pointer;padding:0;flex:0 0 auto}
+.vz-btn:hover{border-color:var(--ink-2)}
+.vz-btn:focus-visible,.vz-info:focus-visible,.vz-theme:focus-visible,.vz-chapters button:focus-visible,.vz-predict button:focus-visible,.vz-whatif button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.vz-btn[data-primary]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.vz-btn svg{width:16px;height:16px;fill:currentColor}
 #play[data-state="play"] .i-pause,#play[data-state="pause"] .i-play{display:none}
-.scrub{position:relative;flex:1;margin:0 10px;display:flex;align-items:center}
-.scrub input{width:100%;accent-color:var(--ink);margin:0;height:20px;background:transparent}
-#marks{position:absolute;left:8px;right:8px;top:21px;height:5px;pointer-events:none}
-#marks span{position:absolute;top:0;width:1px;height:5px;background:var(--muted)}
-#count{font:500 12.5px system-ui,sans-serif;font-variant-numeric:tabular-nums;color:var(--muted);min-width:5ch;text-align:right}
-.rate{font-size:12.5px;color:var(--muted);margin-left:8px;white-space:nowrap}
-/* drawing */
+.vz-count{font:500 11px var(--mono);color:var(--ink-2);margin:0 10px;white-space:nowrap}
+.vz-scrub{flex:1;min-width:0;position:relative;height:36px;display:flex;align-items:center}
+.vz-range{width:100%;accent-color:var(--ink);margin:0}
+#marks{position:absolute;left:8px;right:8px;top:27px;height:4px;pointer-events:none}
+#marks span{position:absolute;top:0;width:1px;height:4px;background:var(--ink-2);opacity:.6}
+.vz-btn.vz-try,.vz-btn.vz-voice{width:auto;min-width:0;padding:0 14px;white-space:nowrap;font:500 13px var(--sans);color:var(--ink)}
+.vz-btn.vz-voice[aria-pressed="false"]{color:var(--ink-2)}
+.vz-btn.vz-try[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.vz-drawer{width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 48px);margin:24px 24px 24px auto;padding:0;border:1px solid var(--hair);border-radius:14px;background:var(--card);color:var(--ink);box-shadow:0 20px 100px #0003}
+.vz-drawer[open]{display:flex;flex-direction:column}
+.vz-drawer::backdrop{background:#10181455}
+.vz-drawer-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 24px;border-bottom:1px solid var(--hair)}
+.vz-drawer-head h2{margin:0;font:550 19px var(--sans)}
+.vz-drawer-body{padding:24px;overflow:auto;overscroll-behavior:contain}
+.vz-drawer-body h3{font:550 13px var(--sans);margin:24px 0 10px}
+.vz-setup,.vz-text{margin:0;font:400 15px/1.65 var(--sans);color:var(--ink-2)}
+.vz-meta{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-top:14px}
+.vz-trust{font:11px var(--sans);padding:4px 8px;border-radius:999px;border:1px solid var(--ink-2);color:var(--ink-2)}
+.vz-readout{font:11px var(--sans);color:var(--ink)}
+.vz-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0;padding:0;list-style:none;font-size:11px;color:var(--ink-2)}
+.vz-legend li{display:inline-flex;align-items:center;gap:7px}
+.vz-swatch{width:8px;height:8px;border-radius:50%;background:var(--tone)}
+.vz-facts{margin:0;padding:0;list-style:none;font:400 13px/1.7 var(--sans);color:var(--ink-2)}
+.vz-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ---- the drawing: line weights in screen pixels, three accents, one meaning each ---- */
 path,circle,rect,line,polyline,polygon,ellipse{vector-effect:non-scaling-stroke}
 #fig{shape-rendering:geometricPrecision}
-text{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--ink)}
+text{font-family:var(--sans);fill:var(--ink)}
 .part{transition:opacity .45s ease}
-#fig.instant .part,#fig.instant .detail,#fig.instant #detLive{transition:none}
-/* overview vs Detail A: the overview sets --fine on the real #scene; the magnified clone never matches
-   "#fig > #scene", so it inherits nothing and shows the fine detail */
+.instant .part,.instant .detail,.instant #detLive{transition:none}
 #fig > #scene{--fine:none}
 .fine,.st-web,.wh-tyre{display:var(--fine,inline)}
 .step{--sink:var(--ink);--sfill:var(--step)}
 .followed{--sink:var(--orange);--sfill:var(--orange-tint)}
 .st-body{fill:var(--sfill);stroke:var(--sink);stroke-width:1.5;stroke-linejoin:round}
-.st-web{fill:var(--paper);stroke:var(--sink);stroke-width:.9}
+.st-web{fill:var(--stage);stroke:var(--sink);stroke-width:.9}
 .st-line{fill:none;stroke:var(--sink,var(--ink));stroke-width:.9}
 .st-fine{fill:none;stroke:var(--sink);stroke-width:.5}
-.wh-rim{fill:var(--paper);stroke:var(--sink,var(--ink));stroke-width:1.5}
+.wh-rim{fill:var(--stage);stroke:var(--sink,var(--ink));stroke-width:1.5}
 .wh-tyre{fill:none;stroke:var(--sink,var(--ink));stroke-width:.5}
 .wh-hub{fill:var(--sink,var(--ink))}
 .wh-mark{stroke:var(--sink,var(--ink));stroke-width:.9}
 .rail-blue{fill:none;stroke:var(--blue);stroke-width:1.5}
 .rail-teal{fill:none;stroke:var(--teal);stroke-width:1.5}
+.lit .rail-blue,.lit .rail-teal{stroke-width:2.6}
 .chain-band{fill:none;stroke:var(--blue);stroke-width:.9}
+.lit .chain-band{stroke-width:1.6}
 .pin{fill:var(--blue)}
 .sp-outline{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round}
 .sp-line{fill:none;stroke:var(--ink);stroke-width:.9}
@@ -926,47 +1428,48 @@ text{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(-
 .tr-chord,.tr-web{fill:none;stroke:var(--ink);stroke-width:.9}
 .bal{fill:none;stroke:var(--ink);stroke-width:.9}
 .hr-band{fill:var(--slab);stroke:var(--ink);stroke-width:1.5}
+.lit .hr-band{stroke-width:2.4}
 .tick{stroke:var(--ink);stroke-width:.9}
 .sh-rim{fill:none;stroke:var(--ink);stroke-width:1.5}
 .sh-line{fill:none;stroke:var(--ink);stroke-width:.9}
 .drv-body{fill:var(--slab);stroke:var(--ink);stroke-width:1.5}
-.drv-line,.drv-frame{fill:none;stroke:var(--ink);stroke-width:.9}
-.drv-chain{fill:none;stroke:var(--ink);stroke-width:.9}
+.drv-line,.drv-frame,.drv-chain,.tension{fill:none;stroke:var(--ink);stroke-width:.9}
 .hidden{fill:none;stroke:var(--ink);stroke-width:.9;stroke-dasharray:5 3}
 .centre{fill:none;stroke:var(--ink);stroke-width:.5;stroke-dasharray:14 3 2 3}
-.tension{fill:none;stroke:var(--ink);stroke-width:.9}
 .leader{fill:none;stroke:var(--ink);stroke-width:.5}
 .ldot{fill:var(--ink)}
-.label text,.ltext{font-size:${FS}px}
-.label text,.ltext,.dimtext,.lvltext,.det-tag{paint-order:stroke;stroke:var(--paper);stroke-width:32px;stroke-linejoin:round}
+.label text,.ltext{font-size:${FS}px;font-weight:500}
 .dim{fill:none;stroke:var(--ink);stroke-width:.5}
 .dimhead{fill:var(--ink)}
-.dimtext{font-size:${FS}px;font-variant-numeric:tabular-nums}
-.lvltext{font-size:${FS * 0.9}px;fill:var(--muted)!important}
+.dimtext{font-size:${FS}px;font-weight:500;font-variant-numeric:tabular-nums}
+.lvltext{font-size:${FS * 0.88}px;fill:var(--ink-2)!important}
+.label text,.ltext,.dimtext,.lvltext,.det-tag{paint-order:stroke;stroke:var(--stage);stroke-width:32px;stroke-linejoin:round}
 .detail{transition:opacity .45s ease}
 .detail.off{opacity:0;visibility:hidden}.detail.dim{opacity:.35}
-.det-bg{fill:var(--paper)}
+.det-bg{fill:var(--stage)}
 .det-ring{fill:none;stroke:var(--ink);stroke-width:1.5}
 .det-src{fill:none;stroke:var(--ink);stroke-width:.5}
-.det-title{font-size:${FS * 0.95}px;letter-spacing:.08em;font-weight:600}
-.det-tag{font-size:${FS * 1.15}px;font-weight:600}
+.det-title{font-size:${FS * 0.88}px;letter-spacing:.08em;font-weight:600}
+.det-tag{font-size:${FS * 1.1}px;font-weight:600}
 #detLive{transition:opacity .3s ease}
 .tb-frame{fill:none;stroke:var(--ink);stroke-width:.9}
 .tb-rule{fill:none;stroke:var(--ink);stroke-width:.5}
-.tb-title{font-size:${FS * 0.9}px;font-weight:600;letter-spacing:.06em}
-.tb-text{font-size:${FS * 0.88}px}
-.tb-small{font-size:${FS * 0.85}px;fill:var(--muted)!important}
+.tb-title{font-size:${FS * 0.84}px;font-weight:600;letter-spacing:.06em}
+.tb-text{font-size:${FS * 0.8}px}
+.tb-key{font-size:${FS * 0.76}px}
+.tb-small{font-size:${FS * 0.78}px;fill:var(--ink-2)!important}
 .k-blue{stroke:var(--blue);stroke-width:1.5}.k-teal{stroke:var(--teal);stroke-width:1.5}.k-orange{stroke:var(--orange);stroke-width:1.5}
 @media (prefers-reduced-motion:reduce){.part,.detail,#detLive{transition:none}}
 `;
 
 const icon = {
-  prev: `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1h1.6v10H2zM10.5 1v10L4.2 6z"/></svg>`,
-  next: `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M8.4 1H10v10H8.4zM1.5 1v10L7.8 6z"/></svg>`,
-  play: `<svg class="i-play" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1v10l8-5z"/></svg>`,
-  pause: `<svg class="i-pause" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg>`,
+  prev: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg>`,
+  next: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg>`,
+  play: `<svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2v12l10-6z"/></svg>`,
+  pause: `<svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h3v12H4zM9 2h3v12H9z"/></svg>`,
+  restart: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3a5 5 0 1 1-4.9 6h1.7A3.4 3.4 0 1 0 8 4.6V7L4.5 3.8 8 .6z"/></svg>`,
 };
-
+const std = VARIANT_DATA.standard;
 const HTML = `<!doctype html>
 <html lang="en">
 <head>
@@ -976,27 +1479,80 @@ const HTML = `<!doctype html>
 <style>${CSS}</style>
 </head>
 <body>
-<header>
-  <div><h1>Escalator</h1><p class="sub">One chain, two wheel tracks and a handrail, drawn to scale: a 3000 mm rise at 30°, every step level at 0.5 m/s.</p></div>
-  <button class="btn" id="theme" type="button">Dark</button>
-</header>
-<nav role="tablist" aria-label="Chapters">
-${BEATS.map((b, i) => `  <button class="tab" role="tab" type="button" aria-selected="${i === 0}"><span class="n">${i + 1}</span>${esc(b.tab)}</button>`).join("\n")}
-</nav>
-<main>
-  <p id="cap" aria-live="polite"></p>
-  ${SVG}
-</main>
-<footer>
-  <button class="btn" id="prev" type="button" aria-label="Previous chapter">${icon.prev}</button>
-  <button class="btn" id="play" type="button" aria-label="Pause" data-state="pause">${icon.play}${icon.pause}</button>
-  <button class="btn" id="next" type="button" aria-label="Next chapter">${icon.next}</button>
-  <div class="scrub"><input id="scrub" type="range" min="0" max="1" step="0.01" value="0" aria-label="Position of the followed step around the loop"><div id="marks"></div></div>
-  <span id="count">1 / 5</span><span class="rate">chain 0.5 m/s</span>
-</footer>
+<div class="vz" id="vz" data-presentation="editorial" data-scene="escalator">
+<article class="vz-card">
+  <header class="vz-head">
+    <div class="vz-heading"><h1 class="vz-title">Escalator</h1><p class="vz-about">One chain, two wheel tracks: how every step stays level on the slope.</p></div>
+    <nav class="vz-chapters" aria-label="Chapters">
+${STEPS.slice(1).map((s, i) => `      <button type="button"><span>${String(i + 1).padStart(2, "0")}</span> ${esc(s.tab)}</button>`).join("\n")}
+    </nav>
+    <div class="vz-utilities"><button class="vz-info" type="button" data-details aria-haspopup="dialog" aria-controls="details">Details</button><button class="vz-theme" id="theme" type="button">Dark</button></div>
+  </header>
+  <div class="vz-body" data-panels="1">
+    <div class="vz-stage" id="stage" tabindex="0" role="group" aria-roledescription="step-through figure" aria-label="Escalator. Left and right arrows step through the explanation; space plays and pauses.">
+      <svg id="fig" class="vz-svg" xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Side elevation of an escalator, cut away to show the step chain, the two wheel tracks, the sprockets, the drive and the handrail"></svg>
+      <section class="vz-caption" aria-live="polite" aria-atomic="true"><h2 class="vz-step-heading" id="heading"></h2>
+        <section class="vz-predict vz-practice" id="practice" aria-label="Now you try" hidden></section></section>
+      <div class="vz-cards">
+        <p class="vz-concept" id="concept">${esc(std.voice ? std.voice[0].text : std.captions[0])}</p>
+        <section class="vz-predict" id="predict" aria-label="Predict the next step" hidden></section>
+      </div>
+    </div>
+    <aside class="vz-panels" aria-label="Readouts for the followed step">
+      <section class="vz-panel">
+        <h3>What if</h3>
+        <div class="vz-panel-body">
+          <div class="vz-whatif" role="group" aria-label="Incline">${Object.entries(VARIANTS).map(([k, v]) => `<button type="button" data-variant="${k}" aria-pressed="${k === "standard"}">${esc(v.label)}</button>`).join("")}</div>
+          <div class="vz-totals">
+            <span><b id="r-rise">200</b> mm step rise</span>
+            <span><b id="r-tilt">0.0°</b> tread tilt</span>
+            <span><b id="r-height">0.00</b> m tread height</span>
+            <span><b id="r-where">incline</b> orange step</span>
+            <span><b id="r-speed">0.5</b> m/s</span>
+            <span><b id="r-steps">53</b> steps</span>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </div>
+  <div class="vz-controls" role="toolbar" aria-label="Playback">
+    <button class="vz-btn" id="prev" type="button" aria-label="Previous step">${icon.prev}</button>
+    <button class="vz-btn" id="play" type="button" aria-label="Play" data-primary data-state="play">${icon.play}${icon.pause}</button>
+    <button class="vz-btn" id="next" type="button" aria-label="Next step">${icon.next}</button>
+    <span class="vz-count" id="count">00 / ${String(STEPS.length - 1).padStart(2, "0")}</span>
+    <div class="vz-scrub"><input class="vz-range" id="scrub" type="range" min="0" max="1" step="0.01" value="0" aria-label="Timeline: where the orange step is on the loop"><div id="marks"></div></div>
+    <button class="vz-btn vz-try" id="try" type="button" aria-pressed="false">Now you try</button>
+    <button class="vz-btn vz-voice" id="voice" type="button" aria-pressed="true" aria-label="Voice narration">Voice on</button>
+    <button class="vz-btn" id="restart" type="button" aria-label="Restart">${icon.restart}</button>
+  </div>
+  <dialog class="vz-drawer" id="details" aria-labelledby="details-title">
+    <div class="vz-drawer-head"><h2 id="details-title">Behind the figure</h2><button class="vz-info" type="button" data-details aria-label="Close details">Close ×</button></div>
+    <div class="vz-drawer-body">
+      <p class="vz-setup">${esc(std.captions[0])}</p>
+      <h3>This step <span class="vz-count" id="d-count"></span></h3>
+      <p class="vz-text" id="d-step"></p>
+      <div class="vz-meta"><span class="vz-trust" title="Every position and readout is calculated by the model running on this page.">Computed live</span><span class="vz-readout">Readouts follow the orange step</span></div>
+      <h3>Colour</h3>
+      <ul class="vz-legend">
+        <li><span class="vz-swatch" style="--tone:var(--blue)"></span>Step chain and chain-wheel track</li>
+        <li><span class="vz-swatch" style="--tone:var(--teal)"></span>Trailer-wheel track</li>
+        <li><span class="vz-swatch" style="--tone:var(--orange)"></span>The followed step</li>
+        <li><span class="vz-swatch" style="--tone:var(--ink)"></span>Everything else, in ink</li>
+      </ul>
+      <h3>How it is computed</h3>
+      <ul class="vz-facts">
+        <li>The chain path is lines and arcs, with ${MODELS.standard.PATH.N} steps at 400 mm along it.</li>
+        <li>Each step is a rigid body. The trailer-wheel track is the path the trailer wheel traces while the tread is held level; it is computed, not drawn by hand.</li>
+        <li>Tests sweep the chain through a whole pitch, 5 mm at a time, for both inclines. They check that no two steps touch, that each wheel stays on its own rail, that every tread is level within 0.5° on the slope, and that the treads are flat at the landings.</li>
+        <li>Step width 1000 mm (not drawn). Dimensions in mm.</li>
+      </ul>
+    </div>
+  </dialog>
+</article>
+</div>
 <script>
 ${modelSrc}
-(${runtime.toString().replace("__S_START__", String(S_START))})(${JSON.stringify(DATA)});
+(${runtime.toString()})(${JSON.stringify(DATA)});
 </script>
 </body>
 </html>
@@ -1004,4 +1560,4 @@ ${modelSrc}
 
 const out = join(HERE, "escalator-cutaway.html");
 writeFileSync(out, HTML);
-console.log(`wrote ${out} (${(HTML.length / 1024).toFixed(0)} KB)`);
+console.log(`wrote ${out} (${(HTML.length / 1024 / 1024).toFixed(2)} MB)`);

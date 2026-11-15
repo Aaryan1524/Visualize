@@ -13,7 +13,7 @@ An experiment on this branch only. The same subject, how an escalator keeps ever
 <table>
   <tr>
     <td width="50%"><b>A. Clay</b><br><img src="compare/clay-4.png" alt="Clay escalator: beige rounded steps, about forty identical wheels, thin green track lines behind them and a large grey floor shadow."></td>
-    <td width="50%"><b>B. Technical cutaway</b><br><img src="cutaway/shots/beat-2.png" alt="Side elevation of an escalator in a cut building section: a blue chain-wheel track and a green trailer-wheel track run side by side up a 30 degree incline, one step highlighted in orange, and a circular Detail A at 2.6 to 1 showing the 200 mm rise and 346 mm going."></td>
+    <td width="50%"><b>B. Technical cutaway</b><br><img src="cutaway/shots/step-2.png" alt="Side elevation of an escalator in a cut building section: a blue chain-wheel track and a green trailer-wheel track run side by side up a 30 degree incline, one step highlighted in orange, and a circular Detail A at 2.6 to 1 showing the 200 mm rise and 346 mm going."></td>
   </tr>
   <tr>
     <td colspan="2" align="center"><b>C. Anatomy isometric</b><br><img src="compare/anatomy.png" width="60%" alt="Anatomy's isometric escalator: precise white and grey solids with no labels."></td>
@@ -30,47 +30,41 @@ An experiment on this branch only. The same subject, how an escalator keeps ever
 
 <table>
   <tr>
-    <td width="33%"><img src="cutaway/shots/beat-3.png" alt="Beat 3: the tracks converge at the top and Detail B shows the steps flattening under the comb plate."></td>
-    <td width="33%"><img src="cutaway/shots/beat-4.png" alt="Beat 4: Detail C shows the steps turning over around the drive sprocket and returning upside down."></td>
-    <td width="33%"><img src="cutaway/shots/dark-beat-2.png" alt="Beat 2 in the dark theme."></td>
+    <td width="33%"><img src="cutaway/shots/predict-revealed.png" alt="Beat 3: the tracks converge at the top and Detail B shows the steps flattening under the comb plate."></td>
+    <td width="33%"><img src="cutaway/shots/step-4.png" alt="Beat 4: Detail C shows the steps turning over around the drive sprocket and returning upside down."></td>
+    <td width="33%"><img src="cutaway/shots/dark-step-3.png" alt="Beat 2 in the dark theme."></td>
   </tr>
   <tr>
-    <td><sub>3 · The landing: the tracks converge and the steps slide under the comb.</sub></td>
+    <td><sub>3 · The landing, after the reader's prediction: the tracks meet and the stairs flatten.</sub></td>
     <td><sub>4 · Turn and return: around the sprocket and back upside down.</sub></td>
-    <td><sub>Dark theme.</sub></td>
+    <td><sub>Dark theme, step 3.</sub></td>
   </tr>
 </table>
 
-## What B does not have yet
+## B as a full Visualize page
 
-- **It is a one-off page, not built from the kit.** The figure is drawn by hand in `cutaway/build.mjs` (about 1,000 lines). It has no voice, no prediction, no What if, no Now you try, and `scripts/verify.mjs` doesn't check it.
-- **Its own weak spots:**
-  - in a side view, the rails cross the steps' side webs;
-  - how the steps turn around each sprocket is a chosen schedule, not taken from a manufacturer's track;
-  - the handrail return is simplified;
-  - text drops to about 11 px at 1280×800.
+B is wrapped in Visualize's own page: the card, the numbered tabs, a large step heading, a readout row computed from the model, and the play bar. It has the reader features:
 
-## If we adopt it
+- **Voice.** About 98 s of narration, recorded locally. It introduces the concept, then narrates each step, and each part lights as it is named.
+- **Predict.** Before the landing, play stops on "The two tracks meet near the top. What happens to the steps?"
+- **What if.** A switch between a 30° standard and a 35° steep escalator. The drawing, the numbers and the voice are all recomputed. For example, the step rise goes from 200 to 229 mm and the step count from 53 to 50.
+- **Now you try.** Questions generated from the model, marked by the page, with a worked answer.
+- **24 tests**, 12 for each incline.
 
-Route by subject:
+What is still missing before it can be a skill feature:
 
-- **Abstract ideas** (binary search, LRU, heaps) stay in **Clay**.
-- **Real mechanisms** get a new **Drawing** look: a sharp 2D side cutaway.
-
-The Drawing look would need these kit parts:
-
-- section hatching;
-- dimension lines and level marks;
-- leaders that avoid each other;
-- detail circles with a scale;
-- a title block.
-
-It would run in the same player, so voice, predict and checks come for free. The cutaway's model and tests would be the first example.
+- **It is not built from the kit yet.** The drawing is hand-written in `cutaway/build.mjs`, and `scripts/verify.mjs` doesn't check it. Making it a "Drawing" look in `src/` is the next step if we adopt it.
+- **Weak spots:**
+  - the predict and practice cards cover part of the drawing while open;
+  - labels drop to about 11 px at 1280×800;
+  - the orange step can jump between narrated steps;
+  - in this side view, the rails cross the steps' side webs.
 
 ## Open it
 
 ```sh
 open explore/escalator/cutaway/escalator-cutaway.html     # the page: tabs, play, Space, Dark
-node --test explore/escalator/cutaway/model.test.mjs      # 12 tests
+node --test explore/escalator/cutaway/model.test.mjs      # 24 tests
+node explore/escalator/cutaway/voice.mjs                  # re-record the voice
 node explore/escalator/cutaway/build.mjs                  # rebuild the page
 ```

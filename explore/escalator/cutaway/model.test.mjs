@@ -12,12 +12,12 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import * as M from "./model.mjs";
-
-const { P, STEP, PATH, LAND, STRUCT, SCHED } = M;
+import { MODELS, VARIANTS } from "./model.mjs";
 const deg = (r) => (r * 180) / Math.PI;
 const SWEEP = Array.from({ length: 80 }, (_, i) => i * 5); // chain advance over one pitch, 5 mm apart
 
+for (const [name, M] of Object.entries(MODELS)) {
+const { P, STEP, PATH, LAND, STRUCT, SCHED } = M;
 function bodies(poses) {
   return poses.map((p) => ({
     pose: p,
@@ -49,11 +49,10 @@ function segX(p, q, r, s) {
   return u > 0 && u < 1 && v > 0 && v < 1;
 }
 
-test("geometry: the stated numbers", () => {
-  assert.equal(P.incline, 30);
-  assert.equal(P.rise, 3000);
-  assert.equal(PATH.L % P.pitch, 0, "loop is a whole number of steps");
-  assert.equal(PATH.N, PATH.L / P.pitch);
+test(`${name}: geometry: the stated numbers`, () => {
+  assert.equal(P.incline, VARIANTS[name].incline);
+  assert.equal(P.rise, VARIANTS[name].rise);
+  assert.ok(Math.abs(PATH.L / P.pitch - PATH.N) < 1e-9, "loop is a whole number of steps");
   // sprocket pitch circle carries exactly `teeth` links
   assert.ok(Math.abs(2 * Math.PI * M.Rs - P.teeth * (P.pitch / P.links)) < 1e-9);
   // chain runs from the lower landing to the upper landing through exactly the rise
@@ -62,7 +61,7 @@ test("geometry: the stated numbers", () => {
   assert.equal(M.DRIVE.handrailSpeed.toFixed(6), P.speed.toFixed(6), "handrail matches the steps");
 });
 
-test("chain path is closed, continuous and tangent-continuous", () => {
+test(`${name}: chain path is closed, continuous and tangent-continuous`, () => {
   const a = M.chainPoint(0), b = M.chainPoint(PATH.L - 1e-6);
   assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-3);
   for (const g of PATH.segs) {
@@ -73,18 +72,20 @@ test("chain path is closed, continuous and tangent-continuous", () => {
   }
 });
 
-test("step rise on the incline is pitch x sin 30 = 200 mm, going 346.4 mm", () => {
+test(`${name}: step rise on the incline is pitch x sin(incline), going pitch x cos(incline)`, () => {
   const inc = PATH.by.incline;
   const s = inc.s0 + 1000;
   const a = M.stepPose(s), b = M.stepPose(s + P.pitch);
-  assert.ok(Math.abs(b.y - a.y - 200) < 1e-6);
-  assert.ok(Math.abs(b.x - a.x - 346.41) < 0.01);
+  assert.ok(Math.abs(b.y - a.y - M.stepRise) < 1e-6);
+  assert.ok(Math.abs(b.x - a.x - M.stepGoing) < 1e-6);
+  if (P.incline === 30) assert.ok(Math.abs(M.stepRise - 200) < 1e-9 && Math.abs(M.stepGoing - 346.41) < 0.01);
+  if (P.incline === 35) assert.ok(Math.abs(M.stepRise - 229.4) < 0.05);
 });
 
 // Independent check of the trailer track: put the chain wheel on the sampled chain polyline,
 // find where a circle of radius |T| meets the sampled trailer polyline behind it, and measure
 // the tread angle from that point alone. The orientation function is never consulted.
-test("trailer track holds every tread level on the passenger run (< 0.5 deg)", () => {
+test(`${name}: trailer track holds every tread level on the passenger run (< 0.5 deg)`, () => {
   const ds = 2;
   const runS0 = SCHED.sD - PATH.L, runS1 = SCHED.sA;
   const trail = [];
@@ -117,7 +118,7 @@ test("trailer track holds every tread level on the passenger run (< 0.5 deg)", (
   assert.ok(worst < 0.5, `worst tread angle ${worst.toFixed(3)} deg`);
 });
 
-test("tracks converge at the landings and are offset on the incline", () => {
+test(`${name}: tracks converge at the landings and are offset on the incline`, () => {
   // vertical distance between the two wheel-centre lines at the same x
   const gapAtX = (x, sGuess) => {
     let lo = sGuess - 900, hi = sGuess + 900;
@@ -132,13 +133,13 @@ test("tracks converge at the landings and are offset on the incline", () => {
   const sI = inc.s0 + inc.len / 2, sF = flat.s0 + flat.len / 2;
   const dInc = gapAtX(M.chainPoint(sI)[0], sI);
   const dFlat = gapAtX(M.chainPoint(sF)[0], sF);
-  const expectInc = -STEP.T[0] * Math.tan((30 * Math.PI) / 180) + STEP.T[1];
+  const expectInc = -STEP.T[0] * Math.tan((P.incline * Math.PI) / 180) + STEP.T[1];
   assert.ok(Math.abs(dInc - expectInc) < 0.5, `incline offset ${dInc}`);
   assert.ok(Math.abs(dFlat - STEP.T[1]) < 0.5, `landing offset ${dFlat}`);
   assert.ok(dInc > 4 * dFlat);
 });
 
-test("treads are level and coplanar on each landing walkway (2-3 steps)", () => {
+test(`${name}: treads are level and coplanar on each landing walkway (2-3 steps)`, () => {
   for (const s0 of SWEEP) {
     const poses = M.stepPositions(s0);
     const up = poses.filter((p) => p.x + STEP.f - RISER() > PATH.xE && p.x + STEP.f < LAND.combUp && Math.abs(p.y - P.rise) < 1e-6);
@@ -152,7 +153,7 @@ test("treads are level and coplanar on each landing walkway (2-3 steps)", () => 
   }
 });
 
-test("no two steps ever overlap (all pairs, chain advance swept over one pitch)", () => {
+test(`${name}: no two steps ever overlap (all pairs, chain advance swept over one pitch)`, () => {
   let worst = Infinity, at = null;
   for (const s0 of SWEEP) {
     const B = bodies(M.stepPositions(s0));
@@ -167,7 +168,7 @@ test("no two steps ever overlap (all pairs, chain advance swept over one pitch)"
   assert.ok(worst > 2, `closest approach ${worst.toFixed(2)} mm at ${JSON.stringify(at)}`);
 });
 
-test("positive control: the overlap check fires when a step is pushed 20 mm", () => {
+test(`${name}: positive control: the overlap check fires when a step is pushed 20 mm`, () => {
   const poses = M.stepPositions(0);
   const inc = poses.findIndex((p) => M.segmentAt(p.s) === "incline" && M.segmentAt(p.s - P.pitch) === "incline");
   const B = bodies(poses);
@@ -177,7 +178,7 @@ test("positive control: the overlap check fires when a step is pushed 20 mm", ()
   assert.ok(stepGap(B[inc], b2) < 0, "a 20 mm push must register as an overlap");
 });
 
-test("each wheel bears on its own drawn rail and never cuts into it", () => {
+test(`${name}: each wheel bears on its own drawn rail and never cuts into it`, () => {
   const R = M.rails();
   const runs = [
     { rail: R.chain.pass, wheel: "c", r: STEP.rc, s0: SCHED.sD - PATH.L + 60, s1: PATH.by["upper turn"].s0 - 60 },
@@ -204,14 +205,14 @@ test("each wheel bears on its own drawn rail and never cuts into it", () => {
   }
 });
 
-test("trailer track is smooth: no cusp, no loop", () => {
+test(`${name}: trailer track is smooth: no cusp, no loop`, () => {
   let minV = Infinity;
   for (let s = 0; s < PATH.L; s += 1) {
     const a = M.trailerPoint(s - 0.5), b = M.trailerPoint(s + 0.5);
     minV = Math.min(minV, Math.hypot(b[0] - a[0], b[1] - a[1]));
   }
   assert.ok(minV > 0.6, `trailer speed ratio dips to ${minV.toFixed(3)}`);
-  const pts = M.sampleLocus((s) => M.trailerPoint(s), PATH, 25);
+  const pts = M.sampleLocus((s) => M.trailerPoint(s), 25);
   for (let i = 0; i < pts.length; i++) {
     for (let j = i + 2; j < pts.length; j++) {
       if (i === 0 && j === pts.length - 1) continue;
@@ -220,7 +221,7 @@ test("trailer track is smooth: no cusp, no loop", () => {
   }
 });
 
-test("steps clear everything the section cuts", () => {
+test(`${name}: steps clear everything the section cuts`, () => {
   const fixed = [LAND.combPlateUp, LAND.combPlateLow, LAND.plateUp, LAND.plateLow, ...STRUCT.members];
   let worst = Infinity, what = null;
   for (let s = 0; s < PATH.L; s += 3) {
@@ -250,7 +251,7 @@ test("steps clear everything the section cuts", () => {
   }
 });
 
-test("no step rises above the tread plane under the landing plates", () => {
+test(`${name}: no step rises above the tread plane under the landing plates`, () => {
   for (let s = 0; s < PATH.L; s += 2) {
     const body = M.placePolygon(M.stepPose(s), M.STEP_OUTLINE);
     for (const v of body) {
@@ -259,3 +260,4 @@ test("no step rises above the tread plane under the landing plates", () => {
     }
   }
 });
+}
