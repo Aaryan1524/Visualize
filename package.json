@@ -9,7 +9,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "node --test \"src/**/*.test.ts\" \"examples/**/*.test.ts\" \"examples/**/*.test.mjs\"",
+    "test": "node --test \"src/**/*.test.ts\" \"src/**/*.test.mjs\" \"examples/**/*.test.ts\" \"examples/**/*.test.mjs\"",
     "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs",
     "verify": "node scripts/verify.mjs",

@@ -1,0 +1,43 @@
+{
+  "stamp": "dad45eb504230876",
+  "reviewer": "independent",
+  "summary": "Every earlier finding is now fixed. The last change gives the right cause for the 0.05 mm high allowance (running clearance and give, not chamfer camming), and nothing else on the page changed.",
+  "findings": [
+    {
+      "where": "variants.loose.captions.5; variants.loose.voice.5; readout 'mm low / high' (0.45 / 0.20); model.mjs keyPlay",
+      "text": "A shallow cut is forgiven only as far as the key can drop in its keyway (0.20 mm), because the key pin rests on the key.",
+      "severity": "wrong",
+      "finding": "The direction of the play is backwards. The five pin springs push every stack down onto the key, and so push the key down onto its lowest support in the keyway (the floor or the wards). Any clearance is therefore already taken up downward, and the free play is above the blade, not below it. That is why people lift a worn key to make it work: lifting helps low stacks, not high ones. When the plug turns, nothing can lower the key, so a key pin standing high gets essentially no allowance, only whatever the blade can flex and the edges are rounded. The model also leaves the blade floating 0.2 mm above the keyway floor (blade bottom at -3.8 mm, floor at -4.0 mm) under spring load, and the long section draws that gap. The 0.20 mm high allowance and the 'drop' animation rest on that unsupported position. Correct statement: 'A shallow cut gets almost no help: the key pin rests on the key, and the springs already hold the key down.' The 32-key count is unchanged, since a one-depth-high pin (0.381 mm) fails either way.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. The high side no longer relies on the key dropping, and the narration, caption, title block and Details all say the springs already press the key down. The remaining 0.2 mm gap between the blade and the keyway floor is accepted: the blade is located by the keyway's wards (their V-profile shows in section A–A), not by the floor, so the drawing does not imply play. Its `drop` code in build.mjs can never act now, because high misses come in 0.381 mm steps and the high allowance is 0.05 mm."
+    },
+    {
+      "where": "practice question, kind 0 (e.g. question(12), question(64))",
+      "text": "The lock allows ±0.45 mm. Fully in, what happens at this chamber? ... answer: The key pin crosses the line",
+      "severity": "wrong",
+      "finding": "This question states a symmetric ±0.45 mm allowance but grades through the asymmetric model, where the high side is only 0.20 mm. A key pin 0.381 mm above the line is inside the stated ±0.45 mm, yet the answer key says it blocks. A reader who applies the question's own number gets it 'wrong'. State the allowance as two numbers (e.g. 'forgives 0.45 mm low, 0.20 mm high'), or only ask deep-cut cases for the worn lock.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. The question now states 'forgives a stack X mm low but only 0.05 mm high', which matches the grading."
+    },
+    {
+      "where": "title block (drawing.loose); lab rows and verdict; details.facts.1",
+      "text": "shear allowance ±0.45 ... It opens: every gap is within ±0.45 mm of the line ... within the allowance of the shear line",
+      "severity": "misleading",
+      "finding": "The readout now shows the allowance as 0.45 low and 0.20 high, but the worn lock's title block still says '±0.45'. The lab's pass rows and verdict say 'inside ±0.45' / 'within ±0.45 mm', and Details speaks of 'the allowance' as one number. All of these should state the two sides separately (e.g. 'shear allowance 0.45 low / 0.20 high'), so the drawing, the readout and the text agree.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. The title block reads 'allowance 0.45 low / 0.05 high' (0.10 / 0.05 for the tight lock), the lab rows and verdict give both sides, and Details describes the two sides."
+    },
+    {
+      "where": "variants.loose.captions.5; model.mjs LOCK.highAllow comment",
+      "text": "A shallow cut gets almost none (0.05 mm, the domed pin top against the bore's edge chamfer), because the key pin rests on the key and the springs already press the key down in its keyway.",
+      "severity": "misleading",
+      "finding": "The number is reasonable, but the stated cause contradicts the rest of the same sentence. A chamfer on the housing bore's edge can only clear a high key pin by camming it down, and the sentence itself says the pin cannot go down: it rests on the key, which the springs already hold at the bottom of its travel. What actually lets a key pin stand a few hundredths of a millimetre proud and still pass is the running clearance between the plug and its housing bore, plus a little elastic give in the pins and blade. Say that instead, e.g. '(0.05 mm: the plug's running clearance in the housing, and a little give)'.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. The caption now attributes the 0.05 mm to the plug running clearance in the housing and a little give in the pins and blade, which is consistent with the key pin resting on a key pressed down by the springs. The model comment matches."
+    }
+  ]
+}

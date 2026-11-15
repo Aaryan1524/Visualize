@@ -29,6 +29,12 @@ export interface Look {
   theme?(scene: THREE.Scene, root: HTMLElement): void;
 }
 
+// A lit (followed or spoken) part is drawn in the follow colour only when its tone is neutral. A
+// semantic tone (a hit, a miss, an eviction) keeps its colour when lit, or the picture would
+// recolour a hit as whatever the follow colour means in the legend.
+const SEMANTIC: Tone[] = ["accent", "cold", "hot", "good", "bad"];
+const followed = (tone: Tone, lit: boolean) => lit && !SEMANTIC.includes(tone);
+
 function sheetTexture(): THREE.CanvasTexture {
   const c = document.createElement("canvas");
   c.width = c.height = 512;
@@ -85,7 +91,7 @@ const PAPER_TONE: Record<Tone, { fill: string; ink: string }> = {
 const paper: Look = {
   font: "'Iowan Old Style', Palatino, Georgia, serif",
   paintDecal(mat, tone, emphasis, lit, opacity) {
-    mat.color.set(lit ? "#c63d2f" : PAPER_TONE[tone].ink).lerp(new THREE.Color("#c9c2b2"), 1 - emphasis);
+    mat.color.set(followed(tone, lit) ? "#c63d2f" : PAPER_TONE[tone].ink).lerp(new THREE.Color("#c9c2b2"), 1 - emphasis);
     mat.opacity = opacity * (0.5 + 0.5 * emphasis);
   },
   edges: true,
@@ -108,10 +114,10 @@ const paper: Look = {
     const t = PAPER_TONE[s.tone];
     // Receding parts fade toward the page; nothing goes grey-black.
     mat.color.set(t.fill).lerp(new THREE.Color("#f6f1e6"), 1 - s.emphasis);
-    mat.emissive.set(s.lit ? "#3a0f08" : "#000000");
+    mat.emissive.set(followed(s.tone, s.lit) ? "#3a0f08" : "#000000");
     mat.transparent = s.opacity < 1;
     mat.opacity = s.opacity;
-    if (edge) edge.color.set(s.lit ? "#c63d2f" : t.ink).lerp(new THREE.Color("#c9c2b2"), 1 - s.emphasis);
+    if (edge) edge.color.set(followed(s.tone, s.lit) ? "#c63d2f" : t.ink).lerp(new THREE.Color("#c9c2b2"), 1 - s.emphasis);
   },
 };
 
@@ -207,8 +213,8 @@ function hatched(mat: THREE.MeshStandardMaterial) {
 const drawing: Look = {
   font: "Manrope, 'Visualize Sans', system-ui, sans-serif",
   paintDecal(mat, tone, emphasis, lit, opacity) {
-    const t = drawTone(lit ? "accent" : tone);
-    mat.color.set(["accent", "cold", "good", "bad", "hot"].includes(tone) || lit ? t.ink : drawTone("subject").ink);
+    const t = drawTone(followed(tone, lit) ? "accent" : tone);
+    mat.color.set(SEMANTIC.includes(tone) || lit ? t.ink : drawTone("subject").ink);
     mat.opacity = opacity * (0.45 + 0.55 * emphasis);
   },
   edges: true,
@@ -234,7 +240,7 @@ const drawing: Look = {
     return m;
   },
   paint(mat, s, edge) {
-    const t = drawTone(s.lit ? "accent" : s.tone);
+    const t = drawTone(followed(s.tone, s.lit) ? "accent" : s.tone);
     const page = drawTone("base").fill;
     // Receding parts fade toward the page, outline and fill together, as a lighter pen would.
     mat.color.set(t.fill).lerp(new THREE.Color(page), 1 - s.emphasis);

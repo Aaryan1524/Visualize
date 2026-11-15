@@ -10,11 +10,14 @@ export interface Config {
   latency: number;
   /** Time for the server to write the ledger or read the key store, ms. */
   dbTime: number;
+  /** Time for the server to send its reply once the database work is done, ms. */
+  replyTime: number;
   /** Client gives up waiting for a response after this long, ms. */
   timeout: number;
   maxAttempts: number;
   /** Message ids the network drops, e.g. "response-1". */
   drop: readonly string[];
+  /** The idempotency key the client makes once for this payment and sends on every attempt. */
   key: string;
 }
 
@@ -25,6 +28,8 @@ export interface Message {
   from: "client" | "server";
   to: "client" | "server";
   sentAt: number;
+  /** The idempotency key a request carries, when the server takes keys. */
+  key?: string;
 }
 
 export interface Charge {
@@ -85,7 +90,7 @@ export function simulate(cfg: Config): { event: Ev; state: Snapshot }[] {
     }
     at(arrives, () => {
       emit({ type: "arrive", t: arrives, message }, { inflight: s.inflight.filter((m) => m.id !== message.id) });
-      if (message.to === "server") serverHandle(arrives, message.attempt);
+      if (message.to === "server") serverHandle(arrives, message.attempt, message.key);
       else clientHandle(arrives, message.attempt);
     });
   };
@@ -93,24 +98,25 @@ export function simulate(cfg: Config): { event: Ev; state: Snapshot }[] {
   const respond = (t: number, attempt: number) =>
     send(t, { id: `response-${attempt}`, kind: "response", attempt, from: "server", to: "client", sentAt: t });
 
-  const serverHandle = (t: number, attempt: number) => {
-    if (cfg.idempotent && s.store?.key === cfg.key) {
+  const serverHandle = (t: number, attempt: number, key: string | undefined) => {
+    if (cfg.idempotent && key !== undefined && s.store?.key === key) {
       const done = t + cfg.dbTime;
       at(done, () => {
-        emit({ type: "replay", t: done, attempt, key: cfg.key }, {});
-        at(done + 10, () => respond(done + 10, attempt));
+        emit({ type: "replay", t: done, attempt, key }, {});
+        at(done + cfg.replyTime, () => respond(done + cfg.replyTime, attempt));
       });
       return;
     }
+    // The first request's key lookup (which finds nothing) is folded into this write.
     const done = t + cfg.dbTime;
     at(done, () => {
       const charge: Charge = { id: s.ledger.length + 1, amount: cfg.amount, attempt, at: done };
       // With idempotency, the charge and the key are written in one transaction.
       emit(
         { type: "charge", t: done, charge, attempt },
-        { ledger: [...s.ledger, charge], ...(cfg.idempotent ? { store: { key: cfg.key, attempt } } : {}) },
+        { ledger: [...s.ledger, charge], ...(cfg.idempotent && key !== undefined ? { store: { key, attempt } } : {}) },
       );
-      at(done + 10, () => respond(done + 10, attempt));
+      at(done + cfg.replyTime, () => respond(done + cfg.replyTime, attempt));
     });
   };
 
@@ -122,7 +128,8 @@ export function simulate(cfg: Config): { event: Ev; state: Snapshot }[] {
 
   const attempt = (t: number, n: number) => {
     s = { ...s, client: { status: n === 1 ? "waiting" : "retrying", attempts: n } };
-    send(t, { id: `request-${n}`, kind: "request", attempt: n, from: "client", to: "server", sentAt: t });
+    // The key was made once, before the first attempt; every retry carries the same one.
+    send(t, { id: `request-${n}`, kind: "request", attempt: n, from: "client", to: "server", sentAt: t, ...(cfg.idempotent ? { key: cfg.key } : {}) });
     at(t + cfg.timeout, () => {
       if (paid || s.client.attempts !== n) return;
       if (n >= cfg.maxAttempts) {

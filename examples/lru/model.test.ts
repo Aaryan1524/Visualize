@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fifoContrast, run, runFifo, type Result } from "./model.ts";
+import { fifoContrast, fifoHits, optimalHits, run, runFifo, type Result } from "./model.ts";
 import { REQUESTS, CAPACITY } from "./scene.ts";
 
 /**
@@ -120,7 +120,7 @@ test("the prediction precedes the first eviction and answers from the current re
   const prompt=compiled.steps[promptIndex]!.teaching!.prediction!;
   assert.equal(prompt.answer,steps[firstEviction]!.event.evicted);
   assert.ok(prompt.choices.includes(prompt.answer));
-  assert.match(compiled.steps.at(-1)!.caption,/last read, not the first arrival/);
+  assert.match(compiled.steps.at(-1)!.caption,/last use, not the first arrival/);
 });
 
 test("practice questions: the model's answer is one of the choices, and it is the key used least recently", async () => {
@@ -135,4 +135,40 @@ test("practice questions: the model's answer is one of the choices, and it is th
     const lru = [...q.choices].sort((a, b) => lastUse(a) - lastUse(b))[0];
     assert.equal(q.answer, lru, `seed ${seed}: ${q.question}`);
   }
+});
+
+/** Reference for the optimum, written separately: try every eviction choice and keep the best. */
+function bestHits(capacity: number, requests: string[], i = 0, cache: string[] = []): number {
+  if (i === requests.length) return 0;
+  const key = requests[i]!;
+  if (cache.includes(key)) return 1 + bestHits(capacity, requests, i + 1, cache);
+  if (cache.length < capacity) return bestHits(capacity, requests, i + 1, [...cache, key]);
+  return Math.max(...cache.map((v) => bestHits(capacity, requests, i + 1, [...cache.filter((k) => k !== v), key])));
+}
+
+test("Belady's policy matches an exhaustive search, and no policy beats it", () => {
+  let seed = 7;
+  const r = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+  for (let trial = 0; trial < 200; trial++) {
+    const capacity = 1 + Math.floor(r() * 3);
+    const requests = Array.from({ length: Math.floor(r() * 10) }, () => "ABCDE"[Math.floor(r() * 5)]!);
+    const best = bestHits(capacity, requests);
+    assert.equal(optimalHits(capacity, requests), best, requests.join(""));
+    assert.ok(run(capacity, requests).steps.reduce((n, s) => n + (s.event.result === "hit" ? 1 : 0), 0) <= best);
+    assert.ok(fifoHits(capacity, requests) <= best);
+  }
+});
+
+test("FIFO hits: counted from the FIFO run, independently", () => {
+  assert.equal(fifoHits(2, ["A", "B", "A", "C", "A"]), 1);
+  assert.equal(fifoHits(CAPACITY, REQUESTS), 2);
+});
+
+test("the scene's run: LRU 3 hits, FIFO 2, the optimum 4; a loop one key too big gets no hits", () => {
+  const last = run(CAPACITY, REQUESTS).steps.at(-1)!.state;
+  assert.equal(last.hits, 3);
+  assert.equal(fifoHits(CAPACITY, REQUESTS), 2);
+  assert.equal(optimalHits(CAPACITY, REQUESTS), 4);
+  const keys = "ABCD".slice(0, CAPACITY + 1).split("");
+  assert.equal(run(CAPACITY, [...keys, ...keys, ...keys]).steps.at(-1)!.state.hits, 0);
 });

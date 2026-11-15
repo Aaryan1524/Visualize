@@ -438,7 +438,7 @@ function titleBlock() {
   const facts = [
     `Rise ${P.rise} · incline ${P.incline}° · step pitch ${P.pitch} · step rise ${P.pitch} sin ${P.incline}° = ${M.stepRise.toFixed(1).replace(/\.0$/, "")} · going ${M.stepGoing.toFixed(1)}`,
     `${PATH.N} steps · step width 1000 (not drawn) · steps and handrail at 0.5 m/s`,
-    `Sprockets ${P.teeth} T, pitch Ø ${(2 * Rs).toFixed(0)} · main shaft ${DRIVE.shaftRpm.toFixed(2)} rpm · near-side truss removed`,
+    `Sprockets ${P.teeth} T, pitch Ø ${((P.pitch / P.links) / Math.sin(Math.PI / P.teeth)).toFixed(0)} · main shaft ${DRIVE.shaftRpm.toFixed(2)} rpm (mean) · near-side truss removed`,
   ];
   facts.forEach((txt, i) => (s += `<text class="tb-text" x="${x0 + 110}" y="${-(y1 - 600 - i * 200)}">${esc(txt)}</text>`));
   const key = [["k-blue", "Chain and chain-wheel track"], ["k-teal", "Trailer-wheel track"], ["k-orange", "Followed step"]];
@@ -581,7 +581,7 @@ const STEPS = [
   { tab: null, heading: "How does a moving staircase keep every step level?", focus: null },
   { tab: "The loop", heading: "One endless chain carries every step.", focus: ["chain", "sprockets", "drive"] },
   { tab: "Two wheels", heading: "Two wheels on two tracks keep each tread level.", focus: ["steps", "cwheels", "twheels", "chaintrack", "trailertrack"] },
-  { tab: "The landing", heading: "The tracks meet, and the stairs flatten.", focus: ["steps", "cwheels", "twheels", "chaintrack", "trailertrack", "landing"] },
+  { tab: "The landing", heading: "The path levels, and the stairs flatten.", focus: ["steps", "cwheels", "twheels", "chaintrack", "trailertrack", "landing"] },
   { tab: "Turn and return", heading: "Each step turns over and rides back underneath.", focus: ["steps", "cwheels", "twheels", "chaintrack", "trailertrack", "chain", "sprockets"] },
   { tab: "The handrail", heading: "The handrail is its own loop, at the same speed.", focus: ["handrail", "sheaves", "hrdrive", "balustrade", "drive"] },
 ];
@@ -591,10 +591,10 @@ function captions(M) {
   return [
     `An escalator is a staircase that never stops: ${M.PATH.N} steps ride one endless loop, up the slope, round the top and back underneath. This one rises ${P.rise} mm at ${P.incline}° and runs at ${P.speed / 1000} m/s.`,
     `The step chain is an endless loop of ${(P.pitch / P.links).toFixed(1)} mm links wrapped round a ${P.teeth}-tooth sprocket at each end. The motor drives the upper sprocket through a ${M.DRIVE.gearRatio.toFixed(1)} : 1 gearbox and a duplex chain, so the main shaft turns at ${M.DRIVE.shaftRpm.toFixed(2)} rpm and the chain moves at ${P.speed / 1000} m/s. The lower sprocket rides on a spring-loaded tension carriage.`,
-    `Each step has a chain wheel on its front axle and a trailer wheel ${-M.STEP.T[0]} mm behind it. On the incline the trailer-wheel track runs ${off.toFixed(1)} mm higher than the chain-wheel track, which lifts the back of the step by exactly the slope over that wheelbase, so the tread stays level. Neighbouring treads are ${M.stepRise.toFixed(1)} mm apart in height and ${M.stepGoing.toFixed(1)} mm apart along the floor.`,
-    `Through the upper curve the trailer-wheel track comes down to ${M.STEP.T[1]} mm above the chain-wheel track, the same as the wheels' own height difference. The rise between neighbouring treads falls to zero, two or three treads lie flat as a walkway, and they pass under the comb plate, whose teeth run in the tread grooves.`,
+    `Each step has a chain wheel on its front axle and a trailer wheel ${-M.STEP.T[0]} mm behind it. On the incline the trailer-wheel track runs ${off.toFixed(1)} mm higher than the chain-wheel track, which is the slope over that wheelbase (${(-M.STEP.T[0] * Math.tan((P.incline * Math.PI) / 180)).toFixed(1)} mm) plus the ${M.STEP.T[1]} mm the trailer axle already sits above the chain axle on a level step, so the tread stays level. These offsets are measured between the wheels' centre paths. The trailer wheel's radius is ${M.STEP.rc - M.STEP.rt} mm smaller, so on the slope its rail sits about ${((M.STEP.rc - M.STEP.rt) / Math.cos((P.incline * Math.PI) / 180)).toFixed(0)} mm higher still. Neighbouring treads are ${M.stepRise.toFixed(1)} mm apart in height and ${M.stepGoing.toFixed(1)} mm apart along the floor.`,
+    `Through the upper curve the trailer-wheel track comes down to ${M.STEP.T[1]} mm above the chain-wheel track, the same as the wheels' own height difference. The chain's path levels out, so the rise between neighbouring treads falls to zero, two or three treads lie flat as a walkway, and they pass under the comb plate, whose teeth run in the tread grooves.`,
     `Past the comb the chain wraps the drive sprocket. The trailer wheel runs in a closed guide that eases each step through half a turn, so it travels back under the passenger run upside down and turns upright again round the tension sprocket.`,
-    `The handrail runs over a sheave in each newel and back inside the balustrade. A chain from the main shaft (${M.DRIVE.zH1} to ${M.DRIVE.zH2} teeth) turns the upper sheave, whose radius is chosen so the rail moves at the same ${P.speed / 1000} m/s as the steps.`,
+    `The handrail runs over a sheave in each newel and back inside the balustrade. A chain from the main shaft (${M.DRIVE.zH1} to ${M.DRIVE.zH2} teeth) turns the upper sheave, which grips the rail by friction; its radius is chosen so the rail moves at the same ${P.speed / 1000} m/s as the steps. Codes allow the rail to run up to 2% faster than the steps, never slower, and a monitor stops the escalator if the rail slips.`,
   ];
 }
 
@@ -677,7 +677,6 @@ function machine(DATA) {
     E.shU = fig.querySelector("#sheaveU .rot");
     E.shL = fig.querySelector("#sheaveL .rot");
     E.live = $("detLive");
-    $("r-rise").textContent = V.readout.rise.toFixed(0);
     $("r-steps").textContent = String(V.readout.N);
     $("r-speed").textContent = String(model.P.speed / 1000);
   }
@@ -798,6 +797,11 @@ function machine(DATA) {
     const tread = model.toWorld(p, [ST.f - 196, ST.t])[1] - model.LAND.treadLow;
     setText("r-height", (tread / 1000).toFixed(2));
     setText("r-where", WHERE[model.segmentAt(travel)] ?? "return run");
+    // the rise to the step ahead, live: 200 on the slope, 0 on a landing, upside down on the return
+    // the rise from the step below to the followed step, while it carries passengers; none on the turns
+    const seg = model.segmentAt(travel);
+    const carrying = ["lower landing", "lower transition", "incline", "upper transition", "upper landing"].includes(seg) && ["lower landing", "lower transition", "incline", "upper transition", "upper landing"].includes(model.segmentAt(travel - model.P.pitch));
+    setText("r-rise", carrying ? Math.abs(model.toWorld(p, [ST.f, ST.t])[1] - model.toWorld(model.stepPose(travel - model.P.pitch), [ST.f, ST.t])[1]).toFixed(0) : "–");
   }
 
   // While the voice names the orange step, the other steps and wheels fade back.
@@ -868,10 +872,10 @@ const modelSrc = readFileSync(join(HERE, "model.mjs"), "utf8").replace(/^export 
 
 const PREDICT = {
   step: 2,
-  question: "The two tracks meet near the top. What happens to the steps?",
+  question: "Near the top, the chain's path levels out. What happens to the steps?",
   choices: ["They tip forward", "They flatten out", "They stop"],
   answer: 1,
-  explanation: "With both wheels at the same height, each tread lines up with its neighbours: a flat walkway before the comb.",
+  explanation: `With the chain level, neighbouring steps sit at the same height: a flat walkway before the comb. The trailer-wheel track, now only ${MODELS.standard.STEP.T[1]} mm above the chain-wheel track, keeps each tread level.`,
   locked: "Locked in. Press play to watch the orange step reach the top.",
 };
 
@@ -966,6 +970,42 @@ text{font-family:var(--sans);fill:var(--ink)}
 @media (prefers-reduced-motion:reduce){.part,.detail,#detLive{transition:none}}
 `;
 
+// ---------------------------------------------------------------- the correctness audit
+// Every number the page states comes from the model; each cause-and-effect sentence below is on the
+// page word for word and tested against both inclines.
+const near = (a, b, e) => Math.abs(a - b) <= e;
+const mid = (M, seg) => M.PATH.by[seg].s0 + M.PATH.by[seg].len / 2;
+const AUDIT = {
+  models: Object.values(MODELS),
+  // derived in the build: the chain's link pitch and the trailer track's offset on the slope
+  facts: Object.values(MODELS).flatMap((M) => [M.P.pitch / M.P.links, -M.STEP.T[0] * Math.tan((M.P.incline * Math.PI) / 180) + M.STEP.T[1], -M.STEP.T[0] * Math.tan((M.P.incline * Math.PI) / 180), M.STEP.rc - M.STEP.rt, (M.STEP.rc - M.STEP.rt) / Math.cos((M.P.incline * Math.PI) / 180), 2 * M.Rs, (1 - Math.cos(Math.PI / M.P.teeth)) * 100, (M.P.pitch / M.P.links) / Math.sin(Math.PI / M.P.teeth)]),
+  allow: [{ value: 5, why: "the tests' sweep step, 5 mm" }, { value: 2, why: "codes: handrail up to 2% faster than the steps" }, { value: 6, why: "codes: 35° only up to a 6 m rise" }, { value: 2.6, why: "detail B's drawing scale" }, { value: 1.6, why: "detail C's drawing scale" }],
+  claims: [
+    { text: "every tread stays level all the way up", test: (M) => { const b = M.PATH.by.incline; for (let s = b.s0; s <= b.s0 + b.len; s += 50) if (Math.abs(M.stepPose(s).phi) > (0.5 * Math.PI) / 180) return false; return true; } },
+    { text: "On the slope that second track sits higher, so it holds up the back of the step", test: (M) => { const p = M.stepPose(mid(M, "incline")), q = M.toWorld(p, M.STEP.T), t = Math.tan((M.P.incline * Math.PI) / 180); return q[1] - (p.y - (p.x - q[0]) * t) > M.STEP.T[1] + 50; } },
+    { text: "the stairs flatten into a walkway", test: (M) => { const s = mid(M, "upper landing"); return near(M.stepPose(s).y, M.stepPose(s - M.P.pitch).y, 1); } },
+    { text: "so the tread stays level through the curve", test: (M) => { const b = M.PATH.by["upper transition"]; for (let s = b.s0; s <= b.s0 + b.len; s += 20) if (Math.abs(M.stepPose(s).phi) > (0.5 * Math.PI) / 180) return false; return true; } },
+    { text: "comes down with it, to just thirty millimetres above", test: (M) => { const p = M.stepPose(mid(M, "upper landing")); return near(M.toWorld(p, M.STEP.T)[1] - p.y, 30, 0.5) && near(M.chainTangent(mid(M, "upper landing"))[1], 0, 1e-6); } },
+    { text: "each step turns over and travels back underneath, upside down", test: (M) => near(Math.abs(M.stepPose(mid(M, "return, incline")).phi), Math.PI, 0.01) },
+    { text: "the rail in your hand moves at the same half a metre per second as the step under your feet", test: (M) => near(M.DRIVE.handrailSpeed, M.P.speed, 1) && near(M.P.speed, 500, 1e-9) },
+    { text: "the rise between neighbouring treads falls to zero", test: (M) => { const s = mid(M, "upper landing"); return near(M.stepPose(s).y, M.stepPose(s - M.P.pitch).y, 1); } },
+  ],
+  coverage: {
+    source: "Wikipedia, Escalator; manufacturer component overviews (step chain, step wheels, trailer track, comb plate, handrail drive)",
+    topics: [
+      { topic: "the step chain, sprockets and drive", where: "step:1" },
+      { topic: "two wheels on two tracks keep each tread level", where: "step:2" },
+      { topic: "the landing: the stairs flatten under the comb plate", where: "step:3" },
+      { topic: "the return run: steps turn over", where: "step:4" },
+      { topic: "the handrail, driven at the step speed", where: "step:5" },
+      { topic: "incline and step rise", where: "whatif" },
+      { topic: "safety devices", where: "deferred", why: "brakes, comb and skirt switches and overspeed governors deserve their own page" },
+    ],
+  },
+  reviewFile: join(HERE, "review.json"),
+  report: join(ROOT, "dist", "escalator.audit.json"),
+};
+
 const std = VARIANT_DATA.standard;
 const HTML = drawingPage({
   title: "Escalator",
@@ -994,13 +1034,17 @@ const HTML = drawingPage({
   facts: [
     `The chain path is lines and arcs, with ${MODELS.standard.PATH.N} steps at 400 mm along it.`,
     "Each step is a rigid body. The trailer-wheel track is the path the trailer wheel traces while the tread is held level; it is computed, not drawn by hand.",
-    "Tests sweep the chain through a whole pitch, 5 mm at a time, for both inclines. They check that no two steps touch, that each wheel stays on its own rail, that every tread is level within 0.5° on the slope, and that the treads are flat at the landings.",
+    "Tests sweep the chain through a whole pitch, 5 mm at a time, for both inclines. They check that no two steps touch and that each wheel stays on its own rail. Level treads are not a test: the trailer-wheel track is computed from the condition that the tread stays level, so they follow from the model.",
+    `A real escalator has two step chains, one each side, and four wheels per step; this side view shows the near one of each. The chain is drawn wrapping each sprocket as a smooth band of the same length (Ø ${(2 * MODELS.standard.Rs).toFixed(0)}); a real ${MODELS.standard.P.teeth}-tooth sprocket makes the chain's speed vary by about ${((1 - Math.cos(Math.PI / MODELS.standard.P.teeth)) * 100).toFixed(1)}% as each tooth engages, so 0.5 m/s is the mean.`,
+    `Codes allow 35° only for rises up to 6 m at speeds up to 0.5 m/s; this escalator rises ${MODELS.standard.P.rise / 1000} m.`,
     "Step width 1000 mm (not drawn). Dimensions in mm.",
+    "Not covered here: the safety devices (the brake, comb-impact and skirt switches, and the overspeed governor).",
   ],
   css: CSS,
   modelSrc,
   machine,
   data: DATA,
+  audit: AUDIT,
 });
 
 // node examples/escalator/build.mjs [--out <file>]; the page goes to dist/escalator.html by default.

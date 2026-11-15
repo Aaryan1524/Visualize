@@ -123,6 +123,10 @@ try {
       };
     });
     if (contract.missingFns.length) fail(`${at}: window.__viz is missing ${contract.missingFns.join(", ")}`);
+    // The correctness audit ran at build time (src/claims/audit.mjs); the page carries its result.
+    const au = await p.evaluate(() => window.__viz?.audit ?? null);
+    if (!au) fail(`${at}: the page carries no correctness audit; build it with drawingPage({ audit })`);
+    else if (!au.ok) for (const q of au.problems) fail(`audit: ${q}`);
     if (contract.ids.length) fail(`${at}: missing #${contract.ids.join(", #")}`);
     if (!contract.voice) fail(`${at}: no recorded voice is embedded (run the example's voice script)`);
     if (contract.missingFns.includes("seekStep") || contract.missingFns.includes("state")) continue;

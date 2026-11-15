@@ -19,6 +19,15 @@ What a machine needs. The escalator built in Clay came out as about forty identi
   It fails on the old looping bar. It runs in CI as `pnpm check:drawing`, and `pnpm test` now runs `examples/**/*.test.mjs`.
 - **Length.** A mechanism takes 5–8 steps. Narration stays under about 3 minutes, or the subject is split.
 - **The voice is compressed again.** `scripts/voice.mjs` asked for 96 kb/s AAC, which afconvert rejects for 24 kHz mono, so every clip silently fell back to WAV. It now asks for 64 kb/s. Pages recorded before this need re-recording to shrink.
+- **What a page says is checked, not only what its model computes (`src/claims/audit.mjs`).** Round 5 lost both topics to a plain agent, and the losses were words: a derailleur page said the cage spring swings the cage forward (it pulls it back), a heading said 60° where the readout said 37°, and limit screws were never taught. The audit runs in every build (`drawingPage`) and in `verify`, and fails on any of these:
+  - a number in the text that the model doesn't have at the precision shown;
+  - a cause-and-effect claim that is not on the page word for word, or that the model contradicts;
+  - a topic list with no source, or with fewer than three in four core topics taught;
+  - no current independent review. `scripts/review-brief.mjs` writes the brief for a reviewer who did not build the page, and editing the text after the review makes it stale.
+
+  It caught a real error on the approved escalator: its landing step said the two tracks "come together" with "both wheels at the same height", but the model keeps the trailer wheel 30 mm higher. The stairs flatten because the chain's path levels out; the narration, heading and prediction now say so. Every example has its topics with a source, its claims and a review.
+
+  The first reviews found 56 problems across the six pages; the numbers held up and the words didn't. On the lock, the near-miss key was one depth too *shallow* and the page said "the chamfers cam it past". A key pin left too high rests on the key, so nothing pushes it down. Locks forgive the other way: a stack left low is cammed up against the driver's spring. The wrong key is now one depth too deep, and the model's allowance is asymmetric (generous low, limited by the key's drop in its keyway high). A worn lock opens for 32 keys; the tight one for 1. On the escalator, the title block's sprocket diameter was a band approximation (now the true pitch diameter), and the step-rise readout stayed at 200 mm on the landing (now live). On LRU, new keys were drawn at the least-recent end.
 - **Concepts in the machines' style: `look: "drawing"`, now the default.** The builder wanted concept pages to match the machine drawings. The new look keeps the 3D layout but draws it like the machines:
   - ink outlines on the cream stage, with flat light and no cast shadows;
   - base plates hatched as cut sections; the hatching is in screen space, because world-space hatching bent with the view;

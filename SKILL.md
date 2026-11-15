@@ -69,15 +69,26 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
 | Trust | `computed` for exact models, `model` for simplified ones, `sourced` only with an exact location | The badge must be true |
 | Where files go | In the user's project: the scene in an explanations folder, the built page in its public or static folder, screenshots beside the scene (verify puts them there) | Keeps the skill folder clean |
 
+## Correctness: what the page says is checked too
+
+A model checks the picture; nothing checked the words, and that is where the skill lost round 5 of the evals. A derailleur page said the cage spring swings the cage forward (it pulls it back), a heading said 60° where its readout said 37°, and limit screws were never taught because no list of topics existed to miss them from. A plain model reasoning straight from physics got all three right. Every page now carries four checks, run by `src/claims/audit.mjs` at build time:
+
+1. **Topics before pictures.** Before any drawing, find what a good reference teaches for the subject (a manual, a textbook, a reference page; search when you can) and write the list with its source: `coverage: { source, topics: [{ topic, where }] }`. Each core topic is a step (`"step:3"`), the lab, What if or Now you try, or `"deferred"` with a reason that Details also states. At least three in four core topics are taught. The topics decide the number of steps, within the Size row.
+2. **No typed numbers.** Every number in the voice, headings, captions, cards and Details must exist in the model at the precision shown ("about" allows 5%). Write numbers from the model into the text; a number that is not a quantity of the subject (a test's step size) goes in `allow` with a reason.
+3. **Claims.** Each cause-and-effect sentence (what pushes, what pulls, which way a part moves, why something happens) goes in `claims` word for word as the page says it, with a test against every variant's model. The audit fails if the sentence is not on the page or the model disagrees.
+4. **A reviewer who did not build it.** `node <skill>/scripts/review-brief.mjs <name>.audit.json <dir>/review.json <page>` prints a brief; give it to a fresh agent (a subagent) or a person. It writes `review.json`, stamped with the text it read. Fix each finding (the edit makes the review stale, so review again) or answer it (`resolved: true` with a `response`). Your own review does not count: it is anchored on your reasoning.
+
+**Show the working.** Put the mechanism's intermediate values on screen, not only its result: a Bloom filter shows word → hash → mod m → bit, not an arrow from word to bit. And keep one camera through a concept page; a view that jumps between steps loses the reader.
+
 ## Workflow
 
 `<skill>` is this folder. Scenes can live in any project: the scripts take paths, and scene files import the kit from `<skill>/src`, which the scaffold sets up.
 
 
-**For a real machine, follow `references/drawing.md` instead of this list.** The steps below are for concept scenes (`scene.ts`, `scripts/voice.mjs <dir>`, `verify.mjs`). A Drawing page keeps the same ideas: a tested model first, a draft early, one prediction, a voice, What if, a lab and Now you try. It uses its own files instead: `model.mjs` and `model.test.mjs`, a `build.mjs` that hands the drawing and the machine's hooks to the shared page and player in `src/drawing/`, a `voice.mjs`, and `scripts/check-drawing.mjs`. Start by copying `examples/lock/`, the smaller of the two. It ships as a standalone page only, with no SVG or React export yet. Deliver with the same report, with `check-drawing: passed` in place of `verify: passed`.
+**For a real machine, follow `references/drawing.md` instead of this list.** The steps below are for concept scenes (`scene.ts`, `scripts/voice.mjs <dir>`, `verify.mjs`). A Drawing page keeps the same ideas: a tested model first, a draft early, one prediction, a voice, What if, a lab and Now you try. It uses its own files instead: `model.mjs` and `model.test.mjs`, a `build.mjs` that hands the drawing and the machine's hooks to the shared page and player in `src/drawing/`, a `voice.mjs`, and `scripts/check-drawing.mjs`. Start by copying `examples/lock/`, the smaller of the two. It ships as a standalone page only, with no SVG or React export yet. Pass the correctness audit to `drawingPage({ audit })`; `check-drawing` fails until it is clean. Deliver with the same report, with `check-drawing: passed` and `audit: clean (<n> claims, <m> topics, review current)` in place of `verify: passed`.
 
 1. **Write the model** (`model.ts`): pure functions returning the state after every event. Test it against a separately written reference implementation and edge cases (`model.test.ts`). Choose the input sequence so the interesting cases happen: a hit, a full-cache miss, a lost message, a divergence.
-2. **Scaffold the scene**: `node <skill>/scripts/new-scene.mjs <name> --dir <folder>` writes a model, a test and an editorial scene that build and verify as generated. Replace the model first, then the view.
+2. **Scaffold the scene**: `node <skill>/scripts/new-scene.mjs <name> --dir <folder>` writes a model, a test and an editorial scene that build and verify as generated, except for the audit, which needs your topics, claims and review. Replace the model first, then the view. Write the topic list (Correctness, 1) before the view.
 3. **Assemble the view from parts.** Use `src/parts/`. Every mark's `key` is a model entity id: keys carry identity across steps, so motion, linking and checks follow them. Position things with the parts' anchors, not by eye.
 4. **Teach in beats** (`teaching`). Use 3–5 chapters and one short action per step (12 words at most). Add one prediction just before the causal moment, such as "D is next. Which key leaves?". The longer caption, assumptions and transcript go in the Details drawer automatically.
 5. **Declare observations** (`observe`): every value shown, every order that matters, every size that encodes a number (`extent`), what must be visible and what must be gone, semantic tones, and what is lit.
@@ -87,7 +98,7 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
 
    ```text
    Built <title>: <n> steps in <chapters> chapters, from <parts>. Model tested against <reference>.
-   verify: passed (<n> observations; depth, focus, labels, layout, both themes). Files: <page>, <scene dir>.
+   verify: passed (<n> observations; depth, focus, labels, layout, both themes; audit clean: <n> claims, <m> topics, review current). Files: <page>, <scene dir>.
    Open: <page>#step=<the key step>. Not verified by machine: <whatever you judged only by eye>.
    ```
 8. **Teach back and narrate.** Add `practice(seed)` from the model (the answer must be computed, never typed), `whatIf` versions built by the same scene factory, and `voice()`. Record the voice: `node <skill>/scripts/voice.mjs <dir>` (a local open-source voice; one model download, then offline). Rebuild; the page now has Listen, What if and Now you try, and verify checks every version and 40 practice questions.

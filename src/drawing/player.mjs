@@ -604,6 +604,7 @@ export function player(DATA, machine) {
       return machine.lab(labValues, S.variant);
     },
     labInputs: () => DATA.lab?.inputs ?? [],
+    audit: DATA.audit ?? null,
     closeLab: () => labOpen && closeLab(),
     state: () => ({ step: S.step, ...(machine.info?.(S.state) ?? {}), ...(labOpen ? { lab: true } : {}), running: S.running, touring: S.touring, voiceOn: S.voiceOn, answer: S.answer, variant: S.variant, lit: S.lit.slice() }),
   };

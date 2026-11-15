@@ -96,7 +96,21 @@ A machine's `build.mjs` does three things and hands them to `drawingPage()` from
    It may use the model's functions (the model is inlined above it) but nothing else from the build.
 3. **Fills `DATA`**: `steps` (heading and focus per step), `base` (the first variant), `predict` (`step`, `question`, `choices`, `answer` and `explanation`, either one or one per variant, and `locked`), `variants` (each with its `svg`, `captions` and `voice`), `alias` (a name the voice lights that stands for several parts) and `lab` (`button`, `title`, `heading`, `intro` and `inputs`, each with `id`, `label`, `min`, `max`, `step`, `value` and an optional `format` such as `"{} mm"`).
 
-Plus the page's words (title, the line under it, the readout row, the legend, the facts in Details) and the drawing's own CSS. The player supplies the timeline, the voice tour, the prediction, What if, Now you try, the lab, Details, the theme, the keyboard (on the document, so the arrows work on a fresh page) and `window.__viz`.
+Plus the page's words (title, the line under it, the readout row, the legend, the facts in Details), the drawing's own CSS, and **the audit** (see SKILL.md, "Correctness"):
+
+```js
+audit: {
+  models: Object.values(MODELS),                 // every variant
+  facts: [/* numbers derived in the build, not stored in the model */],
+  allow: [{ value: 5, why: "the tests' sweep step" }],
+  claims: [{ text: "the sentence exactly as the page says it", test: (M) => /* true by the model */ true }],
+  coverage: { source: "where the topic list came from", topics: [{ topic, where: "step:3" | "lab" | "whatif" | "practice" | "deferred", why }] },
+  reviewFile: join(HERE, "review.json"),
+  report: join(ROOT, "dist", "<name>.audit.json"),   // for scripts/review-brief.mjs
+}
+```
+
+The audit gathers every string in `DATA` and Details itself, so nothing a reader sees escapes it. Both examples carry one: the escalator's caught its own landing step saying the tracks "come together" with "both wheels at the same height", where the model keeps the trailer wheel 30 mm higher and the stairs flatten because the chain's path levels out. The player supplies the timeline, the voice tour, the prediction, What if, Now you try, the lab, Details, the theme, the keyboard (on the document, so the arrows work on a fresh page) and `window.__viz`.
 
 ## The page contract and the check
 
@@ -115,6 +129,7 @@ node scripts/check-drawing.mjs dist/<name>.html     # must print: drawing: passe
 
 `check-drawing` checks at 1440×900 and 1280×800, on every step of every What if variant, the answered prediction, Now you try and the lab at each input's minimum and maximum. It fails on any of these:
 - a missing part of the contract, no embedded voice, no lab, or fewer than two variants;
+- an audit that is not clean: a typed number, a claim the model contradicts or the page does not say, a topic list without a source or with too little taught, or no current independent review;
 - page scroll;
 - a step that lands on the wrong tab, or a timeline that does not run forward step by step;
 - a callout under 11 px, outside the stage, overlapping another callout, or under an open card;

@@ -119,3 +119,29 @@ export function run(capacity: number, requests: string[]) {
   }
   return { initial: initial(capacity, requests), steps };
 }
+
+/** Hits a FIFO cache scores on the same requests. */
+export function fifoHits(capacity: number, requests: string[]): number {
+  return runFifo(capacity, requests).filter((f, i) => f.before.includes(requests[i]!)).length;
+}
+
+/**
+ * Hits Belady's optimal policy scores on the same requests: on a full-cache
+ * miss it evicts the key whose next request is furthest ahead (or never comes).
+ * No policy that cannot see the future does better.
+ */
+export function optimalHits(capacity: number, requests: string[]): number {
+  if (!Number.isInteger(capacity) || capacity < 1) throw new Error(`capacity must be a positive integer, got ${capacity}`);
+  let cache: string[] = [];
+  let hits = 0;
+  requests.forEach((key, i) => {
+    if (cache.includes(key)) return void hits++;
+    if (cache.length === capacity) {
+      const next = (k: string) => { const j = requests.indexOf(k, i + 1); return j < 0 ? Infinity : j; };
+      const victim = cache.reduce((a, b) => (next(b) > next(a) ? b : a));
+      cache = cache.filter((k) => k !== victim);
+    }
+    cache = [...cache, key];
+  });
+  return hits;
+}

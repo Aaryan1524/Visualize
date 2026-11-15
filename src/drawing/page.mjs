@@ -7,10 +7,11 @@
 //
 // See references/drawing.md for what each field is for, and examples/escalator/build.mjs and
 // examples/lock/build.mjs for two complete pages.
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { player } from "./player.mjs";
+import { audit, textsOf } from "../claims/audit.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FONTS = join(HERE, "../render/fonts");
@@ -56,11 +57,39 @@ function labPanel(lab) {
  * @param {string} o.css          the drawing's own CSS (line weights, accents)
  * @param {string} o.modelSrc     the model, inlined (export keywords removed)
  * @param {Function} o.machine    (DATA) => machine hooks, serialized into the page
+ * @param {object} o.audit        the correctness audit (src/claims/audit.mjs): { models, claims, coverage,
+ *                                facts?, allow?, reviewFile, report? }. Its result rides in the page as
+ *                                __viz.audit, and check-drawing fails unless it is clean
  * @param {object} o.data         DATA for the player: steps, predict, variants, base, alias, and
  *                                optionally lab: { button, title, heading, intro, inputs: [{ id, label, min, max, step, value, format }] }
  */
+/** Run the correctness audit over everything the page says. */
+export function auditPage(o) {
+  const strip = (h) => String(h).replace(/<[^>]+>/g, " ");
+  const texts = [
+    ...textsOf(o.data, "data"),
+    ...[["about", o.about], ["setup", o.setup], ["concept", o.concept]].filter(([, t]) => t).map(([where, text]) => ({ where, text })),
+    ...o.facts.map((f, i) => ({ where: `details.facts.${i}`, text: strip(f) })),
+    ...o.legend.map(([, t], i) => ({ where: `details.legend.${i}`, text: t })),
+    // the drawing's own words: callouts, the title block, detail titles
+    ...Object.entries(o.data.variants ?? {}).flatMap(([name, v]) => [...String(v.svg ?? "").matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map((m, i) => ({ where: `drawing.${name}.${i}`, text: m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<") }))),
+  ];
+  const places = [...o.steps.map((_, k) => `step:${k}`).slice(1), "whatif", "practice", ...(o.data.lab ? ["lab"] : [])];
+  const captions = Object.values(o.data.variants ?? {}).flatMap((v) => v.captions ?? []);
+  const details = [o.setup, ...o.facts.map(strip), ...captions].join("\n");
+  if (!o.audit) return { ok: false, problems: ["audit: this page declares no audit (claims, coverage, review)"], review: "missing", stamp: "", counts: {} };
+  const r = audit({ texts, places, details, ...o.audit });
+  if (o.audit.report) {
+    writeFileSync(o.audit.report, JSON.stringify({ title: o.title, stamp: r.stamp, review: r.review, problems: r.problems, claims: o.audit.claims.map((c) => c.text), coverage: o.audit.coverage, texts }, null, 1));
+  }
+  return r;
+}
+
 export function drawingPage(o) {
   const n = o.steps.length - 1;
+  const checked = auditPage(o);
+  for (const p of checked.problems) console.warn(`audit: ${p}`);
+  o = { ...o, data: { ...o.data, audit: { ok: checked.ok, review: checked.review, stamp: checked.stamp, counts: checked.counts, problems: checked.problems } } };
   return `<!doctype html>
 <html lang="en">
 <head>

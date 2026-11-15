@@ -10,6 +10,7 @@ export const SCENARIO: Config = {
   amount: 20,
   latency: 40,
   dbTime: 20,
+  replyTime: 10,
   timeout: 1000,
   maxAttempts: 3,
   drop: ["response-1"],
@@ -150,6 +151,8 @@ function describe(ev: Ev): string {
   }
 }
 
+const RETRY_KEY = `In the front system the retry carries the same key, ${SCENARIO.key}.`;
+
 function caption(s: Joint, e: JointEvent): string {
   const [u, k] = [e.events.unsafe, e.events.safe];
   const has = (list: Ev[], type: Ev["type"]) => list.some((x) => x.type === type);
@@ -159,11 +162,11 @@ function caption(s: Joint, e: JointEvent): string {
     return `${t}: here the worlds split. Without a key, the server cannot tell the retry from a new payment and charges again. With a key, it finds ${SCENARIO.key} already stored and returns the saved response instead.`;
   }
   if (!same) return `${t}: without a key, ${u.map(describe).join("; ") || "nothing"}. With a key, ${k.map(describe).join("; ") || "nothing"}.`;
-  if (has(u, "timeout")) return `${t}: no response after ${SCENARIO.timeout} ms, so the client times out and sends the same payment again. It cannot know the first one succeeded.`;
-  if (has(u, "lost")) return `${t}: the success response is lost on the network. The payment went through, but the client never hears about it.`;
+  if (has(u, "timeout")) return `${t}: no response after ${SCENARIO.timeout} ms, so the client times out and sends the same payment again. It cannot know the first one succeeded. ${RETRY_KEY}`;
+  if (has(u, "lost")) return `${t}: by now the success response should have arrived, but it was lost on the way. The payment went through, but the client never hears about it.`;
   if (has(u, "charge")) {
     return k.length && s.worlds.safe.store
-      ? `${t}: the ledger records the $${SCENARIO.amount} charge. The keyed server also stores ${SCENARIO.key} with its response, in the same transaction.`
+      ? `${t}: the ledger records the $${SCENARIO.amount} charge. The keyed server first looks up ${SCENARIO.key} and finds nothing, so it charges and stores the key with its response, in the same transaction.`
       : `${t}: the ledger records the charge.`;
   }
   if (has(u, "paid")) {
@@ -171,14 +174,14 @@ function caption(s: Joint, e: JointEvent): string {
     return `${t}: both clients see success and mark the order paid. The customer was charged ${cu} times without a key, and ${ck === 1 ? "once" : `${ck} times`} with one.`;
   }
   if (has(u, "send") && u[0]?.type === "send" && u[0].message.attempt === 1 && u[0].message.kind === "request") {
-    return `${t}: the client sends a $${SCENARIO.amount} payment. In the front system the request carries the idempotency key ${SCENARIO.key}.`;
+    return `${t}: the client sends a $${SCENARIO.amount} payment. In the front system the request carries the idempotency key ${SCENARIO.key}, which the client made once for this payment and keeps until it gets a final answer.`;
   }
   return `${t}: ${u.map(describe).join("; ")}.`;
 }
 
 // ---- Teaching ---------------------------------------------------------------------------
 const STEP_HEADING: string[] = [
-  "Two identical payment systems.",
+  "Two payment systems, one difference: a key store.",
   "Terminal sends $20.",
   "Server receives the payment.",
   "Ledger records $20.",
@@ -265,20 +268,24 @@ export default defineScene<Joint, JointEvent>({
   title: "Retries and idempotency keys",
   question: "Why can a retry charge twice?",
   presentation: "editorial",
-  setup: "Two identical payment systems run the same script. Only one stores idempotency keys.",
+  setup: "Two payment systems run the same script with the same faults. Only the front one has a key store.",
   teaching,
   trust: "model",
   assumptions: [
     "One network fault is scripted: the first success response is lost. Both worlds see exactly the same faults and timings.",
-    `Latency ${SCENARIO.latency} ms each way, ${SCENARIO.dbTime} ms per database operation, ${SCENARIO.timeout} ms client timeout. Real values vary; the order of events is what matters.`,
-    "The charge and the stored key are written in one transaction. Without that, a crash between them would reopen the problem.",
+    `Latency ${SCENARIO.latency} ms each way, ${SCENARIO.dbTime} ms per database operation, ${SCENARIO.replyTime} ms for the server to send its reply after the database work, ${SCENARIO.timeout} ms client timeout. Real values vary; the order of events is what matters.`,
+    "The client makes the idempotency key once per payment, before the first attempt, as a long random string such as a UUID. It sends that same key on every retry until it gets a final answer. A new key per attempt would defeat it.",
+    "The keyed server checks the key on every request. On the first request the lookup finds nothing, and here it is folded into the charge's database write, so it adds no time; on the retry the lookup is the one database operation.",
+    "Here the charge and the stored key are written in one transaction in one database. That is a simplification: a real charge goes to an outside card processor, which cannot join the transaction. Real servers first record the key as in progress, call the processor with a key of their own, then record the result, and recover from crashes in between.",
+    "A crash between the charge and the stored key can fail two ways. A charge with no stored key lets a retry charge again. A stored success with no charge tells a retry it paid when no money was taken.",
+    "Servers keep keys only for a while (Stripe may prune them after 24 hours), so a retry after that counts as a new payment. Reusing a key with different details, such as another amount, is rejected as an error instead of replayed.",
     "Requests with the same key never overlap here. A real server must also lock the key while the first request is still being processed.",
   ],
   trace: () => {
     const { initial, steps } = twin();
     return {
       initial,
-      intro: `Two identical payment systems run the same script side by side. The back one has no idempotency keys; the front one stores each key with its response.`,
+      intro: `Two payment systems run the same script side by side, alike except for one part. The back one has no idempotency keys; the front one has a key store and keeps each key with its response.`,
       steps: steps.map(({ event, state }) => ({ event, state, caption: caption(state, event) })),
     };
   },
@@ -297,3 +304,41 @@ export default defineScene<Joint, JointEvent>({
     { tone: "accent", label: "Server writing to the ledger" },
   ],
 });
+
+// The correctness audit (SKILL.md, Correctness): what the page says, checked like the picture.
+const UNSAFE = simulate({ ...SCENARIO, idempotent: false }), SAFE = simulate({ ...SCENARIO, idempotent: true });
+const end = (r: typeof UNSAFE) => r.at(-1)!.state;
+const requests = (r: typeof UNSAFE) => r.flatMap((x) => (x.event.type === "send" && x.event.message.kind === "request" ? [x.event.message] : []));
+export const audit = {
+  models: [UNSAFE, SAFE, SCENARIO, { unsafe: totalCharged(end(UNSAFE)), safe: totalCharged(end(SAFE)) }],
+  allow: [{ value: 24, why: "Stripe's documented key retention in hours, a fact about the reference, not a quantity of this run" }],
+  claims: [
+    {
+      text: RETRY_KEY,
+      test: () => {
+        const sent = requests(SAFE);
+        return sent.length === 2 && sent.every((m) => m.key === SCENARIO.key) && requests(UNSAFE).every((m) => m.key === undefined);
+      },
+    },
+    { text: "without a key, the retry looks like a new payment", test: () => end(UNSAFE).ledger.length === 2 && new Set(end(UNSAFE).ledger.map((c) => c.amount)).size === 1 },
+    { text: "No key: charged again. Key: replayed.", test: () => end(UNSAFE).ledger.length === 2 && end(SAFE).ledger.length === 1 && end(SAFE).store !== null },
+    { text: "Same faults. $40 versus $20.", test: () => totalCharged(end(UNSAFE)) === 40 && totalCharged(end(SAFE)) === 20 },
+    { text: "The reply is lost.", test: () => SCENARIO.drop.includes("response-1") },
+  ],
+  coverage: {
+    source: "Stripe API reference, Idempotent requests; AWS Builders' Library, Making retries safe with idempotent APIs",
+    topics: [
+      { topic: "a lost reply leaves the client unsure", where: "step:5" },
+      { topic: "the client times out and retries", where: "step:6" },
+      { topic: "the client makes one key per payment and sends it on every retry", where: "step:6" },
+      { topic: "without a key, a retry charges twice", where: "step:8" },
+      { topic: "the server stores the key with its result and replays it", where: "step:8" },
+      { topic: "the charge and the stored key are written together", where: "step:3" },
+      { topic: "requests with the same key", where: "deferred", why: "concurrent duplicates need a lock on the key; Details says so" },
+      { topic: "backoff between retries", core: false, where: "deferred", why: "one retry is enough to show the double charge" },
+      { topic: "calling an outside card processor", core: false, where: "deferred", why: "the charge here is a local row; Details names the in-progress pattern" },
+      { topic: "keys are kept only for a while", core: false, where: "deferred", why: "one retry within a second; Details says so" },
+      { topic: "a reused key with different details is rejected", core: false, where: "deferred", why: "the retry here repeats the same payment; Details says so" },
+    ],
+  },
+};

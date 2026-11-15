@@ -31,20 +31,26 @@ export const LOCK = {
   Ltip: 27.5, // blade length, shoulder to tip; fully in when the tip reaches x = Ltip
   tipY: -1.5, // the point of the blade's nose
   play: 0.04, // pin-in-bore clearance: how far a blocked plug can move at its surface
+  highAllow: 0.05, // how far a key pin may stand high: running clearance and give, not a chamfer
   housingEnd: 33,
   plugEnd: 32,
 };
 
 // The lock's pinning: the depth each chamber's key pin is cut for.
 export const PINNING = [3, 6, 2, 5, 4];
-// Keys. The wrong key differs in one cut: the third is one depth too shallow.
-export const KEYS = { right: [3, 6, 2, 5, 4], wrong: [3, 6, 1, 5, 4] };
+// Keys. The wrong key differs in one cut: the third is one depth too deep, so its stack sits low.
+export const KEYS = { right: [3, 6, 2, 5, 4], wrong: [3, 6, 3, 5, 4] };
 
-// The locks the page can show. The tolerance is how far a pin's top may miss the shear line
+// The locks the page can show. The tolerance is how far a stack may sit below the shear line and
+// still let the plug turn: the chamfers on the bore and the driver pin cam the driver up against
+// its spring. A stack that sits too HIGH is another matter: the key pin rests on the key's cut, so
+// nothing pushes it down: the springs already press the key onto its lowest support in the keyway.
+// Only the plug's running clearance in the housing and a little give in the pins and blade let it
+// pass a hair high (highAllow). So the allowance is asymmetric: tol low, min(tol, highAllow) high.
 // and still be cammed past it by the chamfers on the pin and the bore.
 export const VARIANTS = {
-  tight: { tol: 0.1, label: "Tight lock ±0.10 mm" },
-  loose: { tol: 0.45, label: "Loose lock ±0.45 mm" },
+  tight: { tol: 0.1, label: "Tight lock" },
+  loose: { tol: 0.45, label: "Loose lock, worn" },
 };
 
 export const cutRoot = (d, L = LOCK) => L.H0 - L.step * d;
@@ -84,13 +90,17 @@ export function keyPinTip(cuts, ins, i, L = LOCK, n = 1460) {
 }
 
 // Every stack's state for one key position.
+// How far a key pin may stand above the shear line and still let the plug turn.
+export const highAllowance = (tol, L = LOCK) => Math.min(tol, L.highAllow);
+
 export function stacks(pinning, cuts, ins, tol, L = LOCK) {
+  const tolHigh = highAllowance(tol, L);
   return pinning.map((d, i) => {
     const tip = keyPinTip(cuts, ins, i, L);
     const keyTop = tip + keyPinLength(d, L);
     const drvTop = keyTop + L.driver;
     const miss = keyTop - L.R; // > 0: the key pin crosses the shear line; < 0: the driver does
-    const block = miss > tol + 1e-9 ? "key" : miss < -tol - 1e-9 ? "driver" : null;
+    const block = miss > tolHigh + 1e-9 ? "key" : miss < -tol - 1e-9 ? "driver" : null;
     return { i, x: pinX(i, L), depth: d, tip, keyTop, drvTop, spring: L.chamberTop - drvTop, miss, block };
   });
 }
@@ -98,6 +108,7 @@ export function stacks(pinning, cuts, ins, tol, L = LOCK) {
 export function makeModel(over = {}) {
   const L = { ...LOCK, ...(over.lock || {}) };
   const tol = over.tol ?? VARIANTS.tight.tol;
+  const tolHigh = highAllowance(tol, L);
   const pinning = over.pinning || PINNING;
   const keys = over.keys || KEYS;
   const stackAt = (keyName, ins) => stacks(pinning, keyName ? keys[keyName] : null, ins, tol, L);
@@ -108,7 +119,8 @@ export function makeModel(over = {}) {
   const turnLimit = (keyName, ins) => (keyName && fullyIn(ins) && turns(keyName) ? 90 : (L.play / L.R) * (180 / Math.PI));
   const blockers = (keyName, ins) => stackAt(keyName, ins).filter((s) => s.block);
   return {
-    L, tol, pinning, keys, stackAt, turns, turnLimit, blockers,
+    L, tol, tolHigh, pinning, keys, stackAt, turns, turnLimit, blockers,
+    keysThatOpen: keysThatOpen(pinning, tol, L),
     bladeTop: (keyName, u) => bladeTop(keys[keyName], u, L),
     bladeBottom: (u) => bladeBottom(u, L),
     keyPinLength: (d) => keyPinLength(d, L),
@@ -178,4 +190,18 @@ export function pickStacks(pinning, j, lift, order = bindingOrder(), L = LOCK) {
     const drvBot = set ? L.R : keyTop;
     return { i, x: pinX(i, L), depth: d, tip, keyTop, drvBot, drvTop: drvBot + L.driver, set, binding: k === j && j < pinning.length };
   });
+}
+
+// How many keys, out of every code within the MACS, open a lock pinned this way: each cut may sit
+// up to tol deeper than its pin (the driver is cammed up) or up to min(tol, highAllow) shallower.
+export function keysThatOpen(pinning, tol, L = LOCK) {
+  const m = macs(L), hi = highAllowance(tol, L);
+  const ok = pinning.map((p) => [...Array(L.depths).keys()].filter((c) => (c >= p ? (c - p) * L.step <= tol + 1e-9 : (p - c) * L.step <= hi + 1e-9)));
+  let n = 0;
+  const walk = (i, prev) => {
+    if (i === pinning.length) return void n++;
+    for (const c of ok[i]) if (prev === null || Math.abs(c - prev) <= m) walk(i + 1, c);
+  };
+  walk(0, null);
+  return n;
 }

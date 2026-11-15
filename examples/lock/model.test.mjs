@@ -12,7 +12,8 @@ import { LOCK, PINNING, KEYS, VARIANTS, MODELS, makeModel, stacks, keyPinTip, bl
 
 const L = LOCK;
 // Independent reference: opens iff every cut is within the tolerance of its pin's depth.
-const refOpens = (pinning, cuts, tol) => pinning.every((d, i) => Math.abs(cuts[i] - d) * L.step <= tol + 1e-9);
+// A deep cut is forgiven up to the tolerance; a shallow one only as far as the key can drop.
+const refOpens = (pinning, cuts, tol) => pinning.every((d, i) => (cuts[i] >= d ? (cuts[i] - d) * L.step <= tol + 1e-9 : (d - cuts[i]) * L.step <= Math.min(tol, 0.05) + 1e-9));
 const rng = (a) => () => {
   a = (a + 0x6d2b79f5) | 0;
   let t = Math.imul(a ^ (a >>> 15), 1 | a);
@@ -32,7 +33,7 @@ test("the stated numbers", () => {
   // the right key really is the lock's pinning, the wrong key differs in one cut by one depth
   assert.deepEqual(KEYS.right, PINNING);
   const diff = KEYS.wrong.map((c, i) => c - PINNING[i]).filter((v) => v);
-  assert.deepEqual(diff, [-1]);
+  assert.deepEqual(diff, [1]);
 });
 
 test("each cut keeps its full root after its neighbours and the tip ramp are applied", () => {
@@ -110,8 +111,8 @@ for (const [name, M] of Object.entries(MODELS)) {
 
   test(`${name}: the wrong key's outcome`, () => {
     const s = M.stackAt("wrong", L.Ltip)[2];
-    assert.ok(Math.abs(s.miss - L.step) < 1e-9, "the third key pin sits one depth step too high");
-    if (name === "tight") assert.deepEqual([M.turns("wrong"), s.block], [false, "key"]);
+    assert.ok(Math.abs(s.miss + L.step) < 1e-9, "the third stack sits one depth step too low");
+    if (name === "tight") assert.deepEqual([M.turns("wrong"), s.block], [false, "driver"]);
     else assert.deepEqual([M.turns("wrong"), s.block], [true, null]);
   });
 }
@@ -234,4 +235,26 @@ test("the lab's whole range: any key the reader can cut seats without crushing a
       if (withinMacs) assert.equal(st.every((s) => s.block === null), refOpens(PINNING, cuts, M.tol), `${name}: ${cuts}`);
     }
   }
+});
+
+test("forgiveness is asymmetric: a high key pin gets almost none", () => {
+  const loose = MODELS.loose;
+  assert.ok(loose.tolHigh <= 0.05 && loose.tolHigh < loose.tol / 5, "the high side is a hair; the low side is the worn chamfers' allowance");
+  // one depth shallow (0.381 mm high): blocked even in the worn lock
+  assert.equal(stacks([3], [2], L.Ltip, loose.tol)[0].block, "key");
+  // one depth deep (0.381 mm low) is cammed past in the loose lock, blocked in the tight one
+  assert.equal(stacks([3], [4], L.Ltip, loose.tol)[0].block, null);
+  assert.equal(stacks([3], [4], L.Ltip, MODELS.tight.tol)[0].block, "driver");
+});
+
+test("how many keys open each lock, counted against the reference rule over every code", () => {
+  for (const M of Object.values(MODELS)) {
+    let n = 0;
+    for (let code = 0; code < 1e5; code++) {
+      const cuts = String(code).padStart(5, "0").split("").map(Number);
+      if (cuts.every((c, i) => i === 0 || Math.abs(c - cuts[i - 1]) <= macs())) n += refOpens(PINNING, cuts, M.tol) ? 1 : 0;
+    }
+    assert.equal(M.keysThatOpen, n);
+  }
+  assert.equal(MODELS.tight.keysThatOpen, 1);
 });

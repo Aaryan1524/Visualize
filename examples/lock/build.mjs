@@ -3,14 +3,14 @@
 // transverse section A-A in the detail circle, inside the shared Drawing page and player
 // (src/drawing/). No dependencies. The page runs the same model.mjs the tests run (inlined below).
 //
-// The story: the problem (one key in ninety thousand), the pin stacks, the key, the shear line,
+// The story: the problem (its own key among ninety thousand), the pin stacks, the key, the shear line,
 // the turn, a wrong key (with a prediction and a tolerance What if), and the second idea, picking.
 // The lab lets the reader cut a key of their own.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MODELS, VARIANTS, LOCK, KEYS, keyOutline, OFFSETS, bindingOrder } from "./model.mjs";
+import { MODELS, VARIANTS, LOCK, KEYS, keyOutline, OFFSETS, bindingOrder, pickStacks, stacks, keyPinLength } from "./model.mjs";
 import { drawingPage, esc } from "../../src/drawing/page.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -69,7 +69,7 @@ const keyDetail = () => `${polyM(circlePts([-15.5, 0], 2.1, 40))}M${f3(0.6)},-2.
 // ---------------------------------------------------------------- the story
 const PRED_STEP = 4; // the prediction is asked on this step and answered by the next
 const STEPS = [
-  { tab: null, heading: "How does a lock tell one key from ninety thousand?", focus: null },
+  { tab: null, heading: "How does a lock know its own key?", focus: null },
   { tab: "Pin stacks", heading: "Spring-loaded pin stacks lock the plug.", focus: ["keypins", "drivers", "springs", "shear", "plug", "housing"], block: true },
   { tab: "The key", heading: "The key's cuts lift each stack.", focus: ["key", "keypins", "drivers", "springs"] },
   { tab: "Shear line", heading: "Every gap meets the shear line.", focus: ["key", "keypins", "drivers", "shear"] },
@@ -77,7 +77,7 @@ const STEPS = [
   { tab: "Wrong key", heading: null, focus: ["key", "keypins", "drivers", "shear", "plug"], block: true },
   { tab: "Picking", heading: "No lock is perfect, so a pick can set the pins one at a time.", focus: ["pick", "keypins", "drivers", "springs", "shear", "plug"] },
 ];
-const HEAD5 = { tight: "One shallow cut, and the key pin jams.", loose: "A loose lock lets the near-miss key turn." };
+const HEAD5 = { tight: "One deep cut, and a driver pin jams.", loose: "A worn lock lets the near-miss key turn." };
 // The machine's state through each step, at fraction u of its motion (0..1).
 // key: which key, ins: x of its tip (fully in at L.Ltip), angle: plug turn in degrees.
 const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
@@ -92,16 +92,16 @@ function captions(M, name) {
     `Fully in, each cut root sits ${L.R} mm minus its key pin's length above the plug axis, so the top of every key pin, and the gap above it, lies on the shear line. Worst miss with this key: ${Math.max(...M.stackAt("right", L.Ltip).map((x) => Math.abs(x.miss))).toFixed(3)} mm.`,
     `With every gap on the line, the plug turns. The key pins turn with it; the driver pins stay in the housing, held up by the plug's surface; the cam on the back turns and throws the bolt. The figure stops the turn at 60° so the key and cam still read; a real cam turns on to throw the bolt. In the long section the turned parts inside the plug are shown dashed, as hidden lines, foreshortened by the turn.`,
     t
-      ? `The wrong key's third cut is one depth shallow, so its key pin stands ${s.miss.toFixed(3)} mm above the shear line. This lock lets a pin miss by up to ${M.tol} mm (the chamfers cam it past), so the plug still turns: a lock this loose cannot tell the two keys apart.`
-      : `The wrong key's third cut is one depth shallow, so its key pin stands ${s.miss.toFixed(3)} mm above the shear line, more than this lock's ${M.tol} mm allowance. The key pin blocks the plug. A cut that is too deep fails the other way, with the driver pin left across the line.`,
-    `Picking uses the lock's own imperfection. Each chamber is bored a few hundredths of a millimetre off line (here ${OFFSETS.map((o) => (o >= 0 ? "+" : "") + o.toFixed(3)).join(", ")} mm). Light turning force from a tension wrench pinches only the chamber furthest off; a pick lifts that stack until its gap reaches the shear line, the plug turns a hair, and the driver pin is left on the plug's edge. The chambers bind in the order ${bindingOrder().map((i) => i + 1).join(", ")}, so the pins are set one at a time, with no key.`,
+      ? `The wrong key's third cut is one depth deep, so its stack sits ${(-s.miss).toFixed(3)} mm low and the driver pin dips across the shear line. In this worn lock the chamfers on the bore and the driver pin cam a driver up by as much as ${M.tol} mm against its spring, so the plug still turns. A shallow cut gets almost none (${M.tolHigh.toFixed(2)} mm, from the plug's running clearance in the housing and a little give in the pins and blade), because the key pin rests on the key and the springs already press the key down in its keyway. ${M.keysThatOpen} different keys open this lock, against 1 for the tight lock.`
+      : `The wrong key's third cut is one depth deep, so its stack sits ${(-s.miss).toFixed(3)} mm low and the driver pin dips across the shear line, more than this lock's ${M.tol} mm allowance. The driver pin blocks the plug. A cut that is too shallow fails the other way, with the key pin left across the line.`,
+    `Picking uses the lock's own imperfection. Each chamber is bored a few hundredths of a millimetre off line (here ${OFFSETS.map((o) => (o >= 0 ? "+" : "") + o.toFixed(3)).join(", ")} mm, measured in the direction of turn; turning the other way reverses the order). Light turning force from a tension wrench pinches only the chamber furthest off; a pick lifts that stack until its gap reaches the shear line, the plug turns a hair, and the driver pin is left on the plug's edge. The chambers bind in the order ${bindingOrder().map((i) => i + 1).join(", ")}, so the pins are set one at a time, with no key.`,
   ];
 }
 
 const VOICE = existsSync(join(HERE, "voice.json")) ? JSON.parse(readFileSync(join(HERE, "voice.json"), "utf8")) : null;
 
 // ---------------------------------------------------------------- the drawing for one variant
-const DC = [11300, 2420], DR = 1600, DK = 225, DYC = 2.0; // detail circle: centre, radius (units), scale (units/mm), mm y at its centre
+const DC = [11300, 2420], DR = 1600, DK = 190, DYC = 1.6; // detail circle: centre, radius (units), scale (units/mm), mm y at its centre
 const DM = `matrix(${DK},0,0,${-DK},${DC[0]},${DC[1] + DK * DYC})`;
 const D = (z, y) => [DC[0] + DK * z, DC[1] - DK * (y - DYC)];
 const SLOT = { l1: [9560, 1250], l2: [9560, 2420], r1: [13060, 1420], r2: [13060, 3520] };
@@ -158,7 +158,7 @@ function makeDrawing(M, name) {
     label("held", "Driver pins held up", [4900, 980], W(xs[1] + 0.9, R + 2.0), [4], "end"),
     M.turns("wrong")
       ? label("bad", "Plug turns anyway", [5250, 980], W(xs[bad] - 0.9, R + 0.1), [5], "end")
-      : label("bad", "Key pin across the line", [5250, 980], W(xs[bad] - 0.9, R + 0.1), [5], "end", "warn"),
+      : label("bad", "Driver pin across the line", [5250, 980], W(xs[bad] - 0.9, R - 0.15), [5], "end", "warn"),
     label("wrench", "Tension wrench", [3300, 5850], W(-1.0, -9.5), [6], "end"),
     label("pickl", "Pick", [5650, 5850], W(9.5, -3.15), [6], "end"),
     label("set", "Set: driver pin on the plug's edge", [4900, 980], W(xs[1] + 0.9, R + 1.6), [6], "end"),
@@ -168,7 +168,7 @@ function makeDrawing(M, name) {
     label("dshear", "Shear line", SLOT.r1, D(R * Math.sin(0.7), R * Math.cos(0.7)), [1, 3, 5, 6], "start"),
     label("dkey", "Key", SLOT.r2, D(0.45, -2.6), [2], "start"),
     label("dplug", "Plug", SLOT.r2, D(R * 0.62, -R * 0.45), [4], "start"),
-    ...(M.turns("wrong") ? [] : [label("dbad", `Key pin, ${wrong[bad].miss.toFixed(2)} high`, SLOT.l2, D(-1.0, wrong[bad].keyTop - 0.5), [5], "end", "warn")]),
+    ...(M.turns("wrong") ? [] : [label("dbad", `Stack ${(-wrong[bad].miss).toFixed(2)} low`, SLOT.l2, D(-1.0, wrong[bad].keyTop + 0.3), [5], "end", "warn")]),
   ];
   const labelSvg = (l) => `<g class="label${l.cls ? " " + l.cls : ""}" data-label="${l.id}" data-beats="${l.beats.join(" ")}" data-to="${f1(l.to[0])},${f1(l.to[1])}"><path class="leader"/><circle class="ldot" cx="${f1(l.to[0])}" cy="${f1(l.to[1])}" r="24"/><text x="${f1(l.at[0])}" y="${f1(l.at[1])}" text-anchor="${l.anchor}">${esc(l.text)}</text></g>`;
 
@@ -196,7 +196,7 @@ function makeDrawing(M, name) {
 </g></g>
 <circle class="det-ring" cx="${DC[0]}" cy="${DC[1]}" r="${DR}"/>
 <rect id="detailFrame" x="${DC[0] - DR - 1700}" y="${DC[1] - DR - 80}" width="${2 * DR + 3400}" height="${2 * DR + 520}" fill="none" stroke="none"/>
-<text class="det-title" x="${DC[0]}" y="${DC[1] - DR - 110}" text-anchor="middle">SECTION A–A  ·  ${DK / SC} : 1  ·  THROUGH CHAMBER 3</text>
+<text class="det-title" x="${DC[0]}" y="${DC[1] - DR - 110}" text-anchor="middle">SECTION A–A  ·  ${(DK / SC).toFixed(2)}× THE LONG SECTION  ·  CHAMBER 3</text>
 </g>`;
 
   // ---- title block
@@ -208,7 +208,7 @@ function makeDrawing(M, name) {
     s += `<text class="tb-small" x="${x1 - 110}" y="${y0 + 250}" text-anchor="end">mm</text>`;
     const facts = [
       `Plug Ø${(2 * R).toFixed(1)} · ${n} chambers at ${L.pitch} · pins Ø${L.pinD} · driver pins ${L.driver}`,
-      `10 cut depths, ${L.step} apart · MACS ${M.macs} · shear allowance ±${M.tol.toFixed(2)}`,
+      `10 cut depths, ${L.step} apart · MACS ${M.macs} · allowance ${M.tol.toFixed(2)} low / ${M.tolHigh.toFixed(2)} high`,
       `Near half removed. Key, pins and springs not hatched.`,
       `Turned plug: parts inside it shown dashed (hidden).`,
     ];
@@ -255,8 +255,8 @@ function variantData(name) {
     pose: [0, 0, 1, 1, 1, 1, 0.42], // picking: the still frame is mid-way, two pins set and the third lifting
     answer: M.turns("wrong") ? 0 : wrong.block === "key" ? 2 : 1,
     explanation: M.turns("wrong")
-      ? `It lifts that key pin ${wrong.miss.toFixed(2)} mm too high, but this loose lock allows ±${M.tol.toFixed(2)} mm, so the plug turns anyway.`
-      : `It lifts that key pin ${wrong.miss.toFixed(2)} mm too high, past the ±${M.tol.toFixed(2)} mm allowance: the key pin itself now crosses the shear line.`,
+      ? `It leaves that stack ${(-wrong.miss).toFixed(2)} mm low, so the driver pin dips across the line, but this worn lock's chamfers cam a driver up by as much as ${M.tol.toFixed(2)} mm, so the plug turns anyway.`
+      : `It leaves that stack ${(-wrong.miss).toFixed(2)} mm low, past the ${M.tol.toFixed(2)} mm allowance: the driver pin now crosses the shear line.`,
   };
 }
 const VARIANT_DATA = Object.fromEntries(Object.keys(VARIANTS).map((n) => [n, variantData(n)]));
@@ -285,7 +285,8 @@ function machine(DATA) {
       const n = model.pinning.length, w = 0.85 / n;
       if (u >= 0.85) return { key: null, ins: 0, angle: DATA.turn * ease((u - 0.85) / 0.15), pick: { j: n, lift: 0 } };
       const j = Math.floor(u / w), f = (u - j * w) / w;
-      return { key: null, ins: 0, angle: 0, pick: { j, lift: f < 0.7 ? ease(f / 0.7) : 1, release: f >= 0.7 } };
+      // each set pin lets the plug turn on until the next chamber binds: a hair, the bore clearance
+      return { key: null, ins: 0, angle: j > 0 ? (model.L.play / model.L.R) * (180 / Math.PI) : 0, pick: { j, lift: f < 0.7 ? ease(f / 0.7) : 1, release: f >= 0.7 } };
     }
     // the wrong key goes in, then the reader's hand tries to turn it
     const a = Math.min(1, u / 0.6), b = Math.max(0, (u - 0.6) / 0.4);
@@ -309,7 +310,7 @@ function machine(DATA) {
       detail: $("detail"), keyParts: [...fig.querySelectorAll("#scene .key-right, #scene .key-wrong, #scene .key-custom")],
       custom: [...fig.querySelectorAll("#scene .key-custom .key-body")], pick: $("pick"), wrench: $("wrench"),
     };
-    $("r-tol").textContent = `±${V.tol.toFixed(2)}`;
+    $("r-tol").textContent = `${V.tol.toFixed(2)} / ${model.tolHigh.toFixed(2)}`;
   }
 
   // ------------------------------------------------ drawing one moment
@@ -366,13 +367,14 @@ function machine(DATA) {
       const b = turned ? Lk.R : s.drvBot ?? s.keyTop;
       E.dr[i].setAttribute("d", M3(driverPts(s.x, b, b + Lk.driver)).replace(/(-?\d+\.\d+),(-?\d+\.\d+)/g, (_, x, y) => `${fx(OX + SCx * +x)},${fx(OY - SCx * +y)}`));
       E.sp[i].setAttribute("d", springD(s.x, b + Lk.driver, Lk.chamberTop, toU));
-      const blk = labBlock ? labBlock[i] : showBlock ? s.block : null;
+      const blk = labBlock ? labBlock[i] : showBlock ? s.block : state.pick && !s.set && !s.binding && state.pick.j < st.length ? "driver" : null;
       E.kp[i].classList.toggle("block", blk === "key");
       E.dr[i].classList.toggle("block", blk === "driver");
       E.kp[i].classList.toggle("named", !state.pick && !state.lab && i === V.bad);
       E.dr[i].classList.toggle("named", !state.pick && !state.lab && i === V.bad);
       E.kp[i].classList.toggle("binding", !!s.binding);
       E.dr[i].classList.toggle("set", !!s.set);
+      E.dr[i].classList.toggle("binding", !!s.binding);
     });
     // key pins (inside the plug) turn with it: foreshortened, and hidden once turned
     E.kpT.setAttribute("transform", `matrix(${SCx},0,0,${fx(-SCx * c)},${OX},${OY})`);
@@ -435,7 +437,7 @@ function machine(DATA) {
     setText("r-angle", `${state.angle.toFixed(state.angle < 1 && state.angle > 0 ? 1 : 0)}°`);
     const on = state.pick ? st.filter((s) => s.set).length : state.key ? st.filter((s) => s.block === null).length : 0;
     setText("r-on", `${on} / ${st.length}`);
-    setText("r-on-unit", state.pick ? "pins set" : "gaps on the line");
+    setText("r-on-unit", state.pick ? "pins set" : "gaps in allowance");
     setText("r-ins", state.key ? state.ins.toFixed(1) : "0.0");
     setText("r-miss", state.pick ? "–" : Math.max(...st.map((s) => Math.abs(s.miss))).toFixed(2));
     const full = state.key && Math.abs(state.ins - Lk.Ltip) < 1e-6;
@@ -455,7 +457,7 @@ function machine(DATA) {
     const ok = st.every((s) => s.block === null);
     const rows = st.map((s, i) => {
       const d = cuts[i] - model.pinning[i];
-      if (s.block === null) return `Pin ${i + 1}: gap ${Math.abs(s.miss) < 1e-9 ? "on the line" : `${Math.abs(s.miss).toFixed(2)} mm off, inside ±${m.tol.toFixed(2)}`}`;
+      if (s.block === null) return `Pin ${i + 1}: gap ${Math.abs(s.miss) < 1e-9 ? "on the line" : `${Math.abs(s.miss).toFixed(2)} mm off, inside the ${m.tol.toFixed(2)} low / ${m.tolHigh.toFixed(2)} high allowance`}`;
       return s.block === "key"
         ? `Pin ${i + 1}: key pin ${s.miss.toFixed(2)} mm across the line. Cut ${-d} deeper`
         : `Pin ${i + 1}: driver pin ${(-s.miss).toFixed(2)} mm across the line. Cut ${d} shallower`;
@@ -464,7 +466,7 @@ function machine(DATA) {
     return {
       ok,
       state: { key: "custom", cuts, ins: Lk.Ltip, angle: ok ? DATA.turn : 0, lab: true },
-      verdict: ok ? `It opens: every gap is within ±${m.tol.toFixed(2)} mm of the line.` : `Locked: ${blocking} pin${blocking > 1 ? "s" : ""} across the shear line.`,
+      verdict: ok ? `It opens: every stack is within the allowance (${m.tol.toFixed(2)} mm low, ${m.tolHigh.toFixed(2)} mm high).` : `Locked: ${blocking} pin${blocking > 1 ? "s" : ""} across the shear line.`,
       rows,
     };
   }
@@ -483,7 +485,7 @@ function machine(DATA) {
       const out = ["The gap sits on the shear line", "The key pin crosses the line", "The driver pin crosses the line"];
       const ans = s.block === null ? 0 : s.block === "key" ? 1 : 2;
       return {
-        q: `A chamber's key pin is cut for depth ${d}; the key's cut there is depth ${e} (depths ${Lq.step} mm apart, deeper is higher number). The lock allows ±${tol.toFixed(2)} mm. Fully in, what happens at this chamber?`,
+        q: `A chamber's key pin is cut for depth ${d}; the key's cut there is depth ${e} (depths ${Lq.step} mm apart, deeper is higher number). The lock forgives a stack ${tol.toFixed(2)} mm low but only ${Math.min(tol, Lq.highAllow).toFixed(2)} mm high. Fully in, what happens at this chamber?`,
         choices: [out[ans], ...out.filter((_, i) => i !== ans)],
         explain: `The key pin's top lands ${e < d ? "above" : "below"} the line by |${d} − ${e}| × ${Lq.step} = ${Math.abs(s.miss).toFixed(3)} mm. ${s.block === null ? "That is inside the allowance, so the gap counts as on the line." : s.block === "key" ? "A shallow cut lifts the key pin too high, so it crosses the line." : "A deep cut leaves the stack too low, so the driver pin crosses the line."}`,
       };
@@ -499,12 +501,12 @@ function machine(DATA) {
     if (kind === 2) {
       const k = pick(r, [1, 2, 3]), miss = k * Lq.step;
       const tT = DATA.variants.tight.tol, tL = DATA.variants.loose.tol, tight = miss <= tT + 1e-9, loose = miss <= tL + 1e-9;
-      const out = ["Only the loose lock turns", "Both locks turn", "Neither lock turns"];
+      const out = ["Only the worn lock turns", "Both locks turn", "Neither lock turns"];
       const ans = tight ? 1 : loose ? 0 : 2;
       return {
-        q: `A key's cut is ${k} depth${k > 1 ? "s" : ""} too shallow (${k} × ${Lq.step} mm). Which locks still turn: one allowing ±${tT.toFixed(2)} mm, one allowing ±${tL.toFixed(2)} mm?`,
+        q: `A key's cut is ${k} depth${k > 1 ? "s" : ""} too deep (${k} × ${Lq.step} mm), so that stack sits low. Which locks still turn: a tight one whose chamfers forgive ${tT.toFixed(2)} mm, or a worn one that forgives ${tL.toFixed(2)} mm?`,
         choices: [out[ans], ...out.filter((_, i) => i !== ans)],
-        explain: `The key pin stands ${miss.toFixed(3)} mm above the line. ${tight ? "Inside both allowances." : loose ? `Under ${tL} but over ${tT}: only the loose lock is fooled.` : "More than either allowance: both locks hold."}`,
+        explain: `The driver pin dips ${miss.toFixed(3)} mm across the line. ${tight ? "Inside both allowances." : loose ? `Under ${tL} but over ${tT}: only the worn lock is fooled.` : "More than either allowance: both locks hold."}`,
       };
     }
     // this lock's own pin count, so the question never disagrees with the drawing
@@ -531,7 +533,7 @@ const DATA = {
   alias: { block: ["keypins", "drivers"], binding: ["keypins", "drivers"] },
   predict: {
     step: PRED_STEP,
-    question: `This key's ${ORD[bad]} cut is one depth too shallow. Turn it: what happens?`,
+    question: `Next, a key whose ${ORD[bad]} cut is one depth too deep. Turn it: what happens?`,
     choices: ["The plug turns", "A driver pin blocks it", "A key pin blocks it"],
     answer: Object.fromEntries(Object.entries(VARIANT_DATA).map(([k, v]) => [k, v.answer])),
     explanation: Object.fromEntries(Object.entries(VARIANT_DATA).map(([k, v]) => [k, v.explanation])),
@@ -608,6 +610,51 @@ text{font-family:var(--sans);fill:var(--ink)}
 @media (prefers-reduced-motion:reduce){.part,.detail{transition:none}}
 `;
 
+// ---------------------------------------------------------------- the correctness audit
+// Every number the page states must come from the model; every cause-and-effect sentence below is
+// on the page word for word and tested against both locks; the topics are what a locksmithing
+// reference covers for a pin tumbler cylinder.
+const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
+const AUDIT = {
+  models: Object.values(MODELS),
+  // derived in the build or the drawing, not stored in the model
+  facts: [L.depths - 1, keyPinLength(0), keyPinLength(9), ...OFFSETS, DATA.turn, DK / SC],
+  allow: [],
+  claims: [
+    { text: "With no key, the springs push the stacks down, so every driver pin sits across the shear line", test: (m) => m.stackAt(null, 0).every((s) => s.block === "driver") },
+    { text: "A deep cut matches a long key pin, and a shallow cut a short one", test: (m) => [...Array(m.L.depths - 1).keys()].every((d) => m.keyPinLength(d + 1) > m.keyPinLength(d)) },
+    { text: "each cut holds its key pin at exactly the height that puts the gap above it on the shear line", test: (m) => m.stackAt("right", m.L.Ltip).every((s) => near(s.miss, 0, 1e-6)) },
+    { text: "The driver pins stay up in the housing, held there by the plug's surface", test: (m) => m.stackAt("right", m.L.Ltip).every((s) => s.keyTop <= m.L.R + 1e-6 && s.drvTop > m.L.R) },
+    { text: "so the driver pin dips across the shear line", test: (m) => { const s = m.stackAt("wrong", m.L.Ltip)[2]; return s.miss < 0 && s.drvTop > m.L.R && s.keyTop < m.L.R && near(-s.miss, 0.4, 0.05); } },
+    { text: "the chamfers on its bores can push a driver pin up", test: (m) => m.tol < m.L.step || stacks([3], [4], m.L.Ltip, m.tol, m.L)[0].block === null },
+    { text: "A cut that is too shallow gets almost no help, because the key pin rests on the key", test: (m) => m.tolHigh <= 0.05 && (m.tol < m.L.step || stacks([3], [2], m.L.Ltip, m.tol, m.L)[0].block === "key") },
+    { text: "A cut that is too shallow fails the other way: it leaves the key pin itself across the line", test: (m) => m.tol >= m.L.step || [...Array(m.L.depths - 1).keys()].every((d) => stacks([d + 1], [d], m.L.Ltip, m.tol, m.L)[0].block === "key") },
+    { text: "so the plug turns anyway", test: (m) => { const s = m.stackAt("wrong", m.L.Ltip)[2]; return -s.miss > m.tol || m.turns("wrong"); } },
+    { text: "different keys open this lock, against 1 for the tight lock", test: (m) => MODELS.tight.keysThatOpen === 1 && m.keysThatOpen >= 1 },
+    { text: "the chamber bored furthest off line pinches its driver pin first", test: () => bindingOrder()[0] === OFFSETS.indexOf(Math.max(...OFFSETS)) },
+    { text: "the driver pin is left resting on the plug's edge", test: (m) => pickStacks(m.pinning, 1, 0).filter((s) => s.set).every((s) => near(s.drvBot, m.L.R) && s.keyTop < m.L.R) },
+    { text: "Five times over, and the plug turns with no key at all", test: (m) => m.pinning.length === 5 && pickStacks(m.pinning, 5, 0).every((s) => s.keyTop <= m.L.R + 1e-9 && s.drvBot >= m.L.R - 1e-9) },
+  ],
+  coverage: {
+    source: "Wikipedia, Pin tumbler lock; Deviant Ollam, Practical Lock Picking (2nd ed.), chapters 1 and 2",
+    topics: [
+      { topic: "plug, housing and shear line", where: "step:1" },
+      { topic: "pin stacks: key pins, driver pins and springs", where: "step:1" },
+      { topic: "the key's cuts and the depth increment", where: "step:2" },
+      { topic: "every gap at the shear line", where: "step:3" },
+      { topic: "the plug turns and the cam throws the bolt", where: "step:4" },
+      { topic: "a wrong key, and the lock's tolerance", where: "step:5" },
+      { topic: "picking: pins bind one at a time", where: "step:6" },
+      { topic: "how many keys can be cut for a keyway", where: "practice" },
+      { topic: "master keying", where: "deferred", why: "a second shear point per chamber; a page of its own" },
+      { topic: "security pins", core: false, where: "deferred", why: "spools and serrated pins resist picking; named in Details" },
+      { topic: "bumping", core: false, where: "deferred", why: "a second way round the pins, like picking; named in Details" },
+    ],
+  },
+  reviewFile: join(HERE, "review.json"),
+  report: join(ROOT, "dist", "lock.audit.json"),
+};
+
 const HTML = drawingPage({
   title: "Pin Tumbler Lock",
   about: "Five split pins and one shear line: why only the right key turns, and how a pick gets round it.",
@@ -620,9 +667,9 @@ const HTML = drawingPage({
   setup: std.captions[0],
   whatIf: { label: "Lock tolerance", variants: Object.entries(VARIANTS).map(([k, v]) => [k, v.label]) },
   totals: `            <span><b id="r-ins">0.0</b> mm key in</span>
-            <span><b id="r-on">0 / 5</b> <span id="r-on-unit">gaps on the line</span></span>
+            <span><b id="r-on">0 / 5</b> <span id="r-on-unit">gaps in allowance</span></span>
             <span><b id="r-miss">0.00</b> mm worst miss</span>
-            <span><b id="r-tol">±0.10</b> mm allowed</span>
+            <span><b id="r-tol">0.10 / 0.10</b> mm low / high</span>
             <span><b id="r-angle">0°</b> plug turn</span>
             <span><b id="r-state">locked</b></span>`,
   readoutNote: "Readouts are computed from the pins' contact with the key",
@@ -634,15 +681,18 @@ const HTML = drawingPage({
   ],
   facts: [
     `The lock's pinning (${M0.pinning.join("-")}) and each key's cuts are separate tables. Each stack's height comes from contact between its key pin's 45° chamfered tip and the blade profile; the key code is never read.`,
-    "The plug turns only if every key pin's top is within the allowance of the shear line. Tests check this against an independent rule (cut depth equals pin depth, within the allowance) on every one-off key and 2,000 random ones, for both locks.",
+    "The plug turns only if every stack is within the allowance of the shear line: generous when a stack sits low (the chamfers cam the driver up against its spring), a hair when it sits high (the key pin rests on the key). Tests check this against an independent rule written from cut and pin depths, on every one-off key and 2,000 random ones, for both locks.",
     "An insertion sweep, 0.02 mm at a time, checks that no pin enters the blade and no spring is crushed solid; planted faults prove the checks can fail.",
     `Picking: chamber offsets of ${OFFSETS.map((o) => o.toFixed(3)).join(", ")} mm set the binding order ${bindingOrder().map((i) => i + 1).join(", ")}. Tests check that each set chamber leaves nothing across the line and that all five set frees the plug.`,
+    "Not covered here: master keying (a second split in some stacks, so two keys open one lock), security pins (spools and serrated pins that resist picking), and bumping (a specially cut key struck so the pins jump past the line).",
+    `The MACS of ${MODELS.tight.macs} is computed from this model's cut geometry (0.8 mm roots, 45° flanks), not taken from a maker's table.`,
     `Assumptions: dimensions are representative of a five-pin residential cylinder (plug Ø${(2 * L.R).toFixed(1)}, chamber pitch ${L.pitch}, depth step ${L.step}), not one maker's drawing. With no key, each key pin rests on a stop ${-L.rest} mm below the axis (in a real lock, the keyway's wards). The allowance stands in for the chamfers and wear that let a pin slip past the line.`,
   ],
   css: CSS,
   modelSrc,
   machine,
   data: DATA,
+  audit: AUDIT,
 });
 
 // node examples/lock/build.mjs [--out <file>]; the page goes to dist/lock.html by default.
