@@ -17,8 +17,21 @@ What a machine needs. The escalator built in Clay came out as about forty identi
   - no console errors.
 
   It fails on the old looping bar. It runs in CI as `pnpm check:drawing`, and `pnpm test` now runs `examples/**/*.test.mjs`.
-- **Length.** A mechanism takes 5–8 steps. Every page keeps its narration to about 1.5–3 minutes, or splits the subject.
+- **Length.** A mechanism takes 5–8 steps. Narration stays under about 3 minutes, or the subject is split.
 - **The voice is compressed again.** `scripts/voice.mjs` asked for 96 kb/s AAC, which afconvert rejects for 24 kHz mono, so every clip silently fell back to WAV. It now asks for 64 kb/s. Pages recorded before this need re-recording to shrink.
+- **Concepts in the machines' style: `look: "drawing"`, now the default.** The builder wanted concept pages to match the machine drawings. The new look keeps the 3D layout but draws it like the machines:
+  - ink outlines on the cream stage, with flat light and no cast shadows;
+  - base plates hatched as cut sections; the hatching is in screen space, because world-space hatching bent with the view;
+  - the drawings' palette: ink, blue, teal and red, plus orange for the part the reader follows;
+  - leaders ending in dots;
+  - a title block with the legend as line keys, which moves to whichever right-hand corner no part or label covers once a step settles.
+
+  `examples/lru-3d` uses it, and Clay and Paper stay available on request.
+- **One page and player for every machine (`src/drawing/`).** The lock built for an eval copied the escalator's page and rewrote about 1,000 lines of its player. Now a machine supplies its drawing and a few hooks (its model, the state at a moment of the story, how to draw it, its questions, its lab), and the shared player runs the timeline, the voice tour, the prediction, What if, Now you try, the lab, Details, the theme and the keys. The escalator moved onto it pixel for pixel: 29 captured states, identical before and after.
+- **`examples/lock`, the second machine.** A pin tumbler lock, long section and section A–A to scale, with tests for every one-off key, 2,000 random keys, the insertion sweep, picking and the lab's whole range. It fixes what the blind judge found on the eval's version: a quiz about "6 pins" on a 5-pin lock (questions now read the lock's own count), a callout clipped by the prediction card, and a plug hatched exactly like its housing (the plug's section is now tinted and hatched closer).
+- **Depth on every page.** A plain agent beat the skill on depth in both round-4 evals by opening with the problem, covering the topic's second idea and giving a hands-on lab. A page now does all three: the lock opens with one key among about 92,000 and ends with picking, and both machines have a lab (cut a key; move the orange step and set a track error). The Size row now gives the length as a ceiling.
+- **`check-drawing` tests what a reader can do,** not only the steps: every step of every What if variant, the prediction answered, eight Now you try questions, the lab at every input's minimum and maximum, the narrated tour (with stand-in audio) stopping at the prediction, and the right arrow on a fresh page. A callout under an open card now fails; it catches the eval lock's clipped label, which the old check passed. Missing contract parts are reported instead of crashing.
+- **Arrow keys work on a fresh Clay page.** They did nothing until the reader clicked the page (found on the hashing eval, reproduced on the LRU flagship). A standalone page now passes unfocused keys to the figure; an embedded figure still takes keys only when focused. `verify` presses → on a fresh page, with a planted control.
 - **Codex and Antigravity.** Install paths, a Chrome hint for sandboxed agents, and a compatibility line. These were written for the README change but never reached main.
 
 ## 1.0.0

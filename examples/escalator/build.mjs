@@ -1,10 +1,12 @@
 // node examples/escalator/build.mjs  ->  dist/escalator.html (or --out <file>).
-// No dependencies. The page runs the same model.mjs the tests run (inlined below).
+// No dependencies. The page runs the same model.mjs the tests run (inlined below), inside the
+// shared Drawing page and player (src/drawing/).
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MODELS, VARIANTS, arcPts as modelArcPts } from "./model.mjs";
+import { drawingPage } from "../../src/drawing/page.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "../..");
@@ -509,7 +511,7 @@ function defs() {
 // and the upper landing, beat 3), C (the upper turnaround, beat 4). Each is a live <use> of the
 // scene, so it can never disagree with the main view.
 const DETAILS = [
-  { id: "A", src: DET.src, k: DET.k, full: [2], dim: [1, 5], leader: true },
+  { id: "A", src: DET.src, k: DET.k, full: [2], dim: [0, 1, 5], leader: true },
   { id: "B", src: [LAND.combUp - 120, LAND.treadUp - 90], k: 2.6, full: [3], dim: [], leader: false, title: "upper landing" },
   { id: "C", src: [xS + 130, yS + 10], k: 1.6, full: [4], dim: [], leader: false, title: "upper turnaround" },
 ];
@@ -640,31 +642,25 @@ function variantData(name) {
 }
 const VARIANT_DATA = Object.fromEntries(Object.keys(VARIANTS).map((n) => [n, variantData(n)]));
 
-// ---------------------------------------------------------------- runtime (runs in the page)
-function runtime(DATA) {
+// ---------------------------------------------------------------- the machine (runs in the page)
+// The shared player (src/drawing/player.mjs) runs the story; these hooks draw the escalator.
+function machine(DATA) {
   const NS = "http://www.w3.org/2000/svg";
   const $ = (id) => document.getElementById(id);
-  const root = $("vz"), fig = $("fig"), stage = $("stage");
+  const fig = $("fig");
   const fx = (v) => v.toFixed(1);
   const DEGR = 180 / Math.PI;
-  const pad2 = (n) => String(n).padStart(2, "0");
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const STEPS = DATA.steps, LAST = STEPS.length - 1;
   const mk = (tag, attrs, parent) => {
     const e = document.createElementNS(NS, tag);
     for (const k in attrs) e.setAttribute(k, attrs[k]);
     if (parent) parent.appendChild(e);
     return e;
   };
-  const S = { variant: null, step: -1, T: 0, pinPose: true, travel: 0, running: false, touring: false, voiceOn: true, armed: false, answer: null, last: 0, lit: [], heard: -1 };
-  let V = null, model = null, E = null;
+  let V = null, model = null, E = null, P = null;
 
-  // ------------------------------------------------ one drawing per variant
-  function mount(name) {
-    V = DATA.variants[name];
-    S.variant = name;
-    model = makeModel(V.over);
-    fig.innerHTML = V.svg;
+  function mount(v, m) {
+    V = v;
+    model = m;
     E = { steps: [], wc: [], wt: [], pins: [], ticks: [] };
     const N = model.PATH.N, links = model.P.links;
     for (let i = N - 1; i >= 0; i--) E.steps[i] = mk("use", { href: "#stepSym", class: i === 0 ? "step followed" : "step" }, $("steps"));
@@ -681,44 +677,18 @@ function runtime(DATA) {
     E.shU = fig.querySelector("#sheaveU .rot");
     E.shL = fig.querySelector("#sheaveL .rot");
     E.live = $("detLive");
-    E.parts = [...fig.querySelectorAll("#scene .part")];
-    E.details = [...fig.querySelectorAll(".detail")];
-    E.labels = [...fig.querySelectorAll(".label")];
-    layoutText();
-    document.fonts.ready.then(layoutText);
-    for (const b of document.querySelectorAll(".vz-whatif button")) b.setAttribute("aria-pressed", String(b.dataset.variant === name));
     $("r-rise").textContent = V.readout.rise.toFixed(0);
     $("r-steps").textContent = String(V.readout.N);
     $("r-speed").textContent = String(model.P.speed / 1000);
-    SEG = timeline();
-    scrub.max = String(SEG.total);
-    marks.replaceChildren(...SEG.s.slice(1, LAST + 1).map((t) => {
-      const m = document.createElement("span");
-      m.style.left = `${(t / SEG.total) * 100}%`;
-      return m;
-    }));
   }
 
-  // Leaders run from the measured text box to the dot on the part, and the title-block key is
-  // laid out by measured widths; both wait for the web fonts, or they measure the fallback face.
-  function layoutText() {
-    for (const g of E.labels) {
-      const bb = g.querySelector("text").getBBox();
-      const [tx, ty] = g.dataset.to.split(",").map(Number);
-      const cy = bb.y + bb.height * 0.56;
-      const right = tx > bb.x + bb.width / 2;
-      const ax = right ? bb.x + bb.width + 45 : bb.x - 45, ex = ax + (right ? 110 : -110);
-      g.querySelector(".leader").setAttribute("d", `M${fx(ax)},${fx(cy)}L${fx(ex)},${fx(cy)}L${fx(tx)},${fx(ty)}`);
-    }
-    const key = fig.querySelector("#tbkey");
-    let x = +key.dataset.x0;
-    for (const g of key.querySelectorAll(".tbk")) {
-      const t = g.querySelector("text");
-      t.setAttribute("x", "300");
-      g.setAttribute("transform", `translate(${fx(x)},0)`);
-      x += 300 + t.getComputedTextLength() + 170;
-    }
-  }
+  // ------------------------------------------------ the story: where the chain is at each moment
+  // A step starts at its beat's `from` (or, on the narrated tour, where the voice meets it) and
+  // the chain runs at the escalator's speed; a still frame shows the beat's pose.
+  const poseOf = (k) => (k === 0 ? V.beats[0].pose : V.beats[k - 1].pose);
+  const baseOf = (k) => (V.tour?.length ? V.tour[k] : k === 0 ? V.beats[0].from - DATA.speed * DATA.plain : V.beats[k - 1].from);
+  const at = (k, t, still, SEG) => (still ? poseOf(k) : baseOf(k) + DATA.speed * (t - SEG.lead));
+  const stillAt = (k, SEG) => SEG.lead + (poseOf(k) - baseOf(k)) / DATA.speed;
 
   // ------------------------------------------------ drawing one moment
   function hrAt(u) {
@@ -743,7 +713,8 @@ function runtime(DATA) {
     return `M${P2(at)}L${P2([b[0] + n[0] * W, b[1] + n[1] * W])}L${P2([b[0] - n[0] * W, b[1] - n[1] * W])}Z`;
   }
   const WHERE = { "lower landing": "lower landing", "lower transition": "lower curve", incline: "incline", "upper transition": "upper curve", "upper landing": "upper landing", "upper turn": "turning over", "lower turn": "turning over" };
-  function render(travel) {
+  function render(travel, S) {
+    P = S;
     const N = model.PATH.N, pitch = model.P.pitch, ST = model.STEP;
     for (let i = 0; i < N; i++) {
       const s = travel - i * pitch;
@@ -787,7 +758,7 @@ function runtime(DATA) {
     const p1 = model.stepPose(travel - (i0 - 1) * pitch); // the step ahead, one riser higher
     const onIncline = Math.abs(p1.y - p0.y - model.stepRise) < 0.5;
     // only a step that sits squarely in the window gets dimensioned, so no figure is cut by the ring
-    const inView = best < V.det.r * (i0 === 0 ? 0.5 : 0.22) && onIncline && (i0 === 0 || !S.running);
+    const inView = best < V.det.r * (i0 === 0 ? 0.5 : 0.22) && onIncline && (i0 === 0 || !P.running);
     E.live.style.opacity = inView ? 1 : 0;
     if (!inView) return;
     const k = V.det.k, c = A([p0.x, p0.y]), tw = A(model.toWorld(p0, ST.T));
@@ -806,7 +777,7 @@ function runtime(DATA) {
     s += `<path class="dim" d="M${P2([nose0[0], yB + 40])}L${P2([nose0[0], yg + 90])}M${P2([nose1[0], yA + 40])}L${P2([nose1[0], yg + 90])}M${P2([nose0[0] + 4, yg])}L${P2([nose1[0] - 4, yg])}"/>`;
     s += `<path class="dimhead" d="${arrowD([nose0[0], yg], [-1, 0])}${arrowD([nose1[0], yg], [1, 0])}"/>`;
     s += `<text class="dimtext" x="${fx((nose0[0] + nose1[0]) / 2)}" y="${fx(-(yg + 50))}" text-anchor="middle">${model.stepGoing.toFixed(0)}</text></g>`;
-    if (S.step === 2 && i0 === 0) {
+    if (P.step === 2 && i0 === 0) {
       s += lab("Chain wheel", [c[0] + ST.rc * 0.5 * k, c[1] - ST.rc * 0.6 * k], V.det.slot.r2, "start");
       s += lab("Trailer wheel", [tw[0] - ST.rt * 0.55 * k, tw[1] - ST.rt * 0.6 * k], V.det.slot.l1, "end");
     }
@@ -829,341 +800,16 @@ function runtime(DATA) {
     setText("r-where", WHERE[model.segmentAt(travel)] ?? "return run");
   }
 
-  // ------------------------------------------------ focus, and the parts the voice names
-  function applyFocus() {
-    const focus = STEPS[S.step]?.focus;
-    const lit = S.lit;
-    for (const el of E.parts) {
-      const part = el.dataset.part;
-      let o = !focus || focus.includes(part) ? 1 : 0.35;
-      if (lit.length) o = lit.includes(part) || (lit.includes("followed") && ["steps", "cwheels", "twheels"].includes(part)) ? 1 : 0.2;
-      el.style.opacity = String(o);
-      el.classList.toggle("lit", lit.includes(part));
-    }
-    const only = lit.includes("followed");
+  // While the voice names the orange step, the other steps and wheels fade back.
+  function lit(ids) {
+    const only = ids.includes("followed");
     for (const u of [...E.steps, ...E.wc, ...E.wt]) u.style.opacity = only && !u.classList.contains("followed") ? "0.25" : "";
   }
-  function light(ids) {
-    const key = ids.join(" ");
-    if (key === S.lit.join(" ")) return;
-    S.lit = ids;
-    applyFocus();
-  }
-
-  // ------------------------------------------------ steps
-  const tabs = [...document.querySelectorAll(".vz-chapters button")];
-  const heading = $("heading"), count = $("count"), concept = $("concept");
-  const predict = $("predict"), practice = $("practice");
-  const scrub = $("scrub"), marks = $("marks"), playBtn = $("play"), voiceBtn = $("voice"), tryBtn = $("try");
-  // The story timeline: one pass from the concept to the last step, each step as long as its
-  // narration (or a fixed time without a voice). The bar shows story time, never the machine's loop.
-  const LEAD = 0.3, GAP = 0.6, PLAIN = 8;
-  let SEG = null;
-  function timeline() {
-    const d = [];
-    for (let k = 0; k <= LAST; k++) {
-      const tr = V.voice?.[k];
-      d.push(tr ? LEAD + tr.duration + GAP : PLAIN);
-    }
-    const s = [0];
-    d.forEach((x, i) => s.push(s[i] + x));
-    return { d, s, total: s[LAST + 1] };
-  }
-  const segOf = (T) => {
-    let k = 0;
-    for (let i = 1; i <= LAST; i++) if (T >= SEG.s[i] - 1e-6) k = i;
-    return k;
-  };
-  const baseOf = (k) => (V.tour?.length ? V.tour[k] : k === 0 ? V.beats[0].from - DATA.speed * PLAIN : V.beats[k - 1].from);
-  const leadOf = () => (V.tour?.length ? LEAD : 0);
-  const travelAt = (T) => {
-    const k = segOf(T);
-    return reduced ? poseOf(k) : baseOf(k) + DATA.speed * (T - SEG.s[k] - leadOf());
-  };
-  // The still frame of a step sits inside its stretch of the bar, at the moment the voice meets it.
-  const poseT = (k) => {
-    if (k === 0) return 0;
-    const t = SEG.s[k] + leadOf() + (poseOf(k) - baseOf(k)) / DATA.speed;
-    return Math.min(SEG.s[k + 1] - 0.01, Math.max(SEG.s[k], t));
-  };
-  function setStep(k) {
-    if (k === S.step) return;
-    S.step = k;
-    S.heard = -1;
-    root.dataset.step = String(k);
-    root.toggleAttribute("data-opening", k === 0);
-    heading.textContent = STEPS[k].heading;
-    count.textContent = `${pad2(k)} / ${pad2(LAST)}`;
-    tabs.forEach((t, i) => (i + 1 === k ? t.setAttribute("aria-current", "step") : t.removeAttribute("aria-current")));
-    for (const g of E.labels) g.style.display = g.dataset.beats.split(" ").includes(String(k)) ? "" : "none";
-    for (const g of E.details) {
-      const full = g.dataset.full.split(" ").includes(String(k)), dim = g.dataset.dim.split(" ").includes(String(k)) || k === 0 && g.id === "detailA";
-      g.classList.toggle("dim", dim && !full);
-      g.classList.toggle("off", !full && !dim);
-    }
-    S.lit = [];
-    applyFocus();
-    showPredict();
-    $("d-step").textContent = V.captions[k];
-    $("d-count").textContent = `${pad2(k)} / ${pad2(LAST)}`;
-    scrub.setAttribute("aria-valuetext", `${count.textContent}: ${STEPS[k].heading}`);
-    try {
-      history.replaceState(null, "", `#step=${k}${S.variant !== "standard" ? `&what=${S.variant}` : ""}`);
-    } catch {
-      /* sandboxed frames */
-    }
-  }
-  const poseOf = (k) => (k === 0 ? V.beats[0].pose : V.beats[k - 1].pose);
-  function draw() {
-    S.travel = travelAt(S.T);
-    if (reduced || S.pinPose) S.travel = poseOf(segOf(S.T));
-    render(S.travel);
-    scrub.value = String(S.T);
-  }
-  // Go to a step: paused, show its still frame; running, start the beat from its beginning.
-  function goTo(k, how = {}) {
-    k = Math.max(0, Math.min(LAST, k));
-    setStep(k);
-    S.T = S.running && !how.pose ? SEG.s[k] : poseT(k);
-    S.pinPose = !S.running || !!how.pose;
-    draw();
-    if (how.speak !== false) speakNav(k);
-  }
-  const unanswered = () => S.step === 2 && S.answer === null;
-
-  // ------------------------------------------------ time
-  let stillTimer = 0;
-  function setRunning(on) {
-    S.running = on && !reduced;
-    playBtn.dataset.state = on ? "pause" : "play";
-    playBtn.setAttribute("aria-label", on ? "Pause" : "Play");
-    clearInterval(stillTimer);
-    // Reduced motion: no continuous movement; play moves from one still pose to the next.
-    if (on && reduced && !S.touring) {
-      S.stillOn = true;
-      stillTimer = setInterval(() => {
-        if (unanswered()) return stop(true);
-        if (S.step >= LAST) return setRunning(false);
-        goTo(S.step + 1, { pose: true, speak: false });
-      }, 4000);
-    } else S.stillOn = false;
-    if (S.running) {
-      S.last = performance.now();
-      requestAnimationFrame(tick);
-    }
-  }
-  function tick(now) {
-    if (!S.running) return;
-    const dt = Math.min(0.1, (now - S.last) / 1000);
-    S.last = now;
-    S.pinPose = false;
-    if (S.touring) {
-      // The voice moves the story on; within a step the bar runs with it and waits at the step's end.
-      S.T = Math.min(S.T + dt, SEG.s[S.step + 1] - 1e-3);
-    } else {
-      S.T += dt;
-      const k = segOf(S.T);
-      // The prediction holds the story: stop where the landing step would begin.
-      if (S.step <= 2 && k >= 3 && S.answer === null) {
-        S.T = SEG.s[3] - 1e-3;
-        draw();
-        return stop(true);
-      }
-      if (S.T >= SEG.total) {
-        S.T = SEG.total - 1e-3;
-        draw();
-        return setRunning(false);
-      }
-      if (k !== S.step) setStep(k);
-    }
-    draw();
-    requestAnimationFrame(tick);
-  }
-  // Continuous play runs the beat from its start if the machine is elsewhere (after a tour, say).
-  function startPlain() {
-    if (S.pinPose || segOf(S.T) !== S.step) S.T = SEG.s[S.step];
-    S.pinPose = false;
-    setRunning(true);
-  }
-  function stop(toPredict) {
-    stopTour();
-    setRunning(false);
-    if (toPredict) predict.querySelector("button")?.focus();
-  }
-
-  // ------------------------------------------------ voice: recorded narration that lights what it names
-  let clip = null, clipRaf = 0, tourTimer = 0, navTimer = 0;
-  const hasVoice = () => !!(V && V.voice);
-  const fadeOut = (el) => {
-    if (!el || el.paused || el.ended) return;
-    const t0 = performance.now(), v0 = el.volume;
-    const f = () => {
-      const u = (performance.now() - t0) / 200;
-      if (u >= 1) return el.pause();
-      el.volume = v0 * (1 - u);
-      requestAnimationFrame(f);
-    };
-    f();
-  };
-  function stopClip() {
-    clearTimeout(navTimer);
-    cancelAnimationFrame(clipRaf);
-    fadeOut(clip);
-    clip = null;
-    light([]);
-  }
-  function playClip(k, then) {
-    stopClip();
-    const track = V.voice?.[k];
-    if (!track || !S.voiceOn) return false;
-    const el = new Audio(`data:${track.type};base64,${track.audio}`);
-    clip = el;
-    el.onended = () => {
-      cancelAnimationFrame(clipRaf);
-      if (clip === el) light([]);
-      S.heard = k;
-      then?.();
-    };
-    const follow = () => {
-      if (clip !== el) return;
-      const at = el.currentTime;
-      light(track.links.find((l) => at >= l.start - 0.05 && at < l.end + 0.25)?.ids ?? []);
-      clipRaf = requestAnimationFrame(follow);
-    };
-    el.play().then(follow).catch(() => {});
-    return true;
-  }
-  // Each step the reader goes to is spoken once the move settles (after the first gesture).
-  function speakNav(k) {
-    if (S.touring || !S.armed || !S.voiceOn || !hasVoice()) return;
-    stopClip();
-    navTimer = setTimeout(() => playClip(k), 650);
-  }
-  // With the voice on, play is the narrated tour: a step moves on only when its clip has ended.
-  function tourAt(k) {
-    setStep(k);
-    S.T = SEG.s[k];
-    S.pinPose = false;
-    draw();
-    setRunning(true);
-    playBtn.dataset.state = "pause";
-    tourTimer = setTimeout(() => {
-      const ok = playClip(k, () => {
-        if (!S.touring) return;
-        if (k === 2 && S.answer === null) return stop(true);
-        tourTimer = setTimeout(() => (k < LAST ? tourAt(k + 1) : stopTour(true)), GAP * 1000);
-      });
-      if (!ok) tourTimer = setTimeout(() => (k < LAST && S.touring ? tourAt(k + 1) : stopTour(true)), PLAIN * 1000);
-    }, LEAD * 1000);
-  }
-  function startTour(from) {
-    S.touring = true;
-    S.armed = true;
-    tourAt(from);
-  }
-  function stopTour(andMachine) {
-    if (!S.touring) return;
-    S.touring = false;
-    clearTimeout(tourTimer);
-    stopClip();
-    if (andMachine) setRunning(false);
-    playBtn.dataset.state = S.running ? "pause" : "play";
-  }
-
-  playBtn.addEventListener("click", () => {
-    S.armed = true;
-    if (S.touring || S.running || S.stillOn) return stop(false);
-    if (unanswered()) return predict.querySelector("button")?.focus();
-    if (S.voiceOn && hasVoice()) return startTour(S.step >= LAST ? 0 : S.heard === S.step ? S.step + 1 : S.step);
-    if (S.step >= LAST && S.T >= SEG.total - 0.01) goTo(0, { speak: false });
-    startPlain();
-  });
-  voiceBtn.addEventListener("click", () => {
-    S.voiceOn = !S.voiceOn;
-    S.armed = true;
-    voiceBtn.setAttribute("aria-pressed", String(S.voiceOn));
-    voiceBtn.textContent = S.voiceOn ? "Voice on" : "Voice off";
-    if (!S.voiceOn) {
-      const wasTour = S.touring;
-      stopTour(false);
-      stopClip();
-      if (wasTour) startPlain(); // keep the machine running, now without narration
-    } else if (!S.touring) speakNav(S.step);
-  });
-  const nav = (k) => {
-    S.armed = true;
-    if (S.touring) stopTour(true);
-    goTo(k);
-  };
-  $("prev").addEventListener("click", () => nav(S.step - 1));
-  $("next").addEventListener("click", () => (unanswered() ? predict.querySelector("button")?.focus() : nav(S.step + 1)));
-  $("restart").addEventListener("click", () => {
-    stop(false);
-    S.answer = null;
-    goTo(0, { speak: false });
-  });
-  tabs.forEach((t, i) => t.addEventListener("click", () => nav(i + 1)));
-  scrub.addEventListener("input", () => {
-    S.armed = true;
-    stopTour(false);
-    S.T = Number(scrub.value);
-    S.pinPose = false;
-    setStep(segOf(S.T));
-    draw();
-  });
-
-  // ------------------------------------------------ predict before the landing
-  const PRED = DATA.predict;
-  function showPredict() {
-    const k = S.step;
-    const show = !practiceOpen && (k === 2 || (k === 3 && S.answer !== null));
-    predict.hidden = !show;
-    concept.hidden = !(k === 0 && !practiceOpen);
-    syncCards();
-    if (!show) return;
-    const reveal = k === 3;
-    predict.replaceChildren();
-    const kicker = Object.assign(document.createElement("span"), { className: "vz-predict-kicker", textContent: reveal ? "Your prediction" : "Predict" });
-    const q = Object.assign(document.createElement("p"), { textContent: PRED.question });
-    const opts = Object.assign(document.createElement("div"), { className: "vz-predict-options" });
-    const fb = Object.assign(document.createElement("p"), { className: "vz-predict-feedback" });
-    fb.setAttribute("aria-live", "polite");
-    PRED.choices.forEach((c, i) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = c;
-      b.setAttribute("aria-pressed", String(S.answer === i));
-      if (reveal) b.dataset.correct = String(i === PRED.answer);
-      b.addEventListener("click", () => {
-        if (reveal) return;
-        S.answer = i;
-        S.armed = true;
-        for (const o of opts.children) o.setAttribute("aria-pressed", String(o === b));
-        fb.textContent = "Locked in. Press play to watch the orange step reach the top.";
-      });
-      opts.append(b);
-    });
-    if (reveal) fb.textContent = (S.answer === PRED.answer ? "Right. " : "Not quite. ") + PRED.explanation;
-    else if (S.answer !== null) fb.textContent = "Locked in. Press play to watch the orange step reach the top.";
-    predict.append(kicker, q, opts, fb);
-  }
-  // A card sits over the title block's corner; while one is up, the title block steps aside.
-  const syncCards = () => root.toggleAttribute("data-card", !predict.hidden || !concept.hidden);
 
   // ------------------------------------------------ now you try: questions made from the model
-  let practiceOpen = false, seed = 7, right = 0, tried = 0;
-  const rng = (a) => () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
   const pick = (r, xs) => xs[Math.floor(r() * xs.length)];
-  const shuffle = (r, xs) => xs.map((x) => [r(), x]).sort((a, b) => a[0] - b[0]).map((p) => p[1]);
   const rad = (d) => (d * Math.PI) / 180;
-  function question(n) {
-    const r = rng(n * 2654435761);
+  function question(n, r) {
     const kind = n % 4;
     const th = pick(r, [30, 35]), H = pick(r, [3000, 4500, 6000]);
     if (kind === 0) {
@@ -1186,251 +832,73 @@ function runtime(DATA) {
     const v = m.DRIVE.shaftRpm, perSec = m.P.speed / (2 * Math.PI * m.Rs), radps = m.P.speed / m.Rs;
     return { q: `A drive sprocket with ${teeth} teeth on a ${(m.P.pitch / m.P.links).toFixed(1)} mm chain pitch moves the chain at 0.5 m/s. How fast does the main shaft turn?`, choices: [v, perSec, radps].map((x) => `${x.toFixed(2)} rpm`), explain: `One turn moves ${teeth} links, ${(teeth * m.P.pitch / m.P.links / 1000).toFixed(3)} m of chain, so 0.5 m/s is ${(m.P.speed / (teeth * m.P.pitch / m.P.links)).toFixed(4)} turns a second: ${v.toFixed(2)} rpm.` };
   }
-  function renderPractice() {
-    const Q = question(seed);
-    const r = rng(seed * 31 + 7);
-    const order = shuffle(r, [0, 1, 2]);
-    practice.replaceChildren();
-    const kicker = Object.assign(document.createElement("span"), { className: "vz-predict-kicker", textContent: "Now you try" });
-    const q = Object.assign(document.createElement("p"), { textContent: Q.q });
-    const opts = Object.assign(document.createElement("div"), { className: "vz-predict-options" });
-    const fb = Object.assign(document.createElement("p"), { className: "vz-predict-feedback" });
-    fb.setAttribute("aria-live", "polite");
-    const foot = Object.assign(document.createElement("div"), { className: "vz-practice-foot" });
-    const score = Object.assign(document.createElement("span"), { className: "vz-practice-score", textContent: tried ? `${right} of ${tried} right` : "Worked from the model on this page" });
-    const another = Object.assign(document.createElement("button"), { type: "button", className: "vz-practice-next", textContent: "New question" });
-    another.addEventListener("click", () => {
-      seed += 1;
-      renderPractice();
-      practice.querySelector(".vz-predict-options button")?.focus();
-    });
-    let done = false;
-    for (const i of order) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = Q.choices[i];
-      b.setAttribute("aria-pressed", "false");
-      b.addEventListener("click", () => {
-        if (done) return;
-        done = true;
-        tried += 1;
-        if (i === 0) right += 1;
-        for (const o of opts.children) o.dataset.correct = String(o === opts.children[order.indexOf(0)]);
-        b.setAttribute("aria-pressed", "true");
-        fb.textContent = (i === 0 ? "Right. " : "Not quite. ") + Q.explain;
-        score.textContent = `${right} of ${tried} right`;
-      });
-      opts.append(b);
-    }
-    foot.append(score, another);
-    practice.append(kicker, q, opts, fb, foot);
-  }
-  tryBtn.addEventListener("click", () => {
-    practiceOpen = !practiceOpen;
-    root.toggleAttribute("data-practice", practiceOpen);
-    tryBtn.setAttribute("aria-pressed", String(practiceOpen));
-    practice.hidden = !practiceOpen;
-    if (practiceOpen) renderPractice();
-    showPredict();
-    syncCards();
-    if (practiceOpen) practice.querySelector(".vz-predict-options button")?.focus();
-  });
 
-  // ------------------------------------------------ what if
-  for (const b of document.querySelectorAll(".vz-whatif button")) {
-    b.addEventListener("click", () => {
-      if (b.dataset.variant === S.variant) return;
-      const k = S.step;
-      stop(false);
-      stopClip();
-      mount(b.dataset.variant);
-      S.step = -1;
-      goTo(k, { pose: true, speak: false });
-    });
+  // ------------------------------------------------ the lab: put the orange step anywhere, and mis-set a track
+  // The drawing follows the step; the rows read the model at that point. The track error is not
+  // drawn (the tracks are the drawing's ground truth): its tilt is computed over the wheelbase.
+  function lab(values) {
+    const L = model.PATH.L, ST = model.STEP;
+    const travel = ((values.pos / 100) * L) % L;
+    const p = model.stepPose(travel), c = [p.x, p.y], q = model.toWorld(p, ST.T);
+    let tilt = (Math.atan2(q[1] - c[1], q[0] - c[0]) - Math.atan2(ST.T[1], ST.T[0])) * DEGR;
+    tilt = Math.abs(((tilt % 360) + 540) % 360 - 180);
+    const where = WHERE[model.segmentAt(travel)] ?? "return run";
+    const lift = q[1] - c[1];
+    const err = Number(values.err), errTilt = Math.atan2(Math.abs(err), -ST.T[0]) * DEGR;
+    const upside = Math.abs(Math.abs(p.phi) - Math.PI) < 0.05;
+    const level = tilt < 0.5 && !upside;
+    return {
+      ok: level && errTilt < 0.5,
+      state: travel,
+      verdict: err ? `A track ${Math.abs(err)} mm off tilts every tread ${errTilt.toFixed(1)}° on the slope.` : upside ? "Upside down: the step rides back under the passengers." : level ? `Level: the tread tilts ${tilt.toFixed(1)}° here.` : `Turning over: the tread is at ${tilt.toFixed(0)}°.`,
+      rows: [
+        `Where: ${where}, ${(travel / 1000).toFixed(2)} m round the ${(L / 1000).toFixed(1)} m loop`,
+        `Trailer wheel ${lift.toFixed(0)} mm ${lift >= 0 ? "above" : "below"} the chain wheel (${ST.T[1]} mm on the flat)`,
+        `Tread height above the lower floor: ${((model.toWorld(p, [ST.f - 196, ST.t])[1] - model.LAND.treadLow) / 1000).toFixed(2)} m`,
+        err ? `Wheelbase ${-ST.T[0]} mm, so ${Math.abs(err)} mm of error is atan(${Math.abs(err)} / ${-ST.T[0]}) = ${errTilt.toFixed(1)}°` : "Set a track error to see why the trailer track must be exact",
+      ],
+    };
   }
 
-  // ------------------------------------------------ details, theme, keyboard
-  const drawer = $("details");
-  for (const b of document.querySelectorAll("[data-details]")) b.addEventListener("click", () => (drawer.open ? drawer.close() : drawer.showModal()));
-  const themeBtn = $("theme");
-  const applyTheme = (th) => {
-    root.dataset.theme = th;
-    document.body.dataset.theme = th;
-    themeBtn.textContent = th === "dark" ? "Light" : "Dark";
-    themeBtn.setAttribute("aria-label", `Switch to ${th === "dark" ? "light" : "dark"} theme`);
-  };
-  applyTheme(matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-  themeBtn.addEventListener("click", () => applyTheme(root.dataset.theme === "dark" ? "light" : "dark"));
-  document.addEventListener("keydown", (e) => {
-    if (drawer.open || e.metaKey || e.ctrlKey || e.altKey) return;
-    const k = e.key;
-    if (e.target instanceof HTMLButtonElement && (k === " " || k === "Enter")) return;
-    if (e.target instanceof HTMLInputElement && k !== " ") return;
-    if (k === "ArrowRight") $("next").click();
-    else if (k === "ArrowLeft") $("prev").click();
-    else if (k === "Home") nav(0);
-    else if (k === "End") nav(LAST);
-    else if (k === " ") playBtn.click();
-    else return;
-    e.preventDefault();
-  });
-
-  // ------------------------------------------------ start
-  const hash = new URLSearchParams(location.hash.slice(1));
-  const what = DATA.variants[hash.get("what")] ? hash.get("what") : "standard";
-  const first = Math.max(0, Math.min(LAST, Number(hash.get("step") ?? 0) || 0));
-  mount(what);
-  goTo(first, { pose: true, speak: false });
-  setRunning(false);
-  window.__viz = {
-    steps: LAST + 1,
-    seekStep(k) {
-      root.classList.add("instant");
-      stop(false);
-      goTo(Number(k) || 0, { pose: true, speak: false });
-    },
-    seek(ms) {
-      root.classList.add("instant");
-      stop(false);
-      S.T = Math.min(SEG.total, Number(ms) / 1000);
-      S.pinPose = false;
-      setStep(segOf(S.T));
-      draw();
-    },
-    variant(name) {
-      document.querySelector(`.vz-whatif button[data-variant="${name}"]`)?.click();
-    },
-    practice(n) {
-      if (n !== undefined) seed = n;
-      if (!practiceOpen) tryBtn.click();
-      else renderPractice();
-    },
-    state: () => ({ step: S.step, travel: S.travel, running: S.running, touring: S.touring, voiceOn: S.voiceOn, answer: S.answer, variant: S.variant, lit: S.lit.slice() }),
-  };
+  return { model: (v) => makeModel(v.over), mount, at, stillAt, render, lit, lab, question, info: (travel) => ({ travel }) };
 }
 
 // ---------------------------------------------------------------- page
-const font = (f) => readFileSync(join(ROOT, "src/render/fonts", f)).toString("base64");
 const modelSrc = readFileSync(join(HERE, "model.mjs"), "utf8").replace(/^export /gm, "");
 
 const PREDICT = {
+  step: 2,
   question: "The two tracks meet near the top. What happens to the steps?",
   choices: ["They tip forward", "They flatten out", "They stop"],
   answer: 1,
   explanation: "With both wheels at the same height, each tread lines up with its neighbours: a flat walkway before the comb.",
+  locked: "Locked in. Press play to watch the orange step reach the top.",
 };
 
 const DATA = {
-  speed: BASE_SPEED(),
+  speed: MODELS.standard.P.speed,
+  plain: 8,
   FS,
+  base: "standard",
   steps: STEPS.map(({ heading, focus }) => ({ heading, focus })),
   predict: PREDICT,
+  alias: { followed: ["steps", "cwheels", "twheels"] },
+  lab: {
+    button: "Move a step",
+    title: "Move the orange step",
+    heading: "Is the tread level everywhere?",
+    intro: "Drag the orange step anywhere round its loop, then set an error in the trailer-wheel track.",
+    inputs: [
+      { id: "pos", label: "Position", min: 0, max: 99.5, step: 0.5, value: 25, format: "{}%" },
+      { id: "err", label: "Track error", min: -40, max: 40, step: 1, value: 0, format: "{} mm" },
+    ],
+  },
   variants: VARIANT_DATA,
 };
-function BASE_SPEED() {
-  return MODELS.standard.P.speed;
-}
 
-// Visualize tokens (src/render/tokens.css, editorial presentation) and the player's page chrome
-// (src/render/styles.css), followed by the drawing's own line weights.
+// The drawing's own line weights: three accents, one meaning each.
 const CSS = `
-@font-face{font-family:"Visualize Sans";font-style:normal;font-weight:400 700;font-display:block;src:url(data:font/woff2;base64,${font("manrope-latin.woff2")}) format("woff2")}
-@font-face{font-family:"Visualize Mono";font-style:normal;font-weight:500;font-display:block;src:url(data:font/woff2;base64,${font("ibm-plex-mono-latin-500.woff2")}) format("woff2")}
-@font-face{font-family:"Visualize Display";font-style:normal;font-weight:700;font-display:block;src:url(data:font/woff2;base64,${font("playfair-display-sc-latin-700.woff2")}) format("woff2")}
-.vz{--radius-card:16px;--radius-stage:10px;--stage:#fffefa;--paper:#f7f5ef;--card:#fffefa;--ink:#262521;--ink-2:#625f58;--hair:#e5e1d8;--focus:#262521;
-  --t-good:#317b6c;--t-bad:#b34d49;
-  --step:#ebe7dd;--slab:#fffefa;--blue:#2563eb;--teal:#0f9488;--orange:#e4572e;--orange-tint:#f7dccf;
-  --sans:"Visualize Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono:"Visualize Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;color-scheme:light}
-@media (prefers-color-scheme:dark){.vz:not([data-theme="light"]){--stage:#121212;--card:#121212;--ink:#f1f0eb;--ink-2:#b6b4ae;--hair:#30302e;--focus:#f1f0eb;--t-good:#74beaa;--t-bad:#e4928a;--step:#1f2328;--slab:#151719;--orange-tint:#3a2219;color-scheme:dark}}
-.vz[data-theme="dark"]{--stage:#121212;--card:#121212;--ink:#f1f0eb;--ink-2:#b6b4ae;--hair:#30302e;--focus:#f1f0eb;--t-good:#74beaa;--t-bad:#e4928a;--step:#1f2328;--slab:#151719;--orange-tint:#3a2219;color-scheme:dark}
-html,body{margin:0}
-body{padding:24px 32px;background:#f7f5ef;overflow:hidden}
-@media (prefers-color-scheme:dark){body:not([data-theme="light"]){background:#090909}}
-body[data-theme="dark"]{background:#090909}body[data-theme="light"]{background:#f7f5ef}
-.vz,.vz *,.vz *::before,.vz *::after{box-sizing:border-box}
-.vz{color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;max-width:1640px;margin:0 auto;height:calc(100dvh - 48px)}
-.vz-card{background:var(--card);border:1px solid var(--hair);border-radius:var(--radius-card);padding:22px 28px;display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100%}
-.vz-head{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:0 0 18px}
-.vz-heading{min-width:0}
-.vz-title{margin:0;font:700 34px/1.1 "Visualize Display","Playfair Display SC",Georgia,serif;letter-spacing:.01em;color:var(--ink)}
-.vz-about{margin:4px 0 0;font:400 14px/1.45 var(--sans);color:var(--ink-2)}
-.vz-chapters{display:flex;gap:22px}
-.vz-chapters button{appearance:none;background:none;border:0;border-bottom:2px solid transparent;padding:10px 0;color:var(--ink-2);font:500 12px var(--sans);cursor:pointer}
-.vz-chapters button span{font:11px var(--mono);margin-right:5px}
-.vz-chapters button[aria-current]{color:var(--ink);border-bottom-color:var(--ink)}
-.vz-chapters button:hover{color:var(--ink)}
-.vz-utilities{display:flex;align-items:center;gap:8px}
-.vz-info,.vz-theme{border:1px solid var(--hair);border-radius:7px;padding:7px 12px;background:var(--card);color:var(--ink-2);font:500 12px var(--sans);cursor:pointer}
-.vz-info:hover,.vz-theme:hover{color:var(--ink);border-color:var(--ink-2)}
-.vz-body{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;min-height:0}
-.vz-stage{position:relative;min-height:0;border:1px solid var(--hair);border-radius:var(--radius-stage);background:var(--stage);outline:none;overflow:hidden}
-.vz-stage:focus-visible{outline:2px solid var(--focus);outline-offset:4px}
-.vz-svg{position:absolute;inset:0;width:100%;height:100%;display:block;padding:10px 14px}
-.vz-caption{position:absolute;left:26px;top:24px;width:min(262px,21%);z-index:2;pointer-events:none}
-.vz[data-practice] .vz-caption{width:min(400px,32%)}
-.vz-practice{margin-top:16px;pointer-events:auto}
-.vz[data-practice] #fig .detail{visibility:hidden}
-.vz-step-heading{margin:0;font:500 21px/1.35 var(--sans);letter-spacing:-.025em;text-wrap:balance}
-.vz-cards{position:absolute;right:22px;bottom:20px;width:min(410px,35%);z-index:3;display:grid;gap:10px}
-.vz-predict{padding:13px 15px;border:1px solid var(--hair);border-radius:10px;background:var(--stage)}
-.vz-predict[hidden],.vz-concept[hidden]{display:none}
-.vz-predict-kicker{font-size:11px;color:var(--ink-2)}
-.vz-predict p{margin:5px 0 9px;font-size:14px;line-height:1.45}
-.vz-predict-options{display:flex;flex-wrap:wrap;gap:8px}
-.vz-predict button{font:600 13px var(--sans);color:var(--ink);background:var(--card);border:1px solid var(--hair);padding:6px 11px;border-radius:6px;cursor:pointer;text-align:left}
-.vz[data-card] #fig .tblock{visibility:hidden}
-.vz-predict button:hover{border-color:var(--ink-2)}
-.vz-predict button[aria-pressed="true"]{border-color:var(--ink)}
-.vz-predict button[data-correct="true"]{background:color-mix(in oklab,var(--t-good) 14%,var(--card));border-color:var(--t-good)}
-.vz-predict button[data-correct="false"][aria-pressed="true"]{background:color-mix(in oklab,var(--t-bad) 10%,var(--card));border-color:var(--t-bad)}
-.vz-predict .vz-predict-feedback{font-size:12px;color:var(--ink-2);margin:10px 0 0}
-.vz-predict-feedback:empty{display:none}
-.vz-practice-foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--ink-2)}
-.vz-practice-foot button{font:600 13px var(--sans);text-align:center;padding:6px 14px}
-.vz-concept{margin:0;padding:14px 16px;border-radius:12px;background:color-mix(in oklab,var(--card) 92%,transparent);border:1px solid var(--hair);font:400 14px/1.55 var(--sans);color:var(--ink)}
-.vz-panels{display:block;padding:14px 4px 12px;min-width:0}
-.vz-panel{display:flex;align-items:center;gap:20px}
-.vz-panel h3{flex:0 0 auto;font:500 11px var(--sans);margin:0;color:var(--ink)}
-.vz-panel-body{display:flex;align-items:center;justify-content:space-between;gap:24px;flex:1;min-width:0}
-.vz-whatif{display:flex;align-items:center;gap:6px;margin:0;font-size:12px;color:var(--ink-2)}
-.vz-whatif button{font:500 12px var(--sans);color:var(--ink);background:var(--card);border:1px solid var(--hair);border-radius:999px;padding:4px 11px;cursor:pointer}
-.vz-whatif button[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
-.vz-totals{display:flex;flex-wrap:wrap;gap:18px;margin:0;color:var(--ink-2);font-size:12px;justify-content:flex-end}
-.vz-totals b{color:var(--ink);font:500 19px var(--mono);margin-right:3px}
-.vz-controls{display:flex;align-items:center;gap:8px;border-top:1px solid var(--hair);padding-top:14px}
-.vz-btn{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:9px;border:1px solid var(--hair);background:var(--card);color:var(--ink);cursor:pointer;padding:0;flex:0 0 auto}
-.vz-btn:hover{border-color:var(--ink-2)}
-.vz-btn:focus-visible,.vz-info:focus-visible,.vz-theme:focus-visible,.vz-chapters button:focus-visible,.vz-predict button:focus-visible,.vz-whatif button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.vz-btn[data-primary]{background:var(--ink);color:var(--card);border-color:var(--ink)}
-.vz-btn svg{width:16px;height:16px;fill:currentColor}
-#play[data-state="play"] .i-pause,#play[data-state="pause"] .i-play{display:none}
-.vz-count{font:500 11px var(--mono);color:var(--ink-2);margin:0 10px;white-space:nowrap}
-.vz-scrub{flex:1;min-width:0;position:relative;height:36px;display:flex;align-items:center}
-.vz-range{width:100%;accent-color:var(--ink);margin:0}
-#marks{position:absolute;left:8px;right:8px;top:27px;height:4px;pointer-events:none}
-#marks span{position:absolute;top:0;width:1px;height:4px;background:var(--ink-2);opacity:.6}
-.vz-btn.vz-try,.vz-btn.vz-voice{width:auto;min-width:0;padding:0 14px;white-space:nowrap;font:500 13px var(--sans);color:var(--ink)}
-.vz-btn.vz-voice[aria-pressed="false"]{color:var(--ink-2)}
-.vz-btn.vz-try[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
-.vz-drawer{width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 48px);margin:24px 24px 24px auto;padding:0;border:1px solid var(--hair);border-radius:14px;background:var(--card);color:var(--ink);box-shadow:0 20px 100px #0003}
-.vz-drawer[open]{display:flex;flex-direction:column}
-.vz-drawer::backdrop{background:#10181455}
-.vz-drawer-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 24px;border-bottom:1px solid var(--hair)}
-.vz-drawer-head h2{margin:0;font:550 19px var(--sans)}
-.vz-drawer-body{padding:24px;overflow:auto;overscroll-behavior:contain}
-.vz-drawer-body h3{font:550 13px var(--sans);margin:24px 0 10px}
-.vz-setup,.vz-text{margin:0;font:400 15px/1.65 var(--sans);color:var(--ink-2)}
-.vz-meta{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-top:14px}
-.vz-trust{font:11px var(--sans);padding:4px 8px;border-radius:999px;border:1px solid var(--ink-2);color:var(--ink-2)}
-.vz-readout{font:11px var(--sans);color:var(--ink)}
-.vz-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0;padding:0;list-style:none;font-size:11px;color:var(--ink-2)}
-.vz-legend li{display:inline-flex;align-items:center;gap:7px}
-.vz-swatch{width:8px;height:8px;border-radius:50%;background:var(--tone)}
-.vz-facts{margin:0;padding:0;list-style:none;font:400 13px/1.7 var(--sans);color:var(--ink-2)}
-.vz-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-
-/* ---- the drawing: line weights in screen pixels, three accents, one meaning each ---- */
+path,circle,rect,line,polyline,polygon,ellipse{vector-effect:non-scaling-stroke}
 path,circle,rect,line,polyline,polygon,ellipse{vector-effect:non-scaling-stroke}
 #fig{shape-rendering:geometricPrecision}
 text{font-family:var(--sans);fill:var(--ink)}
@@ -1498,101 +966,42 @@ text{font-family:var(--sans);fill:var(--ink)}
 @media (prefers-reduced-motion:reduce){.part,.detail,#detLive{transition:none}}
 `;
 
-const icon = {
-  prev: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg>`,
-  next: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg>`,
-  play: `<svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2v12l10-6z"/></svg>`,
-  pause: `<svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h3v12H4zM9 2h3v12H9z"/></svg>`,
-  restart: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3a5 5 0 1 1-4.9 6h1.7A3.4 3.4 0 1 0 8 4.6V7L4.5 3.8 8 .6z"/></svg>`,
-};
 const std = VARIANT_DATA.standard;
-const HTML = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Escalator</title>
-<style>${CSS}</style>
-</head>
-<body>
-<div class="vz" id="vz" data-presentation="editorial" data-scene="escalator">
-<article class="vz-card">
-  <header class="vz-head">
-    <div class="vz-heading"><h1 class="vz-title">Escalator</h1><p class="vz-about">One chain, two wheel tracks: how every step stays level on the slope.</p></div>
-    <nav class="vz-chapters" aria-label="Chapters">
-${STEPS.slice(1).map((s, i) => `      <button type="button"><span>${String(i + 1).padStart(2, "0")}</span> ${esc(s.tab)}</button>`).join("\n")}
-    </nav>
-    <div class="vz-utilities"><button class="vz-info" type="button" data-details aria-haspopup="dialog" aria-controls="details">Details</button><button class="vz-theme" id="theme" type="button">Dark</button></div>
-  </header>
-  <div class="vz-body" data-panels="1">
-    <div class="vz-stage" id="stage" tabindex="0" role="group" aria-roledescription="step-through figure" aria-label="Escalator. Left and right arrows step through the explanation; space plays and pauses.">
-      <svg id="fig" class="vz-svg" xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Side elevation of an escalator, cut away to show the step chain, the two wheel tracks, the sprockets, the drive and the handrail"></svg>
-      <section class="vz-caption" aria-live="polite" aria-atomic="true"><h2 class="vz-step-heading" id="heading"></h2>
-        <section class="vz-predict vz-practice" id="practice" aria-label="Now you try" hidden></section></section>
-      <div class="vz-cards">
-        <p class="vz-concept" id="concept">${esc(std.voice ? std.voice[0].text : std.captions[0])}</p>
-        <section class="vz-predict" id="predict" aria-label="Predict the next step" hidden></section>
-      </div>
-    </div>
-    <aside class="vz-panels" aria-label="Readouts for the followed step">
-      <section class="vz-panel">
-        <h3>What if</h3>
-        <div class="vz-panel-body">
-          <div class="vz-whatif" role="group" aria-label="Incline">${Object.entries(VARIANTS).map(([k, v]) => `<button type="button" data-variant="${k}" aria-pressed="${k === "standard"}">${esc(v.label)}</button>`).join("")}</div>
-          <div class="vz-totals">
-            <span><b id="r-rise">200</b> mm step rise</span>
+const HTML = drawingPage({
+  title: "Escalator",
+  about: "One chain, two wheel tracks: how every step stays level on the slope.",
+  scene: "escalator",
+  steps: STEPS,
+  stageLabel: "Escalator. Left and right arrows step through the explanation; space plays and pauses.",
+  viewBox,
+  figLabel: "Side elevation of an escalator, cut away to show the step chain, the two wheel tracks, the sprockets, the drive and the handrail",
+  concept: std.voice ? std.voice[0].text : std.captions[0],
+  setup: std.captions[0],
+  whatIf: { label: "Incline", variants: Object.entries(VARIANTS).map(([k, v]) => [k, v.label]) },
+  totals: `            <span><b id="r-rise">200</b> mm step rise</span>
             <span><b id="r-tilt">0.0°</b> tread tilt</span>
             <span><b id="r-height">0.00</b> m tread height</span>
             <span><b id="r-where">incline</b> orange step</span>
             <span><b id="r-speed">0.5</b> m/s</span>
-            <span><b id="r-steps">53</b> steps</span>
-          </div>
-        </div>
-      </section>
-    </aside>
-  </div>
-  <div class="vz-controls" role="toolbar" aria-label="Playback">
-    <button class="vz-btn" id="prev" type="button" aria-label="Previous step">${icon.prev}</button>
-    <button class="vz-btn" id="play" type="button" aria-label="Play" data-primary data-state="play">${icon.play}${icon.pause}</button>
-    <button class="vz-btn" id="next" type="button" aria-label="Next step">${icon.next}</button>
-    <span class="vz-count" id="count">00 / ${String(STEPS.length - 1).padStart(2, "0")}</span>
-    <div class="vz-scrub"><input class="vz-range" id="scrub" type="range" min="0" max="1" step="0.01" value="0" aria-label="Timeline of the explanation"><div id="marks"></div></div>
-    <button class="vz-btn vz-try" id="try" type="button" aria-pressed="false">Now you try</button>
-    <button class="vz-btn vz-voice" id="voice" type="button" aria-pressed="true" aria-label="Voice narration">Voice on</button>
-    <button class="vz-btn" id="restart" type="button" aria-label="Restart">${icon.restart}</button>
-  </div>
-  <dialog class="vz-drawer" id="details" aria-labelledby="details-title">
-    <div class="vz-drawer-head"><h2 id="details-title">Behind the figure</h2><button class="vz-info" type="button" data-details aria-label="Close details">Close ×</button></div>
-    <div class="vz-drawer-body">
-      <p class="vz-setup">${esc(std.captions[0])}</p>
-      <h3>This step <span class="vz-count" id="d-count"></span></h3>
-      <p class="vz-text" id="d-step"></p>
-      <div class="vz-meta"><span class="vz-trust" title="Every position and readout is calculated by the model running on this page.">Computed live</span><span class="vz-readout">Readouts follow the orange step</span></div>
-      <h3>Colour</h3>
-      <ul class="vz-legend">
-        <li><span class="vz-swatch" style="--tone:var(--blue)"></span>Step chain and chain-wheel track</li>
-        <li><span class="vz-swatch" style="--tone:var(--teal)"></span>Trailer-wheel track</li>
-        <li><span class="vz-swatch" style="--tone:var(--orange)"></span>The followed step</li>
-        <li><span class="vz-swatch" style="--tone:var(--ink)"></span>Everything else, in ink</li>
-      </ul>
-      <h3>How it is computed</h3>
-      <ul class="vz-facts">
-        <li>The chain path is lines and arcs, with ${MODELS.standard.PATH.N} steps at 400 mm along it.</li>
-        <li>Each step is a rigid body. The trailer-wheel track is the path the trailer wheel traces while the tread is held level; it is computed, not drawn by hand.</li>
-        <li>Tests sweep the chain through a whole pitch, 5 mm at a time, for both inclines. They check that no two steps touch, that each wheel stays on its own rail, that every tread is level within 0.5° on the slope, and that the treads are flat at the landings.</li>
-        <li>Step width 1000 mm (not drawn). Dimensions in mm.</li>
-      </ul>
-    </div>
-  </dialog>
-</article>
-</div>
-<script>
-${modelSrc}
-(${runtime.toString()})(${JSON.stringify(DATA)});
-</script>
-</body>
-</html>
-`;
+            <span><b id="r-steps">53</b> steps</span>`,
+  readoutNote: "Readouts follow the orange step",
+  legend: [
+    ["var(--blue)", "Step chain and chain-wheel track"],
+    ["var(--teal)", "Trailer-wheel track"],
+    ["var(--orange)", "The followed step"],
+    ["var(--ink)", "Everything else, in ink"],
+  ],
+  facts: [
+    `The chain path is lines and arcs, with ${MODELS.standard.PATH.N} steps at 400 mm along it.`,
+    "Each step is a rigid body. The trailer-wheel track is the path the trailer wheel traces while the tread is held level; it is computed, not drawn by hand.",
+    "Tests sweep the chain through a whole pitch, 5 mm at a time, for both inclines. They check that no two steps touch, that each wheel stays on its own rail, that every tread is level within 0.5° on the slope, and that the treads are flat at the landings.",
+    "Step width 1000 mm (not drawn). Dimensions in mm.",
+  ],
+  css: CSS,
+  modelSrc,
+  machine,
+  data: DATA,
+});
 
 // node examples/escalator/build.mjs [--out <file>]; the page goes to dist/escalator.html by default.
 const outArg = process.argv.indexOf("--out");

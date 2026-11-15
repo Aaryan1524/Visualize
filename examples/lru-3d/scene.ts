@@ -17,6 +17,7 @@ function voice(s: LruState, e: GetEvent | null, k: number): string {
   return k === 3 ? `[${name}|${key}] fills the last slot. Now the cache is full.` : `[${name}|${key}] is new. There's room, so it takes an empty slot.`;
 }
 
-const clay = defineScene({ ...lru, id: "lru-3d", title: "LRU Cache", look: "clay", voice, about: "Keeps what you used lately and drops what you haven't." });
-export const variants = { "lru-3d": clay, "lru-3d-paper": defineScene({ ...clay, id: "lru-3d-paper", look: "paper" }) };
-export default clay;
+// The drawing look, the same family as the machine drawings, is the default; Clay and Paper are kept as variants.
+const drawn = defineScene({ ...lru, id: "lru-3d", title: "LRU Cache", look: "drawing", voice, about: "Keeps what you used lately and drops what you haven't." });
+export const variants = { "lru-3d": drawn, "lru-3d-clay": defineScene({ ...drawn, id: "lru-3d-clay", look: "clay" }), "lru-3d-paper": defineScene({ ...drawn, id: "lru-3d-paper", look: "paper" }) };
+export default drawn;

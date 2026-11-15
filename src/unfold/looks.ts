@@ -3,11 +3,14 @@
 //
 //   paper  the textbook page: white paper solids drawn in ink on graph paper
 //   clay   soft matte solids on a warm table with real soft shadows
+//   drawing  the machine drawings' look for concepts: ink outlines on the cream stage, three flat
+//          tones of light, base plates hatched like cut sections, and the drawings' palette
+//          (ink, blue, teal, red, and orange for the part the reader follows)
 
 import * as THREE from "three";
 import type { Tone } from "../core/types.ts";
 
-export type LookName = "paper" | "clay";
+export type LookName = "paper" | "clay" | "drawing";
 
 export interface PaintState { tone: Tone; role?: "foundation" | "subject"; lit: boolean; emphasis: number; opacity: number }
 
@@ -153,4 +156,95 @@ const clay: Look = {
   },
 };
 
-export const LOOKS: Record<LookName, Look> = { paper, clay };
+// ---- Drawing ----------------------------------------------------------------------
+// The same family as the machine pages (references/drawing.md, examples/escalator): a page
+// that shows a machine and a page that shows a concept should look like two plates from one
+// book. Light and dark follow the page; tones are fill + ink pairs from the drawings' tokens.
+type InkTone = { fill: string; ink: string };
+const DRAW_LIGHT: Record<Tone, InkTone> = {
+  base: { fill: "#fffefa", ink: "#262521" },
+  structure: { fill: "#f4f1ea", ink: "#262521" },
+  subject: { fill: "#fffefa", ink: "#262521" },
+  muted: { fill: "#f1eee7", ink: "#a5a198" },
+  accent: { fill: "#f7dccf", ink: "#e4572e" },
+  cold: { fill: "#dce6fb", ink: "#2563eb" },
+  hot: { fill: "#f4e4cf", ink: "#ad7534" },
+  good: { fill: "#d6ede9", ink: "#0f9488" },
+  bad: { fill: "#f4dcda", ink: "#b34d49" },
+};
+const DRAW_DARK: Record<Tone, InkTone> = {
+  base: { fill: "#151719", ink: "#f1f0eb" },
+  structure: { fill: "#1f2328", ink: "#f1f0eb" },
+  subject: { fill: "#1b1d20", ink: "#f1f0eb" },
+  muted: { fill: "#191b1e", ink: "#6d6b66" },
+  accent: { fill: "#3a2219", ink: "#f08a63" },
+  cold: { fill: "#17233d", ink: "#81a8dc" },
+  hot: { fill: "#33281a", ink: "#d6a56a" },
+  good: { fill: "#15302b", ink: "#74beaa" },
+  bad: { fill: "#3a1f1d", ink: "#e4928a" },
+};
+let drawDark = false;
+const drawTone = (t: Tone) => (drawDark ? DRAW_DARK : DRAW_LIGHT)[t];
+const isDark = () => {
+  const vz = document.querySelector<HTMLElement>(".vz");
+  const th = vz?.dataset.theme;
+  return th ? th === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+};
+// Section hatching drawn on the page, not on the object: 45° lines at a fixed spacing in screen
+// pixels, as a draughtsman hatches a cut face. (Hatching in world space bent with the view.)
+function hatched(mat: THREE.MeshStandardMaterial) {
+  mat.userData.hatch = { value: new THREE.Color("#262521") };
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uHatch = mat.userData.hatch;
+    sh.uniforms.uHatchPx = { value: 9 * Math.min(devicePixelRatio, 2) };
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vHatchW;").replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvHatchW = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vHatchW;\nuniform vec3 uHatch;\nuniform float uHatchPx;")
+      .replace("#include <dithering_fragment>", "#include <dithering_fragment>\nfloat hu = (gl_FragCoord.x + gl_FragCoord.y) / uHatchPx;\nfloat hd = abs(fract(hu) - 0.5) * uHatchPx * 0.7071;\nfloat hl = 1.0 - smoothstep(0.35, 1.15, hd);\ngl_FragColor.rgb = mix(gl_FragColor.rgb, uHatch, hl * 0.6);");
+  };
+  mat.customProgramCacheKey = () => "vz-hatch";
+}
+const drawing: Look = {
+  font: "Manrope, 'Visualize Sans', system-ui, sans-serif",
+  paintDecal(mat, tone, emphasis, lit, opacity) {
+    const t = drawTone(lit ? "accent" : tone);
+    mat.color.set(["accent", "cold", "good", "bad", "hot"].includes(tone) || lit ? t.ink : drawTone("subject").ink);
+    mat.opacity = opacity * (0.45 + 0.55 * emphasis);
+  },
+  edges: true,
+  ink: "#262521",
+  lit: "#e4572e",
+  setup(scene, renderer) {
+    drawDark = isDark();
+    renderer.toneMappingExposure = 1.0;
+    renderer.toneMapping = THREE.NoToneMapping;
+    // Flat light from above-left: the top reads lightest and the two sides as two quieter tones,
+    // as in a hand-shaded axonometric. No cast shadows; a drawing has none.
+    scene.add(new THREE.AmbientLight("#ffffff", 2.1));
+    const key = new THREE.DirectionalLight("#ffffff", 0.9);
+    key.position.set(-0.6, 1.4, 0.8);
+    scene.add(key);
+  },
+  theme() {
+    drawDark = isDark();
+  },
+  material(_tone, role) {
+    const m = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0 });
+    if (role === "foundation") hatched(m);
+    return m;
+  },
+  paint(mat, s, edge) {
+    const t = drawTone(s.lit ? "accent" : s.tone);
+    const page = drawTone("base").fill;
+    // Receding parts fade toward the page, outline and fill together, as a lighter pen would.
+    mat.color.set(t.fill).lerp(new THREE.Color(page), 1 - s.emphasis);
+    mat.emissive.set("#000000");
+    mat.transparent = s.opacity < 1;
+    mat.opacity = s.opacity;
+    const hatch = mat.userData.hatch as { value: THREE.Color } | undefined;
+    if (hatch) hatch.value.set(drawTone("base").ink).lerp(new THREE.Color(page), 0.45 + 0.4 * (1 - s.emphasis));
+    if (edge) edge.color.set(t.ink).lerp(new THREE.Color(drawTone("muted").ink), (1 - s.emphasis) * 0.8);
+  },
+};
+
+export const LOOKS: Record<LookName, Look> = { paper, clay, drawing };

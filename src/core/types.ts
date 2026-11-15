@@ -301,10 +301,11 @@ export interface Scene<S, E> {
   presentation?: "editorial";
   /**
    * Draw the figure in real 3D with a directed camera (the Unfold stage):
-   * "paper" for the textbook page, "clay" for soft matte solids. Omit for the
+   * "paper" for the textbook page, "clay" for soft matte solids, "drawing" for the machine
+   * drawings' look (ink outlines, hatched base plates, the drawings' palette). Omit for the
    * isometric SVG stage.
    */
-  look?: "paper" | "clay";
+  look?: "paper" | "clay" | "drawing";
   setup?: string;
   teaching?: (state: S, event: E | null, index: number) => Teaching;
   /**

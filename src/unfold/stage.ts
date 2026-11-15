@@ -57,6 +57,8 @@ export function createUnfoldStage(steps: readonly StepInfo[], lookName: LookName
   svg.setAttribute("class", "vz-svg");
   svg.setAttribute("role", "img");
   svg.setAttribute("aria-label", label);
+  // A dot where a leader meets its part, as on the machine drawings.
+  svg.innerHTML = `<defs><marker id="vz-leader-dot" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="5" markerHeight="5" markerUnits="userSpaceOnUse"><circle cx="3" cy="3" r="2.5" fill="currentColor"/></marker></defs>`;
   host.append(canvas, svg, labels);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });

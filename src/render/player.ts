@@ -172,6 +172,48 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     "aria-label": `${scene.title}. Left and right arrows step through the explanation; space plays and pauses.`,
   });
   stageBox.append(unfold ? unfold.host : stage.svg);
+  // The drawing look carries the machine drawings' title block: the concept's name, what the
+  // figure is computed from, and the legend as line keys.
+  let tb: HTMLElement | null = null;
+  if (scene.look === "drawing") {
+    tb = h("div", { class: "vz-tblock", "aria-hidden": "true" });
+    tb.append(h("div", { class: "vz-tb-title" }, escapeHtml(`${scene.title} · ${steps.length - 1} steps`)));
+    tb.append(h("div", { class: "vz-tb-text" }, "Every position and number computed live from the model"));
+    if (scene.legend?.length) {
+      const keys = h("div", { class: "vz-tb-keys" });
+      for (const item of scene.legend) {
+        const k = h("span", { class: "vz-tb-key" });
+        k.append(h("i", { "data-tone": item.tone }), document.createTextNode(item.label));
+        keys.append(k);
+      }
+      tb.append(keys);
+    }
+    stageBox.append(tb);
+  }
+  // The camera moves, so no corner is always free: once a step settles, the title block takes the
+  // first right-hand corner that no part or label covers, and steps aside when neither is free.
+  let tbFor = "";
+  const placeTitleBlock = (index: number) => {
+    if (!tb || !unfold || tbFor === String(index)) return;
+    tbFor = String(index);
+    const box = stageBox.getBoundingClientRect();
+    const covered = [
+      ...unfold.inspect().map((p) => ({ x: p.x, y: p.y, w: p.w, h: p.h })),
+      ...[...stageBox.querySelectorAll(".vz-unfold-labels > div")].map((e) => { const r = e.getBoundingClientRect(); return { x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height }; }),
+    ].filter((r) => r.w > 0 && r.h > 0);
+    const w = tb.offsetWidth, ht = tb.offsetHeight, pad = 8;
+    for (const corner of ["top", "bottom"] as const) {
+      const y = corner === "top" ? 16 : box.height - 16 - ht, x = box.width - 18 - w;
+      const clear = covered.every((r) => r.x > x + w + pad || r.x + r.w < x - pad || r.y > y + ht + pad || r.y + r.h < y - pad);
+      if (clear) {
+        tb.style.top = corner === "top" ? "16px" : "auto";
+        tb.style.bottom = corner === "bottom" ? "16px" : "auto";
+        tb.dataset.away = "false";
+        return;
+      }
+    }
+    tb.dataset.away = "true";
+  };
   if (unfold) stageBox.dataset.renderer = "unfold";
   const panelsBox = h("aside", { class: "vz-panels", "aria-label": "Details for the current step" });
   const sideBox = h("aside", { class: "vz-side", "aria-label": "Linked mathematics for the current step" });
@@ -576,6 +618,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     current = compiled.frameAt(displayTime(t));
     unfold?.frame(current.index, current.progress);
     stage.render(current.marks as Resolved[]);
+    if (tb) { if (current.progress >= 1) placeTitleBlock(current.index); else tbFor = ""; }
     const k = current.index === 0 || current.progress >= 0.5 ? current.index : current.index - 1;
     showStep(k, current.shown);
     range.value = String(Math.round(t));
@@ -900,6 +943,20 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     else return;
     e.preventDefault();
   });
+
+  // A standalone page is the figure, so its keys work before anything is clicked: a key pressed
+  // with nothing focused goes to the figure. Embedded in a host page, the figure takes keys only
+  // when it has focus, so it never steals the host's arrows.
+  if (page) {
+    const forward = (e: KeyboardEvent) => {
+      if (e.target !== document.body && e.target !== document.documentElement) return;
+      const copy = new KeyboardEvent("keydown", { key: e.key, code: e.code, bubbles: true, cancelable: true, shiftKey: e.shiftKey, metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey });
+      root.dispatchEvent(copy);
+      if (copy.defaultPrevented) e.preventDefault();
+    };
+    document.addEventListener("keydown", forward);
+    cleanup.push(() => document.removeEventListener("keydown", forward));
+  }
 
   const fromHash = page ? readHashStep() : null;
   if (fromHash !== null) t = compiled.restTime(fromHash);

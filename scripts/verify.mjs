@@ -274,6 +274,12 @@ const PLANTS = {
   keyboard: () => {
     window.addEventListener("keydown", (e) => e.stopImmediatePropagation(), true);
   },
+  // Keys reach the figure only once it has focus (the bug a fresh page had).
+  "fresh-keys": () => {
+    window.addEventListener("keydown", (e) => {
+      if (e.target === document.body || e.target === document.documentElement) e.stopImmediatePropagation();
+    }, true);
+  },
 };
 
 const CONTROLS = [
@@ -297,6 +303,7 @@ const CONTROLS = [
   { plant: "caption", expect: "captions" },
   { plant: "console", expect: "console" },
   { plant: "keyboard", expect: "keyboard" },
+  { plant: "fresh-keys", expect: "keyboard" },
   { plant: "linking", expect: "linking" },
   { plant: "layout-shift", expect: "layout shift" },
   { variant: "label-on-part", expect: "labels" },
@@ -779,8 +786,17 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant, hash = 
       if (tried) report.add("linking", `${tried} linked elements pointed at`, linkProblems);
     }
 
-    // Keyboard.
+    // Keyboard. First as a reader meets a fresh page: nothing focused, nothing clicked.
     const keyProblems = [];
+    await page.evaluate(() => {
+      window.__viz.seekStep(0);
+      document.activeElement?.blur?.();
+    });
+    await page.keyboard.press("ArrowRight");
+    const fresh = await page
+      .waitForFunction((t) => window.__viz.time() === t, { timeout: 4000 }, compiled.restTime(1))
+      .then(() => true, () => false);
+    if (!fresh) keyProblems.push("ArrowRight with nothing focused did nothing; a standalone page must take keys before it is clicked");
     await page.evaluate(() => window.__viz.seekStep(0));
     await page.focus(".vz-stage");
     await page.keyboard.press("ArrowRight");
