@@ -1,6 +1,6 @@
 <h1 align="center">Visualize</h1>
 
-<p align="center"><b>An Agent Skill that turns a one-line request into a step-through explanation you can trust.</b><br>A 3D figure that moves one step at a time, a voice that explains it, and a reader who predicts and practises.<br>Every number on the page is checked against a running model of the idea.</p>
+<p align="center"><b>An Agent Skill that turns a one-line request into a step-through explanation you can trust.</b><br>A figure that moves one step at a time (a to-scale technical cutaway for a machine, soft 3D Clay for an idea), a voice that explains it, and a reader who predicts and practises.<br>Every number on the page is checked against a running model of the idea.</p>
 
 <p align="center">
   <a href="https://code.claude.com/docs/en/skills"><img src="https://img.shields.io/badge/Claude_Code-skill-1b1b19?style=flat-square&logo=claude&logoColor=white" alt="Claude Code skill"></a>
@@ -51,6 +51,10 @@ That's it. For Codex or Antigravity, clone into that agent's folder instead (see
 
 ## Gallery
 
+<p align="center"><img src=".github/assets/escalator.jpg" width="720" alt="A page titled Escalator: a to-scale side cutaway of an escalator in a hatched building section. A blue chain-wheel track and a green trailer-wheel track run up a 30 degree incline, one step is followed in orange, and Detail A at 2.6 to 1 shows the step's 200 mm rise. Readouts under the drawing give step rise, tread tilt, tread height, speed and step count."></p>
+
+<p align="center"><sub><b>escalator</b>, the flagship for mechanisms: two wheels on two offset tracks keep every tread level. Drawn to scale from a tested model, with a voice, a prediction before the landing and a 30°/35° What if.</sub></p>
+
 <table>
   <tr>
     <td width="50%"><img src=".github/assets/lru-cache-evict.jpg" alt="The LRU cache a few steps later: C has been evicted and B enters as the most recent key, shown in orange. The strip reads 1 hit, 5 misses, 2 evictions."></td>
@@ -70,7 +74,7 @@ That's it. For Codex or Antigravity, clone into that agent's folder instead (see
   </tr>
 </table>
 
-Every screenshot is the light theme of a page built from [`examples/`](examples) with `node scripts/build.mjs` and captured with [`scripts/shoot.mjs`](scripts/shoot.mjs).
+Every screenshot is the light theme of a page built from [`examples/`](examples) with `node scripts/build.mjs` (the escalator with its own `build.mjs`) and captured with [`scripts/shoot.mjs`](scripts/shoot.mjs).
 
 ## What the reader gets
 
@@ -78,7 +82,7 @@ Every screenshot is the light theme of a page built from [`examples/`](examples)
 |---|---|
 | **A checked picture** | Every value, order, size, highlight and caption is declared by the model and read back from the rendered page at every step. Planted faults prove the checks can fail. |
 | **The field's own shape** | A tree over its array, a ring, a stock with its refill and gate, a row with pointers, a sequence diagram for timing. The kit's parts never choose the picture. |
-| **A directed 3D stage** | Soft matte Clay parts, lettering printed on the parts, and a camera that opens flat, moves to each step's focus and ends flat. An isometric SVG stage is also available. |
+| **The right look for the subject** | A real machine is a sharp technical cutaway, drawn to scale, with hatched sections, dimensions and a magnified detail for each step. An idea is built in soft matte Clay on a directed 3D stage that opens flat, moves to each step's focus and ends flat. |
 | **A voice** | Recorded locally by an open-source voice model, offline after one download. It explains the concept first, then narrates each step in one take and lights each part as it is named. ▶ plays the narrated tour and waits for every sentence. |
 | **Predict, What if, Now you try** | A pause to predict before the key moment, the same idea on other inputs, and questions the model makes and marks. |
 | **A page you own** | One standalone HTML file per scene, light and dark themes, reduced motion, keyboard control, `#step=` links and a text version of every step. Also an SVG of any step, or a React component. |
@@ -193,7 +197,7 @@ visualize/
 │   └── react/          the React adapter
 ├── references/         kit.md, authoring.md, craft.md, verify.md
 ├── scripts/            build, verify, voice, shoot, export-svg, new-scene
-├── examples/           lru-3d (flagship), lru, attention, retries
+├── examples/           lru-3d (Clay flagship), escalator (mechanism flagship), lru, attention, retries
 ├── test/fixtures/      gallery scenes and the planted faults
 └── evals/evals.json    test prompts and what a good answer contains
 ```
@@ -230,8 +234,9 @@ node scripts/shoot.mjs dist/lru-3d.html --out shot.png --step 4 --scale 4
 ## Limits
 
 - **Desktop first.** Pages work on phones, but the phone layout is not polished yet.
-- **The voice needs one extra step.** After writing the script, run `node scripts/voice.mjs <scene>`. Clips are compressed on macOS; elsewhere they stay WAV and pages get larger. What if versions are not voiced yet.
+- **The voice needs one extra step.** After writing the script, run `node scripts/voice.mjs <scene>`. Clips are compressed to AAC on macOS; elsewhere they stay WAV and pages get larger. What if versions are not voiced yet.
 - **The 3D checks are not yet complete.** Sizes, tones, order, highlights, contrast and phone layout are checked on the isometric stage, not yet on the 3D one.
+- **A mechanism page is written by hand for now.** The escalator is the standard and the starting point (`references/drawing.md`). Its drawing pieces move into the kit when a second machine needs them, and `verify` does not read it yet; `check-drawing` and its model tests do.
 - **The reader cannot type their own input yet.** What if offers prepared inputs; a free-input explorer is planned.
 - **It is slow on purpose.** A page takes a long session: the model and its reference, the view, the checks, and a read of every screenshot.
 

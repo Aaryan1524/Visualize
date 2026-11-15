@@ -9,7 +9,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "node --test \"src/**/*.test.ts\" \"examples/**/*.test.ts\"",
+    "test": "node --test \"src/**/*.test.ts\" \"examples/**/*.test.ts\" \"examples/**/*.test.mjs\"",
     "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs",
     "verify": "node scripts/verify.mjs",
@@ -18,7 +18,8 @@
     "export:svg": "node scripts/export-svg.mjs",
     "check:embed": "node scripts/check-embed.mjs",
     "new-scene": "node scripts/new-scene.mjs",
-    "check:reproducible": "node scripts/check-reproducible.mjs"
+    "check:reproducible": "node scripts/check-reproducible.mjs",
+    "check:drawing": "node examples/escalator/build.mjs && node scripts/check-drawing.mjs dist/escalator.html"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

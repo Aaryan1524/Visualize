@@ -2,6 +2,25 @@
 
 One version covers the kit and the skill (`package.json` `version` and `SKILL.md` `metadata.version` move together). Each entry names the failure that caused it, so the reason for a rule is never lost.
 
+## Unreleased
+
+What a machine needs. The escalator built in Clay came out as about forty identical soft wheels in front of two thin track lines, with a floor shadow that meant nothing. The builder called it unprofessional. Drawn as a to-scale side cutaway, the same mechanism read at a glance.
+
+- **Two looks, chosen by subject.** Real machines and physical systems are drawn as technical cutaways (`references/drawing.md`). Abstract concepts stay in Clay.
+- **`examples/escalator` is the standard for mechanisms.** It is drawn to scale from a model whose tests check that the treads stay level, that no parts collide and that every wheel stays on its rail, for both a 30° and a 35° incline. It has a voice with parts lit as they are named, a prediction before the landing, What if and Now you try.
+- **The timeline runs once, start to end.** The escalator's first bar showed the machine's 42 s loop, so it swept twice during a 98 s explanation and matched nothing on screen. Now each step is as long as its narration, and play stops at the prediction and at the end.
+- **`scripts/check-drawing.mjs`** checks a Drawing page at 1440×900 and 1280×800:
+  - the page contract and an embedded voice;
+  - no page scroll, and the right step for each tab;
+  - a forward-only timeline that stops at the end;
+  - callouts at 11 px or larger that stay inside the stage and don't overlap;
+  - no console errors.
+
+  It fails on the old looping bar. It runs in CI as `pnpm check:drawing`, and `pnpm test` now runs `examples/**/*.test.mjs`.
+- **Length.** A mechanism takes 5–8 steps. Every page keeps its narration to about 1.5–3 minutes, or splits the subject.
+- **The voice is compressed again.** `scripts/voice.mjs` asked for 96 kb/s AAC, which afconvert rejects for 24 kHz mono, so every clip silently fell back to WAV. It now asks for 64 kb/s. Pages recorded before this need re-recording to shrink.
+- **Codex and Antigravity.** Install paths, a Chrome hint for sandboxed agents, and a compatibility line. These were written for the README change but never reached main.
+
 ## 1.0.0
 
 First release, desktop first.

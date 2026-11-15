@@ -24,6 +24,7 @@ jobs:
       - run: pnpm verify
       - run: pnpm verify:controls
       - run: pnpm check:embed
+      - run: pnpm check:drawing
       - name: Keep screenshots and contact sheets for review
         if: always()
         uses: actions/upload-artifact@v4
