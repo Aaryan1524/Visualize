@@ -215,7 +215,7 @@ text{font-family:var(--sans);fill:var(--ink)}
     <button class="vz-btn" id="play" type="button" aria-label="Play" data-primary data-state="play"><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2v12l10-6z"/></svg><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h3v12H4zM9 2h3v12H9z"/></svg></button>
     <button class="vz-btn" id="next" type="button" aria-label="Next step"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
     <span class="vz-count" id="count">00 / 05</span>
-    <div class="vz-scrub"><input class="vz-range" id="scrub" type="range" min="0" max="1" step="0.01" value="0" aria-label="Timeline: where the orange step is on the loop"><div id="marks"></div></div>
+    <div class="vz-scrub"><input class="vz-range" id="scrub" type="range" min="0" max="1" step="0.01" value="0" aria-label="Timeline of the explanation"><div id="marks"></div></div>
     <button class="vz-btn vz-try" id="try" type="button" aria-pressed="false">Now you try</button>
     <button class="vz-btn vz-voice" id="voice" type="button" aria-pressed="true" aria-label="Voice narration">Voice on</button>
     <button class="vz-btn" id="restart" type="button" aria-label="Restart"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3a5 5 0 1 1-4.9 6h1.7A3.4 3.4 0 1 0 8 4.6V7L4.5 3.8 8 .6z"/></svg></button>
@@ -678,7 +678,7 @@ const { P, STEP, PATH, Rs, D, RISER_R, SCHED, LAND, STRUCT, DRIVE, STEP_OUTLINE,
     if (parent) parent.appendChild(e);
     return e;
   };
-  const S = { variant: null, step: -1, travel: 0, running: false, touring: false, voiceOn: true, armed: false, answer: null, last: 0, lit: [], heard: -1 };
+  const S = { variant: null, step: -1, T: 0, pinPose: true, travel: 0, running: false, touring: false, voiceOn: true, armed: false, answer: null, last: 0, lit: [], heard: -1 };
   let V = null, model = null, E = null;
 
   // ------------------------------------------------ one drawing per variant
@@ -712,10 +712,11 @@ const { P, STEP, PATH, Rs, D, RISER_R, SCHED, LAND, STRUCT, DRIVE, STEP_OUTLINE,
     $("r-rise").textContent = V.readout.rise.toFixed(0);
     $("r-steps").textContent = String(V.readout.N);
     $("r-speed").textContent = String(model.P.speed / 1000);
-    scrub.max = String(V.L / DATA.speed);
-    marks.replaceChildren(...V.beats.map((b) => {
+    SEG = timeline();
+    scrub.max = String(SEG.total);
+    marks.replaceChildren(...SEG.s.slice(1, LAST + 1).map((t) => {
       const m = document.createElement("span");
-      m.style.left = `${(tauOf(b.from) / (V.L / DATA.speed)) * 100}%`;
+      m.style.left = `${(t / SEG.total) * 100}%`;
       return m;
     }));
   }
@@ -876,13 +877,36 @@ const { P, STEP, PATH, Rs, D, RISER_R, SCHED, LAND, STRUCT, DRIVE, STEP_OUTLINE,
   const heading = $("heading"), count = $("count"), concept = $("concept");
   const predict = $("predict"), practice = $("practice");
   const scrub = $("scrub"), marks = $("marks"), playBtn = $("play"), voiceBtn = $("voice"), tryBtn = $("try");
-  const L = () => V.L;
-  const tauOf = (s) => (((s - V.start) % L()) + L()) % L() / DATA.speed;
-  const beatAt = (travel) => {
-    const tau = tauOf(travel);
-    let k = 1;
-    V.beats.forEach((b, i) => (tau >= tauOf(b.from) - 1e-6 ? (k = i + 1) : 0));
+  // The story timeline: one pass from the concept to the last step, each step as long as its
+  // narration (or a fixed time without a voice). The bar shows story time, never the machine's loop.
+  const LEAD = 0.3, GAP = 0.6, PLAIN = 8;
+  let SEG = null;
+  function timeline() {
+    const d = [];
+    for (let k = 0; k <= LAST; k++) {
+      const tr = V.voice?.[k];
+      d.push(tr ? LEAD + tr.duration + GAP : PLAIN);
+    }
+    const s = [0];
+    d.forEach((x, i) => s.push(s[i] + x));
+    return { d, s, total: s[LAST + 1] };
+  }
+  const segOf = (T) => {
+    let k = 0;
+    for (let i = 1; i <= LAST; i++) if (T >= SEG.s[i] - 1e-6) k = i;
     return k;
+  };
+  const baseOf = (k) => (V.tour?.length ? V.tour[k] : k === 0 ? V.beats[0].from - DATA.speed * PLAIN : V.beats[k - 1].from);
+  const leadOf = () => (V.tour?.length ? LEAD : 0);
+  const travelAt = (T) => {
+    const k = segOf(T);
+    return reduced ? poseOf(k) : baseOf(k) + DATA.speed * (T - SEG.s[k] - leadOf());
+  };
+  // The still frame of a step sits inside its stretch of the bar, at the moment the voice meets it.
+  const poseT = (k) => {
+    if (k === 0) return 0;
+    const t = SEG.s[k] + leadOf() + (poseOf(k) - baseOf(k)) / DATA.speed;
+    return Math.min(SEG.s[k + 1] - 0.01, Math.max(SEG.s[k], t));
   };
   function setStep(k) {
     if (k === S.step) return;
@@ -913,14 +937,17 @@ const { P, STEP, PATH, Rs, D, RISER_R, SCHED, LAND, STRUCT, DRIVE, STEP_OUTLINE,
   }
   const poseOf = (k) => (k === 0 ? V.beats[0].pose : V.beats[k - 1].pose);
   function draw() {
+    S.travel = travelAt(S.T);
+    if (reduced || S.pinPose) S.travel = poseOf(segOf(S.T));
     render(S.travel);
-    scrub.value = String(tauOf(S.travel));
+    scrub.value = String(S.T);
   }
   // Go to a step: paused, show its still frame; running, start the beat from its beginning.
   function goTo(k, how = {}) {
     k = Math.max(0, Math.min(LAST, k));
     setStep(k);
-    S.travel = S.running && !how.pose ? (k === 0 ? V.beats[0].from : V.beats[k - 1].from) : poseOf(k);
+    S.T = S.running && !how.pose ? SEG.s[k] : poseT(k);
+    S.pinPose = !S.running || !!how.pose;
     draw();
     if (how.speak !== false) speakNav(k);
   }
@@ -951,27 +978,33 @@ const { P, STEP, PATH, Rs, D, RISER_R, SCHED, LAND, STRUCT, DRIVE, STEP_OUTLINE,
     if (!S.running) return;
     const dt = Math.min(0.1, (now - S.last) / 1000);
     S.last = now;
-    const before = S.travel;
-    S.travel += DATA.speed * dt;
-    if (!S.touring) {
-      const k = beatAt(S.travel);
-      const forward = k === S.step + 1 || (S.step === LAST && k === 1);
-      if (k !== S.step && S.step !== 0 && forward) {
-        // The prediction holds the story: stop where the landing chapter would begin.
-        if (S.step === 2 && k === 3 && S.answer === null) {
-          S.travel = before;
-          draw();
-          return stop(true);
-        }
-        setStep(k);
-      } else if (S.step === 0) setStep(k);
+    S.pinPose = false;
+    if (S.touring) {
+      // The voice moves the story on; within a step the bar runs with it and waits at the step's end.
+      S.T = Math.min(S.T + dt, SEG.s[S.step + 1] - 1e-3);
+    } else {
+      S.T += dt;
+      const k = segOf(S.T);
+      // The prediction holds the story: stop where the landing step would begin.
+      if (S.step <= 2 && k >= 3 && S.answer === null) {
+        S.T = SEG.s[3] - 1e-3;
+        draw();
+        return stop(true);
+      }
+      if (S.T >= SEG.total) {
+        S.T = SEG.total - 1e-3;
+        draw();
+        return setRunning(false);
+      }
+      if (k !== S.step) setStep(k);
     }
     draw();
     requestAnimationFrame(tick);
   }
   // Continuous play runs the beat from its start if the machine is elsewhere (after a tour, say).
   function startPlain() {
-    if (S.step >= 1 && beatAt(S.travel) !== S.step) S.travel = V.beats[S.step - 1].from;
+    if (S.pinPose || segOf(S.T) !== S.step) S.T = SEG.s[S.step];
+    S.pinPose = false;
     setRunning(true);
   }
   function stop(toPredict) {
@@ -1031,7 +1064,8 @@ const { P, STEP, PATH, Rs, D, RISER_R, SCHED, LAND, STRUCT, DRIVE, STEP_OUTLINE,
   // With the voice on, play is the narrated tour: a step moves on only when its clip has ended.
   function tourAt(k) {
     setStep(k);
-    S.travel = reduced ? poseOf(k) : V.tour[k];
+    S.T = SEG.s[k];
+    S.pinPose = false;
     draw();
     setRunning(true);
     playBtn.dataset.state = "pause";
@@ -1039,10 +1073,10 @@ const { P, STEP, PATH, Rs, D, RISER_R, SCHED, LAND, STRUCT, DRIVE, STEP_OUTLINE,
       const ok = playClip(k, () => {
         if (!S.touring) return;
         if (k === 2 && S.answer === null) return stop(true);
-        tourTimer = setTimeout(() => (k < LAST ? tourAt(k + 1) : stopTour(true)), 600);
+        tourTimer = setTimeout(() => (k < LAST ? tourAt(k + 1) : stopTour(true)), GAP * 1000);
       });
-      if (!ok) tourTimer = setTimeout(() => (k < LAST && S.touring ? tourAt(k + 1) : stopTour(true)), 3000);
-    }, 300);
+      if (!ok) tourTimer = setTimeout(() => (k < LAST && S.touring ? tourAt(k + 1) : stopTour(true)), PLAIN * 1000);
+    }, LEAD * 1000);
   }
   function startTour(from) {
     S.touring = true;
@@ -1063,7 +1097,7 @@ const { P, STEP, PATH, Rs, D, RISER_R, SCHED, LAND, STRUCT, DRIVE, STEP_OUTLINE,
     if (S.touring || S.running || S.stillOn) return stop(false);
     if (unanswered()) return predict.querySelector("button")?.focus();
     if (S.voiceOn && hasVoice()) return startTour(S.step >= LAST ? 0 : S.heard === S.step ? S.step + 1 : S.step);
-    if (S.step >= LAST) goTo(1, { speak: false });
+    if (S.step >= LAST && S.T >= SEG.total - 0.01) goTo(0, { speak: false });
     startPlain();
   });
   voiceBtn.addEventListener("click", () => {
@@ -1094,9 +1128,10 @@ const { P, STEP, PATH, Rs, D, RISER_R, SCHED, LAND, STRUCT, DRIVE, STEP_OUTLINE,
   scrub.addEventListener("input", () => {
     S.armed = true;
     stopTour(false);
-    S.travel = V.start + Number(scrub.value) * DATA.speed;
-    setStep(beatAt(S.travel));
-    render(S.travel);
+    S.T = Number(scrub.value);
+    S.pinPose = false;
+    setStep(segOf(S.T));
+    draw();
   });
 
   // ------------------------------------------------ predict before the landing
@@ -1279,8 +1314,9 @@ const { P, STEP, PATH, Rs, D, RISER_R, SCHED, LAND, STRUCT, DRIVE, STEP_OUTLINE,
     seek(ms) {
       root.classList.add("instant");
       stop(false);
-      S.travel = V.start + (Number(ms) / 1000) * DATA.speed;
-      setStep(beatAt(S.travel));
+      S.T = Math.min(SEG.total, Number(ms) / 1000);
+      S.pinPose = false;
+      setStep(segOf(S.T));
       draw();
     },
     variant(name) {
