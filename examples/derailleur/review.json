@@ -1,0 +1,151 @@
+{
+  "stamp": "b8ee221583eecd3d",
+  "reviewer": "independent",
+  "summary": "Every finding from rounds 1 and 2 is fixed or accepted, and I recomputed all the new sums from the model (73 = 46.94 + 26.02; 29.41 + 11.99 - 5.19 - 10.18 = 26.02; 102.50 = 54.96 + 47.54; 51.49 + 15.66 - 6.33 - 13.28 = 47.54; tight cable leaves the largest cog on its line). I found nothing new that is wrong, misleading or missing.",
+  "findings": [
+    {
+      "where": "setup, concept, variants.*.captions.0, variants.*.voice.0",
+      "text": "The 28 holds 73 mm more chain than the 11, so it must also take up slack, so the chain never hangs loose.",
+      "severity": "misleading",
+      "finding": "The direction is muddled. On the biggest cog the loop uses up more chain, so the cage has to give chain up (the page itself says so in caption 5 and in the prediction: 'so it gives up chain'). The slack appears on the smallest cog, where the cage has to take up the same difference. The sentence says the 28 'must also take up slack', which is the opposite of what happens on the 28. Say that the cage pays out chain going up the cassette and takes it back coming down, so the chain is never loose on the small cog and never over-tight on the large one.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: setup, concept and voice now say the cage pays out chain going up the cassette and takes it back coming down."
+    },
+    {
+      "where": "variants.*.captions.5, predict.question, steps 0 and 5",
+      "text": "The 28 holds 73 mm more chain than the 11 ... so the cage gives up 47 mm of the chain it holds",
+      "severity": "misleading",
+      "finding": "Two different numbers (73 and 47 mm; 102 and 55 for the 34) are given for the same job with no sentence joining them, and the prediction asks what makes the cage 'give up chain' straight after quoting 73 mm. A reader will ask where the other 26 mm went. In the model it is the rest of the loop: the lower run from the ring is about 30 mm shorter because the tension pulley has swung 31 mm forward, the ring wrap shortens about 12 mm, and the cog-to-guide run and the top run lengthen about 15 mm together (73 + 15 - 12 - 30 = 46, which is the 47). Either state that the cage gives up 47 mm because the lower run supplies the rest, or call the headline figure 'the extra chain the 28 wraps' and say plainly that the cage gives up less than that.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: 73 = 47 + 26 is now stated in the captions, the predict explanation, the voice and Details, and the figures recompute (46.94 + 26.02 = 72.96). See the new findings on how the 26 is described and on the wide-cassette rounding."
+    },
+    {
+      "where": "steps.7.heading, variants.*.captions.7, variants.*.voice.7, audit claim 'every gear lands 1.4 millimetres outboard of its cog'",
+      "text": "A slack cable leaves every gear short ... every gear lands 1.4 millimetres outboard of its cog",
+      "severity": "misleading",
+      "finding": "Not every gear. The smallest cog is set by the H screw and the return spring, not by the cable, so slack leaves it exactly where it was (the model returns 'quiet, on the line' for gear 1, and the audit test skips k = 0 to make the sentence pass). A mechanic would say it as: every gear except the smallest, which the H screw fixes, and that is why indexing trouble shows up when shifting up the cassette and not in the top gear. Both 'every' sentences and the test should carry the exception.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed for the page text: every cog but the smallest, with the H-screw reason. The practice question for a tight cable still carries the old exemption (new finding)."
+    },
+    {
+      "where": "variants.*.captions.7, details.facts (rub past 0.6 mm and skip past 1.3 mm), lab",
+      "text": "Past 0.6 mm the chain rubs the next cog; past 1.3 mm it skips under load; past half a cog (1.87 mm) it sits on the wrong one.",
+      "severity": "misleading",
+      "finding": "The sentence just before is in millimetres of cable (1 mm slack), and the lab's slider is in millimetres of cable error, but these thresholds are millimetres the chain sits off its cog (cable error times 1.4). So 0.6 mm is 0.43 mm of cable slack and 1.3 mm is 0.93 mm of cable. A reader who takes them as cable numbers will think a 1 mm slack cable is merely 'rubbing'. Write 'off line' after each figure and give the cable equivalents (0.43, 0.93, 1.34 mm). Also say which cog: with a slack cable the chain is outboard and rubs the next smaller cog; with a tight cable it rubs the next larger.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: each threshold now says 'off line' with its cable equivalent (0.43, 0.93, 1.34 mm, all correct to rounding), and the slack case rubs the next smaller cog, the tight case the next larger."
+    },
+    {
+      "where": "variants.*.captions.6",
+      "text": "The B screw ... sets the gap between the guide pulley and the cog: 5.5 mm tip to tip here, on the smallest and largest cogs; between them the parallelogram's arc opens it to as much as 13.4 mm.",
+      "severity": "misleading",
+      "finding": "One screw cannot set the gap on both end cogs, and no shop procedure does. Park Tool and Shimano set the B gap with the chain on the largest cog (the closest approach, the one that can touch) and accept that it grows on smaller cogs. Equal 5.5 mm gaps at both ends are a result of how this model fits its linkage, not something the B screw does, and a real small-cog gap is usually larger. As written it also implies the B screw moves the pulley sideways. Say that the B screw is set on the largest cog, that it rotates the whole body so the gap changes in every gear together, and that the gap is wider on the smaller cogs.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: the B gap is set on the largest cog, as close as it can run without touching, 5.5 mm (inside Park Tool's 5 to 6 mm), and the page says a real gap grows toward smaller cogs and that the equal end gaps are the model's fit."
+    },
+    {
+      "where": "steps.6, variants.*.captions.6, details.facts",
+      "text": "the B screw and the guide pulley's gap: step 6",
+      "severity": "missing",
+      "finding": "Nothing says what goes wrong when the B gap is wrong, which is the reason Park Tool and Shimano give for setting it. Too wide: sloppy, noisy shifts up to the big cogs and a slower shift. Too tight: the guide pulley touches the largest cog or the chain rubs it in the big gear. The lab covers cable error and the L screw only. One sentence on both consequences, and the 'on the largest cog, as close as it can be without touching' rule, would cover it.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: too close (teeth reach the largest cog) and too far (longer unsupported run to the big cogs) are both stated."
+    },
+    {
+      "where": "variants.*.captions.6, practice questions",
+      "text": "The H screw stops the parallelogram on the smallest cog's line ... Backed out, it lets the chain over the largest cog and into the spokes",
+      "severity": "missing",
+      "finding": "Only the L screw's failure is described in the page text. The H screw's failure (chain thrown outboard off the smallest cog into the dropout, where it jams) appears only in a practice-question answer, and it is the return spring, not the cable, that over-travels there. Also, '2 mm of extra pull' (2.8 mm of travel) is quoted next to a spoke gap of 4 mm without saying how far the L screw is backed out or how much the cable is pulled, so the paragraph reads as if 2 mm of pull plus a backed-out screw reaches the spokes; it does not in the model (it needs at least 2.9 mm of cable and a screw out by 4 mm). Describe both ends symmetrically and give the amounts.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: H failure into the dropout is described symmetrically with L, with the amounts (screw out 4 mm or more, cable 2.9 mm = 4 / 1.4, 2 mm of pull = 2.8 mm of travel)."
+    },
+    {
+      "where": "steps.7, variants.*.captions.7, variants.*.voice.7",
+      "text": "Turning the barrel adjuster out lengthens the housing, takes up that slack, and every gear lines up again.",
+      "severity": "missing",
+      "finding": "Only the slack case and one direction are in the walk-through. The rule a mechanic works by is in two parts: if the chain hesitates or rubs going up to a larger cog, the cable is slack, so turn the barrel out (counter-clockwise); if the downshift hesitates or the chain rubs the next larger cog, the cable is tight, so turn it in. The lab's hint text has this but the step and Details do not. Also missing is that Park Tool makes the final adjustment while pedalling and trying every gear, not by eye.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: both directions are given, out and counter-clockwise for slack, in and clockwise for tight, with the final adjustment made while pedalling. The author's point that counter-clockwise is out agrees with Park Tool and with my own understanding, so it stands."
+    },
+    {
+      "where": "variants.wide.captions.2, variants.wide.captions.6, variants.wide.label",
+      "text": "it swings through 83° from the smallest cog to the largest (road: 69°); 8.4 mm against 13.4 mm of arc opening",
+      "severity": "misleading",
+      "finding": "The toggle is labelled 'long cage', and on a real bike the short and long cage versions of a derailleur (for example Shimano SS and GS) share the same parallelogram: only the cage differs. Here the same 46 mm links swing through 69° on one and 83° on the other for the same 37.4 mm of sideways travel, because the model refits the linkage to hold 5.5 mm at both end cogs. The reader sees a different linkage behind a 'cage' choice. Either say the long-cage variant also has a taller swing in this model, or note that on a real derailleur the linkage is the same and the larger gap shows up on the smaller cogs.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: the text now says a real short and long cage share one linkage and that the 69 and 83 degrees come from refitting the linkage per cassette. See the new finding on one sentence that still says 'the same linkage'."
+    },
+    {
+      "where": "variants.*.captions.5",
+      "text": "so the chain is held at 13.8 N instead of 8.1 N",
+      "severity": "misleading",
+      "finding": "These are the tension in the slack (lower) side of the chain, set by the cage spring. Chain tension in the driving run is two orders of magnitude higher under pedalling. 'The chain is held at' reads as the whole chain's tension. Say 'the slack side of the chain'.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: the tensions are called the slack side, in the readout label, the captions and Details, and Details says the driving side carries far more."
+    },
+    {
+      "where": "variants.*.captions.5, details.facts",
+      "text": "the chain wraps about a third of each cog here, which is why the half-wrap rule's 108 mm is too much",
+      "severity": "misleading",
+      "finding": "The half-wrap figure is the basis of the chain-length formula and of manufacturers' total-capacity ratings, which are deliberately conservative. Calling it 'too much' reads as a general correction of those ratings, but the 116-123 degree wrap is a product of this model's guide-pulley position (about 115-124 degrees below and behind the axle). Say it is this layout, and that a rated capacity still has to be met with the real wrap, chain length and cage.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: the text now says it is this layout (guide pulley 115 to 124 degrees from forward) and that a maker's capacity is a different, conservative figure that still has to be met."
+    },
+    {
+      "where": "steps.4, variants.*.captions.4, variants.*.voice.4",
+      "text": "the chain only moves to a new cog while it turns",
+      "severity": "missing",
+      "finding": "What turns the chain is forward pedalling. Coasting (the wheel and cassette turn, the chain does not), and backpedalling, do not shift. The page says 'pedal' but never says that coasting does not count or that backpedalling is not a shift (it can also drop the chain). Park Tool tests indexing by pedalling and shifting under light load. One sentence would remove the commonest rider mistake.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. The two phrasings I suggested that the author declined are accepted. My 'the cassette turns while coasting' was wrong: the cassette sits on the freehub body, which stays with the chain when the hub freewheels, so neither turns. 'Backpedalling can drop the chain' was an untested extra and the page does not need it. The page's sentence (only forward pedalling drives the chain, so coasting and backpedalling do not shift) is correct."
+    },
+    {
+      "where": "variants.*.captions.5, variants.*.voice.5, details.facts",
+      "text": "the other 26 mm from the rest of the loop, most of it from the lower run to the chainring, which is 29 mm shorter ... with small changes in the ring's wrap and the upper runs",
+      "severity": "misleading",
+      "finding": "The lower run alone (29.4 mm) is larger than the whole 26 mm it is said to be 'most' of, and the other pieces are not small or 'upper runs'. In the model the ring's wrap gives up 12.0 mm, the top run takes back 5.2 mm, and the run between the cog and the guide pulley takes back 10.2 mm (29.4 + 12.0 - 5.2 - 10.2 = 26.0). Wide: lower run 51.5, ring wrap 15.7, runs back 6.3 and 13.3, total 47.5. A reader checking the figures finds 29 > 26. Say that the lower run gives up 29 mm and the ring's wrap 12 mm, while the two runs beside the cog take back 15 mm, so the rest of the loop nets 26 mm. The voice's 'most of the rest from the lower run' is fine as spoken, once the page text is exact.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: the breakdown is now 29 + 12 - 5 - 10 = 26 mm, and I recomputed it from the model: lower run 29.406, ring wrap 11.989, top run 5.194 (takes back), cog-to-guide run 10.182 (takes back), sum 26.019 = 72.962 - 46.943. Details gives the same pieces."
+    },
+    {
+      "where": "variants.wide.captions.5, variants.wide.explanation, predict.explanation.wide, details.facts (With the 34: 102 mm, 55 mm and 48 mm)",
+      "text": "The 34 wraps 102 mm more chain ... 55 mm from the loop through the cage, and the other 48 mm",
+      "severity": "misleading",
+      "finding": "55 + 48 = 103, not 102. The model values are 102.50, 54.96 and 47.54, each rounded on its own, so the three printed figures do not add up on the page that sets out to show that they do. Print the wide figures to one decimal (102.5 = 55.0 + 47.5) or round the remainder as 102 - 55 = 47. The road figures (73 = 47 + 26) add correctly.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: wide figures now read 102.50 = 54.96 + 47.54 (model 102.497, 54.956, 47.541) and 51.49 + 15.66 - 6.33 - 13.28 = 47.54 (model 51.490, 15.659, 6.333, 13.275). Both sums hold exactly. The wide setup caption still says '102 mm' where the other wide sentences say 102.50; that is rounding to different places, not a contradiction."
+    },
+    {
+      "where": "practice question, kind 1 (build.mjs): 'The cable is X mm too slack/tight ... how far off its cog does every cog but the smallest land?'",
+      "text": "how far off its cog does every cog but the smallest land?",
+      "severity": "wrong",
+      "finding": "True for a slack cable only. With a tight cable the L screw holds the largest cog on its line, and the smallest is not held at all: the model gives 1.40 mm inboard on cogs 1 to 10 and 0.00 on cog 11 for +1 mm of cable. So for a tight cable the exemption is the largest cog, and the smallest does land off line. The question's explanation ('inboard, toward the bigger cogs') is right but the question text is wrong for those cases. Say 'every cog but the one a limit screw holds (the smallest when slack, the largest when tight)'.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: the question now names the exempt cog as the one a limit screw holds (smallest when slack, largest when tight), and caption 7 says the L screw holds the largest on a tight cable. The model agrees: +1 mm of cable gives 1.40 mm inboard on cogs 1 to 10 and 0.00 on cog 11."
+    },
+    {
+      "where": "variants.*.captions.6",
+      "text": "On a real derailleur the gap is wider on the smaller cogs; here the same linkage is refitted for each cassette to the same 5.5 mm on the smallest cog",
+      "severity": "misleading",
+      "finding": "Contradicts the sentence in caption 2: 'On a real derailleur the short and long cage versions share one linkage ... here each cassette gets its own fitted linkage'. 'The same linkage is refitted' says both at once. Write 'here the linkage is refitted for each cassette'.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: captions 2 and 6 and Details now say 'the linkage is refitted for each cassette'."
+    }
+  ]
+}

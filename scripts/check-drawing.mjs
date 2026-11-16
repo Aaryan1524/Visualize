@@ -17,7 +17,12 @@
 // - the arrow key on a fresh page, before anything has focus;
 // - play: the narrated tour (with a stand-in for audio) stops at the prediction, and play near
 //   the end stops at the end;
-// - no text anywhere reads NaN, undefined or Infinity, and nothing logs a console error.
+// - no text anywhere reads NaN, undefined or Infinity, and nothing logs a console error;
+// - playback: every frame of the whole story, at 60 fps, for every What if variant, is timed from
+//   the frame's start to its layout being done. The 95th percentile must stay under 8 ms (half a
+//   frame, leaving the rest for paint), and no frame outside a step change may take a whole frame
+//   (16.7 ms). A slow frame is timed again, and its best time counts, so a stray pause of the
+//   machine running the check does not fail a page.
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -254,6 +259,57 @@ try {
     if (end.running || end.T < max - 0.1) fail(`${at}: play near the end did not stop at the end (at ${end.T.toFixed(2)} of ${max.toFixed(2)})`);
 
     if (errors.length) fail(`${at}: console errors: ${[...new Set(errors)].join(" | ")}`);
+    await p.close();
+  }
+
+  // Playback: every frame of the story, for every variant, at 1440 x 900.
+  {
+    const p = await browser.newPage();
+    await p.setViewport({ width: 1440, height: 900 });
+    await p.evaluateOnNewDocument(fakeAudio);
+    await p.goto(url);
+    await p.evaluate(() => document.fonts.ready);
+    await wait(300);
+    const variants = await p.evaluate(() => window.__viz?.variants ?? [...document.querySelectorAll(".vz-whatif button")].map((b) => b.dataset.variant));
+    for (const v of variants.length ? variants : [null]) {
+      if (v) await p.evaluate((v) => window.__viz.variant(v), v);
+      const max = await p.evaluate(() => Number(document.getElementById("scrub").max) * 1000);
+      const times = [];
+      let worst = { ms: 0, t: 0 };
+      // in chunks, so a slow page cannot outlast one call to the browser
+      for (let t0 = 0; t0 < max; t0 += 400 * (1000 / 60)) {
+        const chunk = await p.evaluate((t0, max) => {
+          const count = document.getElementById("count"), out = [];
+          let retries = 12;
+          const frame = (t) => {
+            const a = performance.now();
+            window.__viz.seek(t);
+            document.body.getBoundingClientRect();
+            return performance.now() - a;
+          };
+          for (let i = 0, t = t0; i < 400 && t < max; i++, t += 1000 / 60) {
+            const before = count.textContent;
+            let ms = frame(t);
+            const step = count.textContent !== before;
+            // a frame over budget: step back and time the same move again, twice; the best time
+            // counts (only a few per chunk, so an always-slow page does not take three times as long)
+            if (ms > 1000 / 60 && !step && retries-- > 0) for (let r = 0; r < 2; r++) (frame(t - 1000 / 60), (ms = Math.min(ms, frame(t))));
+            out.push({ ms, t, step });
+          }
+          return out;
+        }, t0, max);
+        for (const f of chunk) {
+          times.push(f.ms);
+          if (!f.step && f.ms > worst.ms) worst = f;
+        }
+      }
+      times.sort((a, b) => a - b);
+      const p95 = times[Math.floor(times.length * 0.95)] ?? 0;
+      const s = `playback ${v ?? ""}`.trim();
+      console.log(`${s}: ${times.length} frames, median ${(times[times.length >> 1] ?? 0).toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, worst outside a step change ${worst.ms.toFixed(1)} ms`);
+      if (p95 > 8) fail(`${s}: the 95th-percentile frame takes ${p95.toFixed(1)} ms, over the 8 ms budget; draw parts once and move them (references/drawing.md, "Isometric machine figures")`);
+      if (worst.ms > 1000 / 60) fail(`${s}: a frame at ${(worst.t / 1000).toFixed(2)} s takes ${worst.ms.toFixed(1)} ms, longer than a frame at 60 fps`);
+    }
     await p.close();
   }
 } finally {

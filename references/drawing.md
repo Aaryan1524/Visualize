@@ -11,7 +11,7 @@ Build both (`node examples/escalator/build.mjs`, `node examples/lock/build.mjs`)
 
 | Subject | Look | Why |
 |---|---|---|
-| A real machine or physical system: escalator, engine, lock, gearbox, pump, disk drive, bicycle gears, a lift | **Drawing**: a sharp 2D side elevation or section, drawn to scale | In Clay, a machine's many parts became identical soft blobs. Forty wheels hid the two tracks that are the whole point, and the builder called it unprofessional |
+| A real machine or physical system: escalator, engine, lock, gearbox, pump, disk drive, a lift | **Drawing**: a sharp 2D side elevation or section, drawn to scale; or, when it works in depth as well (a bicycle's rear derailleur), an isometric figure (see "Isometric machine figures") | In Clay, a machine's many parts became identical soft blobs. Forty wheels hid the two tracks that are the whole point, and the builder called it unprofessional |
 | An abstract concept with no physical figure: binary search, LRU, heaps, retries, attention | **A scene in the drawing look** (`look: "drawing"`): the kit's 3D parts in the same ink, hatching, palette and title block | There is no real geometry to draw to scale, but the page should still look like a plate from the same book |
 
 Aim for sharp and precise, not photo-real: an engineering drawing a reader trusts, not a render.
@@ -138,11 +138,58 @@ node scripts/check-drawing.mjs dist/<name>.html     # must print: drawing: passe
 - a question without three distinct choices and a worked explanation, or a lab without a verdict;
 - the right arrow doing nothing on a fresh page;
 - a narrated tour (run with stand-in audio) that does not stop at the prediction, or play near the end that does not stop at the end;
-- any console error.
+- any console error;
+- playback: the 95th-percentile frame over 8 ms, or any frame outside a step change over one 60 fps frame (16.7 ms). Every frame of the whole story is timed, for every variant, from its start to its layout being done.
 
 It is proven against faults: the old looping escalator, the round-4 eval lock (no lab, an incomplete contract) and the eval's clipped "Plug turns anyway" label planted back into the new lock.
 
 It cannot judge beauty. Shoot every step with `node scripts/shoot.mjs <page> --step k`, plus the detail circle at 4× (`--select "#detailFrame" --scale 4`). Read every image, then fix and reshoot. The escalator took three rounds.
+
+## Isometric machine figures
+
+Two drawings serve a machine. Pick by what the reader must see.
+
+| Use | When | Example |
+|---|---|---|
+| **The flat cutaway** (the rest of this page) | The mechanism works in one plane, and a section shows it: tracks and steps, pins and a shear line | `examples/escalator/`, `examples/lock/` |
+| **An isometric figure** on `src/rig/` | The mechanism works in depth as well: parts move sideways and in the side plane at once, or stack in layers a section would cut away | `examples/derailleur/`: the cage swings in the side plane while the parallelogram carries it across eleven cogs |
+
+An isometric figure keeps everything else on this page: the model and its tests, the steps, the voice, the prediction, What if, the lab, Now you try, the audit and `check-drawing`.
+
+### Build one with `src/rig/`
+
+- **Camera** (`camera.ts`): `fitCamera(points, box, azimuth, elevation)` fits an orthographic view to the figure's bounds; fit it to every pose the story reaches, so nothing leaves the stage. `insetCamera` makes a second, magnified view, such as the derailleur's View A, which follows the guide pulley by sliding its group.
+- **Shapes** (`shapes.ts`): every part is a closed mesh whose faces carry their outward normals.
+  - `plate(plane, { outer, holes }, t0, t1)` extrudes any outline: teeth, windows and slots included.
+  - `turned(origin, axis, profile)` makes pulleys, bolts and barrels.
+  - `rod(a, b, r)` makes pins.
+  - A plate seen edge-on still draws: its walls are its rim.
+- **The look** (`draw.ts`, `rig.css`):
+  - `drawMesh(mesh, camera, { material, shine })` shades each face continuously from its normal under one key light fixed to the camera.
+  - The silhouette is drawn heavier than the creases.
+  - Metal edges that catch the light get a specular line.
+  - `contactShadow` lays a soft shadow toward the part behind.
+  - Materials are token pairs (steel, alloy, chain, slate, subject, frame) in both themes.
+  - Make the subject the strongest material, keep context (frame, wheel) in `frame`, and let out-of-focus parts recede by tone (`--recede`), never by opacity: a see-through solid shows what it should hide.
+
+### Draw once, then move
+
+A page that redraws its figure every frame stutters: the derailleur's first isometric version rebuilt about 2,800 elements a frame and ran near 25 fps. The rule:
+
+- **Build each part once**, at rest, and place it each frame with one SVG transform (`moveInPlane`). A flat part turning or sliding in its own plane is redrawn exactly by one 2D transform, because the camera is linear.
+- **A thick part that turns** is exact on the face it is placed by, and off by its thickness times the angle elsewhere. Draw it ahead at a few angles across its symmetry (`angleBin`), and turn only the small rest, placing it by the plane in the middle of what it draws. The derailleur draws one drawing a cog (half a tooth left over), two a pulley, a cage plate every 4° and a chain piece at 12 angles (`BINS` in `examples/derailleur/figure.mjs`). Hold every part under a pixel, and test it, as `examples/derailleur/figure.test.mjs` does (its worst is an inner link's rollers, 0.8 px).
+- **Repeated parts are `<use>` instances** of one drawing, such as the chain's links. Selectors that name an ancestor do not reach inside a `<use>`, so style through tokens and classes without ancestors.
+- **Order with fixed slots.** Parts that are slabs between parallel planes (cogs, chain plates, pulleys, cage plates) are keyed by the gap they sit in (`slotKey`), so the order changes only when a part really crosses a plane.
+- **Rebuild only parts whose shape changes**, and only when their state does. In the derailleur those are the links on tilted pins, the spring, the inner cable and the force arrows.
+- **The page runtime** is `RigStage`: one `<g>` per part, created once; each frame sets transforms and re-orders only on change.
+- **The shared player's hooks:**
+  - `focus({ focus, lit })` lets the figure recede parts itself.
+  - `anchors()` makes callouts with `data-at` follow moving parts.
+  - `drawingPage({ scripts })` ships the bundled engine; esbuild bundles `src/rig` with the figure.
+
+### Check it plays
+
+`check-drawing` times every frame of the story and fails a page that takes more than 8 ms at the 95th percentile, or a whole frame outside a step change. The derailleur's redraw-every-frame version fails it; the draw-once version passes.
 
 ## Known gaps
 
@@ -150,3 +197,4 @@ It cannot judge beauty. Shoot every step with `node scripts/shoot.mjs <page> --s
 - **`voice.mjs` is per example**, a copy of the same recorder with the machine's own script. `scripts/voice.mjs` records concept scenes only.
 - **`scripts/verify.mjs` does not read Drawing pages.** The model tests and `check-drawing` stand in for it.
 - **Desktop only,** like the rest of the kit for now.
+- **The rig sorts by fixed slots, not by a general solver.** Parts that are not slabs between parallel planes need keys chosen by hand; two parts that interpenetrate on screen in both orders need splitting.
