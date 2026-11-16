@@ -7,7 +7,7 @@
 //
 // See references/drawing.md for what each field is for, and examples/escalator/build.mjs and
 // examples/lock/build.mjs for two complete pages.
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { player } from "./player.mjs";
@@ -80,6 +80,7 @@ export function auditPage(o) {
   if (!o.audit) return { ok: false, problems: ["audit: this page declares no audit (claims, coverage, review)"], review: "missing", stamp: "", counts: {} };
   const r = audit({ texts, places, details, ...o.audit });
   if (o.audit.report) {
+    mkdirSync(dirname(o.audit.report), { recursive: true }); // a fresh checkout has no dist/ yet
     writeFileSync(o.audit.report, JSON.stringify({ title: o.title, stamp: r.stamp, review: r.review, problems: r.problems, claims: o.audit.claims.map((c) => c.text), coverage: o.audit.coverage, texts }, null, 1));
   }
   return r;
