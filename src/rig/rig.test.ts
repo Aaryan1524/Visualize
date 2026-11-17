@@ -4,6 +4,7 @@ import { axesOf, nearness, fitCamera, insetCamera, screenOf, type Camera } from 
 import { plate, planeOf, pointOn, circlePoints, rod, sprocket, turned, type Mesh } from "./shapes.ts";
 import { drawMesh, keyLight, shadeOf } from "./draw.ts";
 import { applyAffine, moveInPlane, planeKey, slotKey } from "./motion.ts";
+import { keepInPlace } from "./stage.ts";
 import { dot, sub, type V3 } from "./vec.ts";
 
 const rng = (a: number) => () => {
@@ -146,4 +147,27 @@ test("slots: parts between parallel slabs sort by the gap they sit in, and hold 
   assert.ok(slotKey(planes, -11, 0.9) < planeKey(0));
   assert.equal(slotKey(planes, -4.9, 0.3), slotKey(planes, -0.1, 0.3), "moving inside one gap does not change the key");
   assert.ok(slotKey(planes, 0, 0.2) > planeKey(2), "a part on a slab's own plane paints after the slab");
+});
+
+test("stage: reordering moves as few groups as it can: one part crossing the whole list is one move", () => {
+  const moves = (positions: number[]) => positions.length - keepInPlace(positions).size;
+  assert.equal(moves([0, 1, 2, 3, 4, 5]), 0, "nothing out of place");
+  assert.equal(moves([1, 2, 3, 4, 5, 0]), 1, "the first part now wanted last");
+  assert.equal(moves([5, 0, 1, 2, 3, 4]), 1, "the last part now wanted first");
+  assert.equal(moves([0, 1, 5, 2, 3, 4]), 1, "a part jumped forward");
+  assert.equal(moves([0, -1, 1, 2]), 1, "a new part is the only move");
+  assert.equal(moves([3, 2, 1, 0]), 3, "a reversal is the worst case");
+  // the kept entries really are in order, and the moves are never more than any other choice would need (brute force)
+  const r = rng(7);
+  for (let n = 0; n < 200; n++) {
+    const len = 2 + Math.floor(r() * 7), pos = Array.from({ length: len }, (_, i) => i).sort(() => r() - 0.5);
+    const stay = [...keepInPlace(pos)].sort((a, b) => a - b);
+    for (let i = 1; i < stay.length; i++) assert.ok(pos[stay[i]!]! > pos[stay[i - 1]!]!, "kept parts are in order");
+    let best = 0;
+    for (let mask = 0; mask < 1 << len; mask++) {
+      const idx = [...Array(len).keys()].filter((i) => mask >> i & 1);
+      if (idx.every((v, k) => k === 0 || pos[v]! > pos[idx[k - 1]!]!)) best = Math.max(best, idx.length);
+    }
+    assert.equal(stay.length, best, `keeps the most it can in ${pos}`);
+  }
 });

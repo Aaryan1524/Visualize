@@ -139,7 +139,7 @@ node scripts/check-drawing.mjs dist/<name>.html     # must print: drawing: passe
 - the right arrow doing nothing on a fresh page;
 - a narrated tour (run with stand-in audio) that does not stop at the prediction, or play near the end that does not stop at the end;
 - any console error;
-- playback: the 95th-percentile frame over 8 ms, or any frame outside a step change over one 60 fps frame (16.7 ms). Every frame of the whole story is timed, for every variant, from its start to its layout being done.
+- playback: the 95th-percentile frame over 8 ms, or any frame outside a step change over one 60 fps frame (16.7 ms), both scaled to the machine (see "Check it plays"). Every frame of the whole story is timed, for every variant, from its start to its layout being done.
 
 It is proven against faults: the old looping escalator, the round-4 eval lock (no lab, an incomplete contract) and the eval's clipped "Plug turns anyway" label planted back into the new lock.
 
@@ -181,7 +181,7 @@ A page that redraws its figure every frame stutters: the derailleur's first isom
 - **Repeated parts are `<use>` instances** of one drawing, such as the chain's links. Selectors that name an ancestor do not reach inside a `<use>`, so style through tokens and classes without ancestors.
 - **Order with fixed slots.** Parts that are slabs between parallel planes (cogs, chain plates, pulleys, cage plates) are keyed by the gap they sit in (`slotKey`), so the order changes only when a part really crosses a plane.
 - **Rebuild only parts whose shape changes**, and only when their state does. In the derailleur those are the links on tilted pins, the spring, the inner cable and the force arrows.
-- **The page runtime** is `RigStage`: one `<g>` per part, created once; each frame sets transforms and re-orders only on change.
+- **The page runtime** is `RigStage`: one `<g>` per part, created once; each frame sets transforms and re-orders only on change, moving only the parts that are out of place. That last point matters: a first version moved every part it passed whenever one crossed the list (a chain link reappearing at the far cut), about 160 moves a frame, and made the slowest tenth of frames five times dearer.
 - **The shared player's hooks:**
   - `focus({ focus, lit })` lets the figure recede parts itself.
   - `anchors()` makes callouts with `data-at` follow moving parts.
@@ -189,7 +189,14 @@ A page that redraws its figure every frame stutters: the derailleur's first isom
 
 ### Check it plays
 
-`check-drawing` times every frame of the story and fails a page that takes more than 8 ms at the 95th percentile, or a whole frame outside a step change. The derailleur's redraw-every-frame version fails it; the draw-once version passes.
+`check-drawing` times every frame of the story and fails a page that takes more than 8 ms at the 95th percentile, or a whole frame (16.7 ms) outside a step change. The limits scale with the machine, so a slow runner does not fail a page that is fine at 60 fps:
+
+- **Calibration.** First, in the same browser and viewport, the check times a fixed workload like a frame of the rig: 300 `<g>` holding a `<use>` of a 24-path part, a transform set on each, some arithmetic, one layout read (batches of 10 frames, the median of 20, the best of three runs). `REFERENCE_MS` in `scripts/check-drawing.mjs` (0.28 ms) is that workload on the machine the budgets were set on; it runs at 0.71 ms under 2.5x CPU throttling. Both limits are multiplied by `max(1, measured / reference)`, capped at 3, and the check prints the scale (`machine is 2.6x the reference`).
+- **A stray pause** (garbage collection, a shared host) does not count: a frame over its limit is timed again twice and its best time counts.
+- **A page clearly over** its limit (the 95th percentile of its first 800 frames) stops being timed, so a failing page fails in seconds.
+- **To try a slow machine**, set `VIZ_CPU_THROTTLE=2.5`. Chrome slows the reference and the page alike. `VIZ_ONLY_PLAYBACK=1` skips every other check, to time a page alone.
+
+The derailleur's redraw-every-frame version fails at 1x (p95 38 ms) and at 2.5x (p95 94 ms); the draw-once version passes at both (p95 1.9 and 4.4 ms), as do the escalator and the lock.
 
 ## Known gaps
 

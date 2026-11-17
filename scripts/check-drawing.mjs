@@ -22,7 +22,13 @@
 //   the frame's start to its layout being done. The 95th percentile must stay under 8 ms (half a
 //   frame, leaving the rest for paint), and no frame outside a step change may take a whole frame
 //   (16.7 ms). A slow frame is timed again, and its best time counts, so a stray pause of the
-//   machine running the check does not fail a page.
+//   machine running the check does not fail a page. Both limits scale with the machine: first a
+//   fixed reference workload (a few hundred transformed <g>/<use> parts and a layout read a frame,
+//   the work the rig does) is timed in the same browser, and the limits are multiplied by
+//   max(1, measured / reference), capped at 3. Set VIZ_CPU_THROTTLE=2.5 to run the check as if on
+//   a machine 2.5 times slower (Chrome's CPU throttling applies to the reference and the page alike).
+//   A page that is clearly over its limit stops being timed once 800 frames of a variant have been,
+//   so a failing page fails in seconds. VIZ_ONLY_PLAYBACK=1 skips every other check, to time a page alone.
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -37,6 +43,14 @@ const url = pathToFileURL(resolve(page)).href;
 const fails = [];
 const fail = (msg) => fails.push(msg);
 const MIN_TEXT = 11; // px, rendered, at 1280×800 and above
+// Playback: the median frame of the reference workload (below) on the machine the budgets were set on:
+// a MacBook (Apple silicon) running Chrome 1440 x 900, no CPU throttling, measured as the median of the
+// calibration's own median over 20 runs (0.27 to 0.29 ms; the same workload runs at 0.71 ms under 2.5x CPU throttling). The check multiplies its limits by max(1, measured / REFERENCE_MS).
+const REFERENCE_MS = 0.28;
+const MAX_SCALE = 3;
+const THROTTLE = Number(process.env.VIZ_CPU_THROTTLE || 1);
+const ONLY_PLAYBACK = !!process.env.VIZ_ONLY_PLAYBACK;
+const throttle = async (page) => THROTTLE > 1 && (await (await page.createCDPSession()).send("Emulation.setCPUThrottlingRate", { rate: THROTTLE }));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Measure what a reader sees right now: scroll, callouts, open cards, and any broken number.
@@ -105,7 +119,7 @@ const fakeAudio = () => {
 
 const browser = await launch();
 try {
-  for (const [w, h] of [[1440, 900], [1280, 800]]) {
+  for (const [w, h] of ONLY_PLAYBACK ? [] : [[1440, 900], [1280, 800]]) {
     const p = await browser.newPage();
     await p.setViewport({ width: w, height: h });
     await p.evaluateOnNewDocument(fakeAudio);
@@ -264,8 +278,49 @@ try {
 
   // Playback: every frame of the story, for every variant, at 1440 x 900.
   {
+    // The machine: the same kind of work as a frame of the rig (set a transform on a few hundred <g>
+    // holding a <use>, read the layout), timed here, in a blank page of the same browser and size.
+    const cal = await browser.newPage();
+    await cal.setViewport({ width: 1440, height: 900 });
+    await throttle(cal);
+    await cal.setContent(`<svg id="s" width="1440" height="900" viewBox="0 0 1440 900"><defs><g id="d">${Array.from({ length: 24 }, (_, i) => `<path d="M${i} 0L${i + 20} 0L${i + 20} 10L${i} 10Z"/>`).join("")}</g></defs></svg>`);
+    const medians = [];
+    for (let run = 0; run < 3; run++) {
+      medians.push(await cal.evaluate(() => {
+        const svg = document.getElementById("s"), gs = [];
+        for (let i = 0; i < 300; i++) {
+          const g = document.createElementNS("http://www.w3.org/2000/svg", "g"), u = document.createElementNS("http://www.w3.org/2000/svg", "use");
+          u.setAttribute("href", "#d");
+          g.append(u);
+          svg.append(g);
+          gs.push(g);
+        }
+        let sink = 0;
+        const frame = (f) => {
+          for (let i = 0; i < gs.length; i++) gs[i].setAttribute("transform", `matrix(1 0 0 1 ${(i * 4 + f) % 1400} ${(i * 3 + f * 2) % 880})`);
+          for (let i = 0; i < 4000; i++) sink += Math.sin(i * 0.01 + f) * Math.cos(i * 0.02 - f); // the model's arithmetic
+          document.body.getBoundingClientRect();
+        };
+        for (let f = 0; f < 30; f++) frame(f); // warm-up
+        // batches of 10 frames, so a coarse clock still resolves a fraction of a millisecond
+        const batches = [];
+        for (let b = 0; b < 20; b++) {
+          const a = performance.now();
+          for (let f = 0; f < 10; f++) frame(30 + b * 10 + f);
+          batches.push((performance.now() - a) / 10);
+        }
+        batches.sort((x, y) => x - y);
+        return batches[batches.length >> 1] + (sink > 1e18 ? 1 : 0);
+      }));
+    }
+    await cal.close();
+    const measured = Math.min(...medians);
+    const scale = Math.min(MAX_SCALE, Math.max(1, measured / REFERENCE_MS));
+    const P95 = 8 * scale, WORST = (1000 / 60) * scale;
+    console.log(`playback: reference workload ${measured.toFixed(2)} ms a frame (reference ${REFERENCE_MS.toFixed(2)}), machine is ${(measured / REFERENCE_MS).toFixed(1)}x the reference; limits ${P95.toFixed(1)} ms (95th percentile) and ${WORST.toFixed(1)} ms (any frame outside a step change)${measured / REFERENCE_MS > MAX_SCALE ? `, scale capped at ${MAX_SCALE}` : ""}`);
     const p = await browser.newPage();
     await p.setViewport({ width: 1440, height: 900 });
+    await throttle(p);
     await p.evaluateOnNewDocument(fakeAudio);
     await p.goto(url);
     await p.evaluate(() => document.fonts.ready);
@@ -278,7 +333,7 @@ try {
       let worst = { ms: 0, t: 0 };
       // in chunks, so a slow page cannot outlast one call to the browser
       for (let t0 = 0; t0 < max; t0 += 400 * (1000 / 60)) {
-        const chunk = await p.evaluate((t0, max) => {
+        const chunk = await p.evaluate((t0, max, WORST) => {
           const count = document.getElementById("count"), out = [];
           let retries = 12;
           const frame = (t) => {
@@ -293,22 +348,27 @@ try {
             const step = count.textContent !== before;
             // a frame over budget: step back and time the same move again, twice; the best time
             // counts (only a few per chunk, so an always-slow page does not take three times as long)
-            if (ms > 1000 / 60 && !step && retries-- > 0) for (let r = 0; r < 2; r++) (frame(t - 1000 / 60), (ms = Math.min(ms, frame(t))));
+            if (ms > WORST && !step && retries-- > 0) for (let r = 0; r < 2; r++) (frame(t - 1000 / 60), (ms = Math.min(ms, frame(t))));
             out.push({ ms, t, step });
           }
           return out;
-        }, t0, max);
+        }, t0, max, WORST);
         for (const f of chunk) {
           times.push(f.ms);
           if (!f.step && f.ms > worst.ms) worst = f;
+        }
+        // clearly over: the 95th percentile of 800 frames or more is already past its limit
+        if (times.length >= 800 && [...times].sort((x, y) => x - y)[Math.floor(times.length * 0.95)] > P95) {
+          console.log(`${v ?? ""}: over the limit after ${times.length} frames; the rest are not timed`);
+          break;
         }
       }
       times.sort((a, b) => a - b);
       const p95 = times[Math.floor(times.length * 0.95)] ?? 0;
       const s = `playback ${v ?? ""}`.trim();
       console.log(`${s}: ${times.length} frames, median ${(times[times.length >> 1] ?? 0).toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, worst outside a step change ${worst.ms.toFixed(1)} ms`);
-      if (p95 > 8) fail(`${s}: the 95th-percentile frame takes ${p95.toFixed(1)} ms, over the 8 ms budget; draw parts once and move them (references/drawing.md, "Isometric machine figures")`);
-      if (worst.ms > 1000 / 60) fail(`${s}: a frame at ${(worst.t / 1000).toFixed(2)} s takes ${worst.ms.toFixed(1)} ms, longer than a frame at 60 fps`);
+      if (p95 > P95) fail(`${s}: the 95th-percentile frame takes ${p95.toFixed(1)} ms, over the ${P95.toFixed(1)} ms budget; draw parts once and move them (references/drawing.md, "Isometric machine figures")`);
+      if (worst.ms > WORST) fail(`${s}: a frame at ${(worst.t / 1000).toFixed(2)} s takes ${worst.ms.toFixed(1)} ms, longer than ${WORST.toFixed(1)} ms (a frame at 60 fps, on this machine)`);
     }
     await p.close();
   }

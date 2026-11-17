@@ -30,6 +30,30 @@ interface Slot extends SVGGElement {
 
 const SVGNS = "http://www.w3.org/2000/svg";
 
+/**
+ * Given where each part now sits in the list (-1 for a part not in it yet), in the order they are
+ * wanted, which entries can stay put: the longest increasing run of the positions. Everything else moves.
+ */
+export function keepInPlace(positions: readonly number[]): Set<number> {
+  const tails: number[] = [], tailAt: number[] = [], prev = new Array<number>(positions.length).fill(-1);
+  for (let j = 0; j < positions.length; j++) {
+    const v = positions[j]!;
+    if (v < 0) continue;
+    let lo = 0, hi = tails.length;
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      if (tails[m]! < v) lo = m + 1;
+      else hi = m;
+    }
+    tails[lo] = v;
+    tailAt[lo] = j;
+    prev[j] = lo > 0 ? tailAt[lo - 1]! : -1;
+  }
+  const stay = new Set<number>();
+  for (let j = tailAt.length ? tailAt[tailAt.length - 1]! : -1; j >= 0; j = prev[j]!) stay.add(j);
+  return stay;
+}
+
 export class RigStage {
   readonly groups = new Map<string, Slot>();
   readonly host: SVGGElement;
@@ -97,11 +121,31 @@ export class RigStage {
       order.push(g);
     }
     order.sort((a, b) => a._key! - b._key!);
-    // move only the groups that are out of place; most frames move none
-    const keep = new Set<Element>(order);
-    for (const g of [...this.host.children]) if (!keep.has(g)) g.remove();
+    // most frames change nothing: look before doing any work
     const kids = this.host.children;
-    for (let i = 0; i < order.length; i++) if (kids[i] !== order[i]) this.host.insertBefore(order[i]!, kids[i] ?? null);
+    let i = 0;
+    if (kids.length === order.length) while (i < order.length && kids[i] === order[i]) i++;
+    if (i === order.length) return;
+    this.reorder(order);
+  }
+
+  /**
+   * Put the groups in `order`, moving as few as possible: those in the longest run already in the right
+   * order stay where they are, so one part crossing to the far end of the list costs one move, not one
+   * move for every part it passes.
+   */
+  private reorder(order: Slot[]): void {
+    const host = this.host, keep = new Set<Element>(order);
+    for (const g of Array.from(host.children)) if (!keep.has(g)) g.remove();
+    const at = new Map<Element, number>();
+    Array.from(host.children).forEach((g, j) => at.set(g, j));
+    const stay = keepInPlace(order.map((g) => at.get(g) ?? -1));
+    let next: Element | null = null;
+    for (let j = order.length - 1; j >= 0; j--) {
+      const g = order[j]!;
+      if (!stay.has(j)) host.insertBefore(g, next);
+      next = g;
+    }
   }
 
   /** Mark parts that recede (out of focus) and parts the voice names. */
