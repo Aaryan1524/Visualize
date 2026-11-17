@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildSync } from "esbuild";
 import { MODELS, VARIANTS, DR, makeModel, clickPull, indexing, BANDS, shares } from "./model.mjs";
-import { cameraFor, XCUT, VIEW_A } from "./figure.mjs";
+import { cameraFor, figure, XCUT, VIEW_A } from "./figure.mjs";
 import { screenOf } from "../../src/rig/index.ts";
 import { drawingPage, esc } from "../../src/drawing/page.mjs";
 
@@ -37,13 +37,13 @@ const PRED_STEP = 4;
 const G3 = 3; // the story starts in the fourth gear
 const STEPS = [
   { tab: null, heading: "How does one cable choose among eleven cogs?", focus: null },
-  { tab: "The parts", heading: "A sprung parallelogram hangs a cage of two pulleys under the cassette.", focus: null },
-  { tab: "One click", heading: null, focus: ["cable", "links", "pknuckle", "bknuckle", "guide", "tension", "cage", "chain", "cassette", "barrel"] },
-  { tab: "Return spring", heading: "Let cable out, and the return spring pulls the derailleur back out.", focus: ["rspring", "links", "pknuckle", "bknuckle", "guide", "tension", "cage", "chain", "cassette", "cable"] },
-  { tab: "Pedal to shift", heading: "The pulley moves at once; the chain waits for a ramp to come round.", focus: ["guide", "tension", "cage", "pknuckle", "chain", "cassette"] },
-  { tab: "Slack", heading: null, focus: ["cage", "guide", "tension", "chain", "cassette", "forces", "pknuckle"] },
-  { tab: "Limit screws", heading: "Two screws stop the swing at the end cogs; a third sets the gap.", focus: ["bknuckle", "links", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "hanger"] },
-  { tab: "Barrel adjuster", heading: "A slack cable puts every cog but the smallest off line; the barrel adjuster takes it up.", focus: ["cable", "barrel", "bknuckle", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "links"] },
+  { tab: "The parts", heading: "A sprung parallelogram hangs a cage of two pulleys under the cassette.", focus: null, shot: ["cassette", "hanger", "bknuckle", "links", "pknuckle", "cage", "guide", "tension"] },
+  { tab: "One click", heading: null, shot: ["barrel", "wire", "links"], focus: ["cable", "links", "pknuckle", "bknuckle", "guide", "tension", "cage", "chain", "cassette", "barrel"] },
+  { tab: "Return spring", heading: "Let cable out, and the return spring pulls the derailleur back out.", shot: ["links", "rspring"], focus: ["rspring", "links", "pknuckle", "bknuckle", "guide", "tension", "cage", "chain", "cassette", "cable"] },
+  { tab: "Pedal to shift", heading: "The pulley moves at once; the chain waits for a ramp to come round.", shot: ["ramp"], focus: ["guide", "tension", "cage", "pknuckle", "chain", "cassette"] },
+  { tab: "Slack", heading: null, shot: ["cage", "guide", "tension", "forces"], focus: ["cage", "guide", "tension", "chain", "cassette", "forces", "pknuckle"] },
+  { tab: "Limit screws", heading: "Two screws stop the swing at the end cogs; a third sets the gap.", shot: ["hscrew", "lscrew", "bscrew"], focus: ["bknuckle", "links", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "hanger"] },
+  { tab: "Barrel adjuster", heading: "A slack cable puts every cog but the smallest off line; the barrel adjuster takes it up.", shot: ["barrel"], focus: ["cable", "barrel", "bknuckle", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "links"] },
 ];
 const STRETCH = -1.0; // mm of cable slack in the barrel adjuster step
 const OVER = 2.0; // mm of extra cable pull against the L screw in the limit screw step
@@ -77,6 +77,25 @@ function captions(M) {
 
 const VOICE = existsSync(join(HERE, "voice.json")) ? JSON.parse(readFileSync(join(HERE, "voice.json"), "utf8")) : null;
 
+// ---------------------------------------------------------------- planted faults
+// `--plant <fault>` builds a page with one fault the camera's checks must catch (scripts/check-drawing.mjs
+// fails on each); the build's own name check reports it instead of stopping, so the page gets written
+// (with --strict it stops, as it does on any unplanted build).
+const PLANTS = {
+  // a step's shot names a part the figure does not have
+  "missing-shot": () => (STEPS[3].shot = ["links", "sprocket"]),
+  // the voice names a part the figure does not have
+  "unknown-link": () => VOICE.variants.road[2].links[0].ids.splice(0, 1, "sprocket"),
+  // the clear area runs under the cards and the title block, so a framed part lands under them
+  "under-card": () => (PLANT_CLEAR = { x0: 9900, y0: 3900, x1: VBW - 100, y1: VBH - 100 }),
+};
+const PLANT = process.argv.includes("--plant") ? process.argv[process.argv.indexOf("--plant") + 1] : null;
+let PLANT_CLEAR = null;
+if (PLANT) {
+  if (!PLANTS[PLANT]) throw new Error(`--plant: one of ${Object.keys(PLANTS).join(", ")}`);
+  PLANTS[PLANT]();
+}
+
 // ---------------------------------------------------------------- the drawing skeleton for one variant
 // The parts are drawn live; the build writes the layers, the callouts and the title block.
 function skeleton(M, name) {
@@ -85,11 +104,11 @@ function skeleton(M, name) {
   // the housing and the chain fade out toward the cut; the frame's stays fade away from the dropout
   const xa = screenOf(cam, [XCUT - 60, -20, 0])[0], xb = screenOf(cam, [XCUT - 4, -20, 0])[0];
   const dz = screenOf(cam, [4, -12, 0]);
-  const defs = `<defs><linearGradient id="fadeXg" gradientUnits="userSpaceOnUse" x1="${f1(xa)}" x2="${f1(xb)}" y1="0" y2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><mask id="fadeX" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeXg)"/></mask><radialGradient id="fadeStaysG" gradientUnits="userSpaceOnUse" cx="${f1(dz[0])}" cy="${f1(dz[1])}" r="${f1(cam.scale * 95)}"><stop offset=".45" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient><mask id="fadeStays" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeStaysG)"/></mask><clipPath id="insetClip"><circle cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/></clipPath></defs>`;
-  const inset = `<g id="insetG" class="inset"><circle class="inset-bg" cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/><g clip-path="url(#insetClip)"><defs id="rigDefsA"></defs><g id="insetScene"></g></g><circle class="inset-ring" cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/><text class="inset-title" x="${INSET.c[0]}" y="${INSET.c[1] - INSET.r - 110}" text-anchor="middle">VIEW A · FROM BEHIND · FOLLOWS THE GUIDE PULLEY</text></g>`;
+  const defs = `<defs><linearGradient id="fadeXg" gradientUnits="userSpaceOnUse" x1="${f1(xa)}" x2="${f1(xb)}" y1="0" y2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><mask id="fadeX" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeXg)"/></mask><radialGradient id="fadeStaysG" gradientUnits="userSpaceOnUse" cx="${f1(dz[0])}" cy="${f1(dz[1])}" r="${f1(cam.scale * 95)}"><stop offset=".45" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient><mask id="fadeStays" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeStaysG)"/></mask>${camFade()}<clipPath id="insetClip"><circle cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/></clipPath></defs>`;
+  const inset = `<g id="insetG" class="inset"><circle class="inset-bg" cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/><g clip-path="url(#insetClip)"><defs id="rigDefsA"></defs><g id="insetScene"></g></g><circle class="inset-ring" data-camera-avoid="" cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/><text class="inset-title" data-camera-avoid="" x="${INSET.c[0]}" y="${INSET.c[1] - INSET.r - 110}" text-anchor="middle">VIEW A · FROM BEHIND · FOLLOWS THE GUIDE PULLEY</text></g>`;
   // the title block
   const x0 = 10200, x1 = VBW - 80, y0 = 4950, y1 = VBH - 80;
-  let tb = `<g class="tblock"><path class="tb-frame" d="M${x0},${y0}H${x1}V${y1}H${x0}Z"/><path class="tb-rule" d="M${x0},${y0 + 360}H${x1}M${x0},${y1 - 300}H${x1}"/>`;
+  let tb = `<g class="tblock" data-camera-avoid=""><path class="tb-frame" d="M${x0},${y0}H${x1}V${y1}H${x0}Z"/><path class="tb-rule" d="M${x0},${y0 + 360}H${x1}M${x0},${y1 - 300}H${x1}"/>`;
   tb += `<text class="tb-title" x="${x0 + 110}" y="${y0 + 240}">REAR DERAILLEUR · ISOMETRIC · ${esc(M.v.label.toUpperCase())}</text><text class="tb-small" x="${x1 - 110}" y="${y0 + 240}" text-anchor="end">mm</text>`;
   const facts = [
     `${M.n} cogs ${M.cogs[0]}–${N.big} at ${DR.pitch} · chain ${M.links} links · ${DR.ring}T ring`,
@@ -100,13 +119,22 @@ function skeleton(M, name) {
   tb += `<g id="tbkey" data-x0="${x0 + 110}">`;
   for (const [cls, t] of [["k-blue", "Cable"], ["k-green", "Springs"], ["k-orange", "Followed part"], ["k-red", "Off line"]]) tb += `<g class="tbk"><path class="${cls}" d="M0,${y1 - 140}h240"/><text class="tb-text tb-key" x="0" y="${y1 - 100}">${t}</text></g>`;
   tb += "</g></g>";
-  return `${defs}<defs id="rigDefs"></defs><g id="scene"></g>${inset}<g id="labels">${LABELS.map(labelSvg).join("")}</g>${tb}`;
+  return `${defs}<defs id="rigDefs"></defs><g mask="url(#camFade)"><g id="scene" data-camera=""></g></g>${inset}<g id="labels">${LABELS.map(labelSvg).join("")}</g>${tb}`;
+}
+
+// Zoomed in, the figure fades out sideways before it reaches the callout columns, the heading on the left
+// and View A and the title block on the right, so the camera never paints under them. The fade does not
+// move with the camera.
+const LX = 3900, RX = 9420;
+const CLEAR = { x0: LX + 150, y0: 150, x1: RX - 150, y1: VBH - 150 };
+function camFade() {
+  const a = LX - 150, b = RX + 150, w = b - a, at = (x) => ((x - a) / w).toFixed(4);
+  return `<linearGradient id="camFadeG" gradientUnits="userSpaceOnUse" x1="${a}" x2="${b}" y1="0" y2="0"><stop offset="0" stop-color="#000"/><stop offset="${at(CLEAR.x0)}" stop-color="#fff"/><stop offset="${at(CLEAR.x1)}" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><mask id="camFade" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#camFadeG)"/></mask>`;
 }
 
 // Callouts: text placed in units; the leader is drawn live to the part's projected point (`to`,
 // a name in the scene's anchor table), so it follows the part as it moves.
 const label = (id, text, x, y, to, beats, anchor = "end", cls = "") => ({ id, text, at: [x, y], to, beats, anchor, cls });
-const LX = 3900, RX = 9420;
 const LABELS = [
   // step 1: every part, left and right, each column in the order of its targets
   label("cassette", "Cassette", RX, 800, "cassette", [1], "start"),
@@ -238,6 +266,37 @@ function machine(DATA) {
     return { ...s, k, u: clamp(tt / anim(k)), turn: turnAt(k, tt), phase: phaseOf(k) };
   };
   const stillAt = (k, SEG) => SEG.lead + POSE[k] * anim(k);
+
+  // ------------------------------------------------ what the camera can frame
+  // A name is a part (data-part) or one drawn item of it; "ramp" is where the chain meets the next
+  // cog's ramp. Bounds are in the figure's own units: each item's box, through its own transform.
+  const ITEMS = DATA.camera.items;
+  function boundsOf(names) {
+    const scene = $("scene");
+    if (!scene) return null;
+    const inv = scene.getCTM().inverse();
+    let b = null;
+    const add = (x0, y0, x1, y1) => (b = b ? { x0: Math.min(b.x0, x0), y0: Math.min(b.y0, y0), x1: Math.max(b.x1, x1), y1: Math.max(b.y1, y1) } : { x0, y0, x1, y1 });
+    for (const n of names) {
+      if (n === "ramp" || n === "gates") {
+        // the gate nearest the chain, with the chain and teeth around it
+        const g = lastAt?.gate;
+        if (!g) continue;
+        add(g[0] - 650, g[1] - 650, g[0] + 650, g[1] + 650);
+        continue;
+      }
+      const sel = ITEMS[n] ? ITEMS[n].map((id) => `[data-item="${id}"]`).join(",") : `[data-part="${n}"]`;
+      for (const el of scene.querySelectorAll(sel)) {
+        if (el.style.display === "none") continue;
+        const r = el.getBBox();
+        if (!r.width && !r.height) continue;
+        const m = inv.multiply(el.getCTM());
+        const pts = [[r.x, r.y], [r.x + r.width, r.y], [r.x, r.y + r.height], [r.x + r.width, r.y + r.height]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+        add(Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1])));
+      }
+    }
+    return b;
+  }
 
   function mount(v, m) {
     V = v;
@@ -394,7 +453,7 @@ function machine(DATA) {
   return {
     model: (v) => MODELS_IN_PAGE[v.name],
     mount, at, stillAt,
-    render, focus, anchors: () => lastAt, lab, question,
+    render, focus, anchors: () => lastAt, lab, question, boundsOf, clearArea: () => DATA.camera.clear,
     heading: (k) => V.heads[k] ?? null,
     info: () => (cur ? { pull: cur.pull, chainK: cur.chainK, err: cur.err, lOut: cur.lOut, alpha: cur.pose?.alpha, z: cur.pose?.z, off: cur.pose?.off, swing: cur.pose ? cur.pose.alpha - model.N.alpha0 : null, tension: cur.pose?.tension, at: lastAt } : {}),
   };
@@ -406,11 +465,48 @@ if (/<\/script/i.test(bundle)) throw new Error("the figure bundle contains </scr
 const modelSrc = readFileSync(join(HERE, "model.mjs"), "utf8").replace(/^export /gm, "") + "\nconst MODELS_IN_PAGE = MODELS;\n";
 const std = VARIANT_DATA.road, M0 = MODELS.road;
 
+// ---------------------------------------------------------------- what the camera can frame
+// A step's shot and each [phrase|part] the voice speaks name parts the camera frames. A name is a part
+// (data-part), one drawn item of a part (CAM_ITEMS), or "ramp"/"gates", the shift gate where the chain
+// meets the next cog. An unknown name stops the build; scripts/check-drawing.mjs then checks, in the
+// page, that every name has bounds and sits clear of the cards where it is framed.
+const CAM_ITEMS = { hscrew: ["m-screwH"], lscrew: ["m-screwL"], bscrew: ["m-bscrew"], barrel: ["m-barrel"], wire: ["m-wire"], cable: ["m-barrel", "m-wire"], housing: ["m-housing"] };
+const CAM_ALIAS = { forces: ["forces", "cage", "tension"], gates: ["cassette", "chain"], lscrew: ["bknuckle"], hscrew: ["bknuckle"], bscrew: ["bknuckle", "hanger"], barrel: ["cable"], housing: ["cable"] };
+function framable() {
+  const names = new Set(["ramp", "gates", ...Object.keys(CAM_ITEMS)]);
+  for (const M of Object.values(MODELS)) {
+    const F = figure(M, cameraFor(M, BOX), { prefix: "m" });
+    const ids = new Set(F.parts.map((p) => p.id));
+    for (const p of F.parts) names.add(p.part);
+    for (let k = 0; k < M.n; k++)
+      for (const i of F.pose({ pose: M.pose(M.pullFor(k), k), roll: 0, show: { gates: true, forces: true } }).items) {
+        ids.add(i.id);
+        if (i.part) names.add(i.part);
+      }
+    for (const [n, items] of Object.entries(CAM_ITEMS)) for (const id of items) if (!ids.has(id)) throw new Error(`camera: "${n}" is drawn as ${id}, which the figure does not draw`);
+  }
+  return names;
+}
+function cameraNames() {
+  const can = framable(), bad = [];
+  STEPS.forEach((st, k) => (st.shot ?? []).forEach((n) => can.has(n) || bad.push(`step ${k}'s shot names "${n}"`)));
+  for (const [v, tracks] of Object.entries(VOICE?.variants ?? {}))
+    tracks.forEach((tr, k) => tr.links.forEach((l) => l.ids.forEach((n) => can.has(n) || bad.push(`the voice (${v}, step ${k}, at ${l.start.toFixed(2)} s) names "${n}"`))));
+  if (!bad.length) return;
+  const msg = `the camera cannot frame: ${bad.join("; ")}. A name is a part (${[...can].sort().join(", ")}).`;
+  if (PLANT && !process.argv.includes("--strict")) console.log(`planted fault "${PLANT}", which the build reports: ${msg}`);
+  else throw new Error(msg);
+}
+cameraNames();
+
 const DATA = {
   box: BOX, inset: INSET, g3: G3, plain: 8, stretch: STRETCH, over: OVER, bands: BANDS,
   base: "road",
-  steps: STEPS.map(({ heading, focus }) => ({ heading, focus })),
-  alias: { forces: ["forces", "cage", "tension"], gates: ["cassette", "chain"], lscrew: ["bknuckle"], hscrew: ["bknuckle"], bscrew: ["bknuckle", "hanger"], barrel: ["cable"], housing: ["cable"] },
+  steps: STEPS.map(({ heading, focus, shot }) => ({ heading, focus, ...(shot ? { shot } : {}) })),
+  // the camera: where framed parts may go (between the two columns of callouts, clear of the heading,
+  // View A, the title block and the cards), and the drawn items a camera name can mean
+  camera: { clear: PLANT_CLEAR ?? CLEAR, items: CAM_ITEMS },
+  alias: CAM_ALIAS,
   predict: {
     step: PRED_STEP,
     question: `Next the chain climbs to the ${M0.N.big}, which wraps ${shares(M0).extra} mm more chain round the cog. The chain cannot stretch, so the cage has to give some up. What turns the cage forward to do it?`,
@@ -468,8 +564,9 @@ text{font-family:var(--sans);fill:var(--ink)}
 .leader{fill:none;stroke:var(--ink);stroke-width:.5}
 .ldot{fill:var(--ink)}
 .label text{font-size:${FS}px;font-weight:500}
-.label text{paint-order:stroke;stroke:var(--stage);stroke-width:32px;stroke-linejoin:round}
-.tb-frame{fill:none;stroke:var(--ink);stroke-width:.9}
+.label text{paint-order:stroke;stroke:var(--stage);stroke-width:48px;stroke-linejoin:round}
+.tb-frame{fill:var(--stage);stroke:var(--ink);stroke-width:.9}
+.vz-step-heading{text-shadow:0 0 6px var(--stage),0 0 12px var(--stage),0 0 18px var(--stage)}
 .tb-rule{fill:none;stroke:var(--ink);stroke-width:.5}
 .tb-title{font-size:${FS * 0.8}px;font-weight:600;letter-spacing:.06em}
 .tb-text{font-size:${FS * 0.78}px}
