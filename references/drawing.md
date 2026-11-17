@@ -139,6 +139,7 @@ node scripts/check-drawing.mjs dist/<name>.html     # must print: drawing: passe
 - the right arrow doing nothing on a fresh page;
 - a narrated tour (run with stand-in audio) that does not stop at the prediction, or play near the end that does not stop at the end;
 - any console error;
+- the camera, on a page whose steps name a shot: a named part it cannot frame, framed under a card or too small, a camera that differs by how a step or time was reached, or one that moves too fast or holds a shot under 0.8 s (see "Point the camera at what the step teaches");
 - playback: the 95th-percentile frame over 8 ms, or any frame outside a step change over one 60 fps frame (16.7 ms), both scaled to the machine (see "Check it plays"). Every frame of the whole story is timed, for every variant, from its start to its layout being done.
 
 It is proven against faults: the old looping escalator, the round-4 eval lock (no lab, an incomplete contract) and the eval's clipped "Plug turns anyway" label planted back into the new lock.
@@ -197,6 +198,32 @@ A page that redraws its figure every frame stutters: the derailleur's first isom
 - **To try a slow machine**, set `VIZ_CPU_THROTTLE=2.5`. Chrome slows the reference and the page alike. `VIZ_ONLY_PLAYBACK=1` skips every other check, to time a page alone.
 
 The derailleur's redraw-every-frame version fails at 1x (p95 38 ms) and at 2.5x (p95 94 ms); the draw-once version passes at both (p95 1.9 and 4.4 ms), as do the escalator and the lock.
+
+### Point the camera at what the step teaches
+
+A figure that shows the whole machine at every step leaves the reader hunting for a 4 mm screw. The shared player has a camera (`src/drawing/camera.mjs`): zoom and pan only, as one transform on the figure's group, so nothing is redrawn and the viewing angle never changes.
+
+- **A step names its shot:** `shot: ["hscrew", "lscrew", "bscrew"]` in `DATA.steps`. The camera frames those parts' bounds in the stage's clear area, zoomed at most 3×, never below 1×. A step without a shot shows the whole figure.
+- **The voice points too.** While the narration speaks a `[phrase|part]` the step's shot does not frame well (inside the clear area and at least 6% of its shorter side), the camera eases to that part before the words reach it, holds at least 0.8 s, and comes back when there is room. Links too close together share one shot, so the camera never chases every word.
+- **Calm.** Each move is long enough that the picture never moves faster than 2 clear-area short sides a second, eased in and out. Under reduced motion it jumps instead.
+- **Deterministic.** The camera is a function of the story time. Running on from the step before, a step eases in from that step's camera; reached by a tab, it eases from wherever the camera is to the step's shot. A seek and a play to the same time give the same camera.
+- **What does not zoom:** callout text, View A, the title block and the cards. Leaders follow the camera to their parts; a callout whose point leaves the picture hides.
+- **The machine supplies two hooks:**
+  - `boundsOf(names)`: the named parts' bounds in the figure's own units, without the camera, or null for a name it does not have;
+  - `clearArea()`: `{ x0, y0, x1, y1 }`, where framed parts may go, clear of the heading, the callout columns, any inset and the cards.
+
+  Put `data-camera` on the group the camera moves, and `data-camera-avoid` on anything framed parts must stay out from under (the derailleur marks View A and the title block). Keep insets and labels outside the camera's group. A fade mask on the group at the callout columns keeps a zoomed figure from running under them.
+- **Every name must be framable.** The derailleur's build stops on a shot or a voice link naming a part the figure does not draw.
+
+`check-drawing` checks the camera on any page whose steps name a shot:
+- **Framing.** At each step's still frame, and at the moment each spoken name begins, every named part has bounds. Each sits inside the clear area, off the cards, the heading and anything marked `data-camera-avoid`, at 6% or more of the stage's shorter side, and its callout points at it on the stage. Checked at 1440×900 and 1280×800, for every variant.
+- **Determinism.** A step's camera matches by `seekStep` and by its tab. A time's camera matches by `seek` and by playing up to it.
+- **Calm.** Run frame by frame through the whole story, the picture never moves faster than the limit. Every shot is held 0.8 s or more, and a tab's eased move keeps to the same speed.
+
+It fails each of the derailleur's planted faults (`node examples/derailleur/build.mjs --plant missing-shot|unknown-link|under-card --out <page>`):
+- a shot naming a part the figure lacks;
+- a voice link to an unknown part;
+- a clear area that frames parts under the cards.
 
 ## Known gaps
 
