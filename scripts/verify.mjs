@@ -30,6 +30,7 @@ const shotsArg = argv.find((a, i) => argv[i - 1] === "--shots");
 let dirs = argv.filter((a, i) => !a.startsWith("--") && argv[i - 1] !== "--plant" && argv[i - 1] !== "--shots").map((d) => resolve(d));
 
 const { compile } = await import(pathToFileURL(join(ROOT, "src/core/scene.ts")).href);
+const { audit, textsOf } = await import(pathToFileURL(join(ROOT, "src/claims/audit.mjs")).href);
 
 // ---- Planted faults ------------------------------------------------------------
 // Each one breaks the page after standalone fonts and the player are ready. Used by --controls
@@ -274,6 +275,12 @@ const PLANTS = {
   keyboard: () => {
     window.addEventListener("keydown", (e) => e.stopImmediatePropagation(), true);
   },
+  // Keys reach the figure only once it has focus (the bug a fresh page had).
+  "fresh-keys": () => {
+    window.addEventListener("keydown", (e) => {
+      if (e.target === document.body || e.target === document.documentElement) e.stopImmediatePropagation();
+    }, true);
+  },
 };
 
 const CONTROLS = [
@@ -297,6 +304,7 @@ const CONTROLS = [
   { plant: "caption", expect: "captions" },
   { plant: "console", expect: "console" },
   { plant: "keyboard", expect: "keyboard" },
+  { plant: "fresh-keys", expect: "keyboard" },
   { plant: "linking", expect: "linking" },
   { plant: "layout-shift", expect: "layout shift" },
   { variant: "label-on-part", expect: "labels" },
@@ -779,8 +787,17 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant, hash = 
       if (tried) report.add("linking", `${tried} linked elements pointed at`, linkProblems);
     }
 
-    // Keyboard.
+    // Keyboard. First as a reader meets a fresh page: nothing focused, nothing clicked.
     const keyProblems = [];
+    await page.evaluate(() => {
+      window.__viz.seekStep(0);
+      document.activeElement?.blur?.();
+    });
+    await page.keyboard.press("ArrowRight");
+    const fresh = await page
+      .waitForFunction((t) => window.__viz.time() === t, { timeout: 4000 }, compiled.restTime(1))
+      .then(() => true, () => false);
+    if (!fresh) keyProblems.push("ArrowRight with nothing focused did nothing; a standalone page must take keys before it is clicked");
     await page.evaluate(() => window.__viz.seekStep(0));
     await page.focus(".vz-stage");
     await page.keyboard.press("ArrowRight");
@@ -1045,6 +1062,31 @@ try {
             if (!q.question.trim() || !q.explanation.trim()) problems.push(`seed ${seed}: empty question or explanation`);
           }
           report.add("practice", "40 model-made questions: one right answer among distinct choices, each explained", problems);
+        }
+        // Correctness: what the page says, checked like the picture (src/claims/audit.mjs). A scene
+        // declares it by exporting `audit` from scene.ts; the first variant carries the review.
+        {
+          const mod = await import(pathToFileURL(join(dir, "scene.ts")).href);
+          const problems = [];
+          const fixture = !relative(join(ROOT, "test"), dir).startsWith("..");
+          if (fixture) { /* kit fixtures test parts, not explanations */ }
+          else if (!mod.audit) problems.push("no audit exported from scene.ts: topics with a source, claims tested against the model, and an independent review (SKILL.md, Correctness)");
+          else {
+            const compiled = compile(scene);
+            const words = {
+              title: scene.title, about: scene.about ?? "",
+              steps: compiled.steps.map((st) => ({ heading: st.teaching?.heading ?? "", caption: st.caption, voice: st.voice ?? "", prediction: st.teaching?.prediction ?? null })),
+              assumptions: scene.assumptions ?? [], legend: (scene.legend ?? []).map((l) => l.label),
+              practice: scene.practice ? Array.from({ length: 10 }, (_, k) => { const q = scene.practice(k); return { question: q.question, choices: q.choices, explanation: q.explanation }; }) : [],
+            };
+            const texts = textsOf(words, "scene").map((t) => ({ ...t, text: t.text.replace(/\[([^\]|]+)\|[^\]]+\]/g, "$1").replace(/\{([^}]+)\}/g, "$1") }));
+            const places = [...compiled.steps.map((_, k) => `step:${k}`).slice(1), "whatif", "practice"];
+            const details = [...(scene.assumptions ?? []), ...compiled.steps.map((st) => st.caption)].join("\n");
+            const r = audit({ texts, places, details, ...mod.audit, reviewFile: mod.audit.reviewFile ?? join(dir, "review.json") });
+            if (mod.audit.report !== false) writeFileSync(join(out, `${name}.audit.json`), JSON.stringify({ title: scene.title, stamp: r.stamp, review: r.review, problems: r.problems, claims: (mod.audit.claims ?? []).map((c) => c.text), coverage: mod.audit.coverage, texts }, null, 1));
+            problems.push(...r.problems);
+          }
+          if (!fixture) report.add("audit", "numbers from the model, claims tested, topics with a source, an independent review of the current text", problems);
         }
         report.print();
         writeFileSync(join(shotsDir, "report.json"), JSON.stringify(report.rows, null, 2));

@@ -584,6 +584,11 @@ polyline.vz-link { fill: none; }
 .vz-unfold[data-look="paper"] .vz-unfold-labels > div { color: #25304a; font-family: "Iowan Old Style", Palatino, Georgia, serif; }
 .vz-unfold[data-look="paper"] .vz-unfold-face { font-size: 17px; }
 .vz-unfold[data-look="clay"] .vz-unfold-labels > div { color: #3b3027; }
+.vz-unfold[data-look="drawing"] .vz-unfold-labels > div { color: var(--ink); font-size: 12px; }
+.vz-unfold[data-look="drawing"] .vz-unfold-label[data-size="small"] { font-size: 11.5px; color: var(--ink); }
+.vz-unfold[data-look="drawing"] .vz-svg { color: var(--ink); }
+.vz-unfold[data-look="drawing"] .vz-unfold-leader { stroke: var(--ink); stroke-width: .75; stroke-opacity: 1; marker-end: url(#vz-leader-dot); }
+.vz-unfold[data-look="drawing"] .vz-unfold-face { color: var(--ink); font-size: 17px; }
 .vz[data-presentation="editorial"] .vz-stage:has(.vz-unfold) .vz-svg { height: 100%; }
 /* What if? and Now you try */
 .vz-whatif { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; font-size: 12px; color: var(--ink-2); }
@@ -627,3 +632,13 @@ polyline.vz-link { fill: none; }
 @media (max-width: 760px) {
   .vz .vz-controls .vz-btn.vz-try, .vz .vz-controls .vz-btn.vz-voice { order: 10; flex: 1 1 calc(50% - 6px); width: auto; }
 }
+
+/* The drawing look's title block: the machine drawings' frame, ruled cells and line keys. */
+.vz-tblock { position: absolute; right: 18px; top: 16px; z-index: 1; min-width: 260px; max-width: 34%; border: 1px solid var(--ink); background: var(--stage, var(--card)); color: var(--ink); pointer-events: none; }
+.vz-tblock > div { padding: 5px 10px; border-top: .5px solid var(--ink); font: 400 10.5px/1.45 var(--sans); }
+.vz-tblock > div:first-child { border-top: 0; font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; }
+.vz-tb-keys { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.vz-tb-key { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.vz-tb-key i { display: inline-block; width: 16px; height: 0; border-top: 1.5px solid var(--t-structure, var(--ink)); }
+.vz-tb-key i[data-tone="accent"] { border-color: #e4572e; } .vz-tb-key i[data-tone="good"] { border-color: #0f9488; } .vz-tb-key i[data-tone="bad"] { border-color: #b34d49; } .vz-tb-key i[data-tone="cold"] { border-color: #2563eb; } .vz-tb-key i[data-tone="hot"] { border-color: #ad7534; }
+.vz[data-opening] .vz-tblock, .vz-tblock[data-away="true"] { visibility: hidden; }

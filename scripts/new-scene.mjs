@@ -205,6 +205,25 @@ export default defineScene<QueueState, QueueEvent>({
     { tone: "good", label: "Served" },
   ],
 });
+
+// The correctness audit (SKILL.md, Correctness). verify fails on "audit" until it is complete:
+// write the topics a good reference teaches (with its source), pair each cause-and-effect
+// sentence with a test, and get an independent review (node scripts/review-brief.mjs).
+const RUN = run(CAPACITY, ARRIVALS, OPS);
+export const audit = {
+  models: [RUN, { capacity: CAPACITY }],
+  claims: [
+    { text: "arrives at a full queue and is rejected", test: () => RUN.some(({ event, state }) => event.type === "reject" && state.items.length === CAPACITY) },
+  ],
+  coverage: {
+    source: "",
+    topics: [
+      { topic: "items join at the back", where: "step:1" },
+      { topic: "the oldest item is served first", where: "step:5" },
+      { topic: "a full queue rejects arrivals", where: "step:4" },
+    ],
+  },
+};
 `;
 
 mkdirSync(dir, { recursive: true });
@@ -217,4 +236,7 @@ console.log(`created ${rel}/model.ts, model.test.ts, scene.ts
 next:
   node --test ${rel}/model.test.ts
   node scripts/build.mjs ${rel}
-  node scripts/verify.mjs ${rel}`);
+  node scripts/verify.mjs ${rel}
+
+verify passes everything but "audit" as generated: fill in the topic list and its source,
+the claims, and an independent review (SKILL.md, Correctness).`);

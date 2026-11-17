@@ -1,0 +1,63 @@
+{
+  "stamp": "e8c2f8e4f742578b",
+  "reviewer": "independent",
+  "summary": "Round 2: all seven round-1 findings are fixed, and every new number is correct. Recomputed: cat 0.77484 (scaled) against 0.88349 (unscaled), so 0.775 and 0.883 are correct three-decimal roundings. The \"the\" row is 0.45553, 0.22461 and 0.31987, so 0.456 + 0.225 + 0.320 = 1.001 beside Σ 1.000 is honest rounding. Details states it, and forcing the row to sum to 1.000 would misstate one weight, so I accept both choices the author flagged. The new length-against-direction sentence (cosine 0.95 against 0.89, lengths 0.71 against 2), the variance argument, the flatter-weights prediction, the concatenate-then-project wording, the self-attention note and the honest last-step heading all check out. No new findings.",
+  "findings": [
+    {
+      "where": "scene.steps.5.caption",
+      "text": "The authors suspect that for large d_k the dot products grow large, pushing softmax into regions with extremely small gradients, and scale to counteract it.",
+      "severity": "missing",
+      "finding": "This explains why the scores are scaled but not why the divisor is √d_k. The paper's footnote 4 gives the reason: if the components of q and k are independent with mean 0 and variance 1, q·k has mean 0 and variance d_k, so dividing by √d_k brings the variance back to 1. That is the step's actual content. The paper also says the dot products 'grow large in magnitude' (they can be large and negative), not just 'grow large'. Add the variance argument in one sentence.",
+      "fixed": true,
+      "resolved": false
+    },
+    {
+      "where": "step:5 (prediction) and step:6",
+      "text": "Which token will get the most weight? ... cat: it has the largest scaled score.",
+      "severity": "missing",
+      "finding": "Dividing by a positive constant cannot change the order of the scores, and softmax preserves order, so the prediction was already decided at step 3 (raw score 4 is the largest). It tests nothing about scaling. What scaling changes is how sharp the softmax is, and the page never shows it. Without scaling, sat's weights would be [0.044, 0.884, 0.072]; with it they are [0.093, 0.775, 0.132]. Showing 0.88 -> 0.77 on cat, or asking 'does scaling make the weights sharper or flatter?', would teach the step.",
+      "fixed": true,
+      "resolved": false
+    },
+    {
+      "where": "scene.steps.2/3/4.caption",
+      "text": "A larger score means the key matches the query better.",
+      "severity": "misleading",
+      "finding": "The dot product rewards a key's length as well as its direction, and this example shows it. In direction alone, k_sat = [0.5, 0.5] matches q_sat = [1, 2] better than k_cat = [0, 2] does (cosine 0.95 against 0.89). Cat wins only because its key is longer (|k| = 2 against 0.71). Say 'a larger dot product, which grows with both alignment and length, means more attention', or pick vectors where the claim is true.",
+      "fixed": true,
+      "resolved": false
+    },
+    {
+      "where": "scene.steps.7.caption; weights panel",
+      "text": "0.09 of “the”, 0.77 of “cat”, 0.13 of “sat”",
+      "severity": "misleading",
+      "finding": "Rounded to two places, the weights shown add up to 0.99, while the heading and the Σ column say 1.00. The exact values are 0.0929, 0.7748 and 0.1323. A careful reader will see the mismatch. Show three decimals for this row (0.093, 0.775, 0.132), or round so the shown values sum to 1.",
+      "fixed": true,
+      "resolved": false
+    },
+    {
+      "where": "step:8 (picture)",
+      "text": "Every token does the same, all at once.",
+      "severity": "misleading",
+      "finding": "On this step the panels show all three rows of weights and outputs, but the stage still shows only 'sat': the gauges read 0.09 / 0.77 / 0.13, the weighted reach lines leave 'sat' only, and 'sat''s plinth still looks highlighted. The picture says one query while the words say every query at once. Either show all three rows on the stage (for example, three sets of reach lines or a 3×3 gauge grid) or say plainly that the stage still shows 'sat''s row while the matrix shows all of them.",
+      "fixed": true,
+      "resolved": false
+    },
+    {
+      "where": "scene.assumptions[2]",
+      "text": "multi-head attention runs several heads in parallel and joins their outputs.",
+      "severity": "misleading",
+      "finding": "Coverage says Details explains how the heads combine, but 'joins' does not say how. In §3.2.2, each head uses its own learned projections W_i^Q, W_i^K, W_i^V. The h outputs are concatenated and multiplied by W^O: MultiHead(Q,K,V) = Concat(head_1..head_h) W^O. Say concatenate-then-project. Averaging or summing would be a different model.",
+      "fixed": true,
+      "resolved": false
+    },
+    {
+      "where": "scene.assumptions[0]",
+      "text": "In a Transformer they are learned linear projections of each token's embedding.",
+      "severity": "misleading",
+      "finding": "They are projections of the layer's input, which is the token embedding only in the first layer and the previous layer's output after that. The page also never says this is self-attention (Q, K and V from the same sequence, which is why 'sat' scores itself). In the paper's encoder-decoder attention, queries come from the decoder and keys and values from the encoder output. Say 'projections of each token's representation at that layer', and name self-attention.",
+      "fixed": true,
+      "resolved": false
+    }
+  ]
+}

@@ -2,6 +2,47 @@
 
 One version covers the kit and the skill (`package.json` `version` and `SKILL.md` `metadata.version` move together). Each entry names the failure that caused it, so the reason for a rule is never lost.
 
+## Unreleased
+
+What a machine needs. The escalator built in Clay came out as about forty identical soft wheels in front of two thin track lines, with a floor shadow that meant nothing. The builder called it unprofessional. Drawn as a to-scale side cutaway, the same mechanism read at a glance.
+
+- **Two looks, chosen by subject.** Real machines and physical systems are drawn as technical cutaways (`references/drawing.md`). Abstract concepts stay in Clay.
+- **`examples/escalator` is the standard for mechanisms.** It is drawn to scale from a model whose tests check that the treads stay level, that no parts collide and that every wheel stays on its rail, for both a 30° and a 35° incline. It has a voice with parts lit as they are named, a prediction before the landing, What if and Now you try.
+- **The timeline runs once, start to end.** The escalator's first bar showed the machine's 42 s loop, so it swept twice during a 98 s explanation and matched nothing on screen. Now each step is as long as its narration, and play stops at the prediction and at the end.
+- **`scripts/check-drawing.mjs`** checks a Drawing page at 1440×900 and 1280×800:
+  - the page contract and an embedded voice;
+  - no page scroll, and the right step for each tab;
+  - a forward-only timeline that stops at the end;
+  - callouts at 11 px or larger that stay inside the stage and don't overlap;
+  - no console errors.
+
+  It fails on the old looping bar. It runs in CI as `pnpm check:drawing`, and `pnpm test` now runs `examples/**/*.test.mjs`.
+- **Length.** A mechanism takes 5–8 steps. Narration stays under about 3 minutes, or the subject is split.
+- **The voice is compressed again.** `scripts/voice.mjs` asked for 96 kb/s AAC, which afconvert rejects for 24 kHz mono, so every clip silently fell back to WAV. It now asks for 64 kb/s. Pages recorded before this need re-recording to shrink.
+- **What a page says is checked, not only what its model computes (`src/claims/audit.mjs`).** Round 5 lost both topics to a plain agent, and the losses were words: a derailleur page said the cage spring swings the cage forward (it pulls it back), a heading said 60° where the readout said 37°, and limit screws were never taught. The audit runs in every build (`drawingPage`) and in `verify`, and fails on any of these:
+  - a number in the text that the model doesn't have at the precision shown;
+  - a cause-and-effect claim that is not on the page word for word, or that the model contradicts;
+  - a topic list with no source, or with fewer than three in four core topics taught;
+  - no current independent review. `scripts/review-brief.mjs` writes the brief for a reviewer who did not build the page, and editing the text after the review makes it stale.
+
+  It caught a real error on the approved escalator: its landing step said the two tracks "come together" with "both wheels at the same height", but the model keeps the trailer wheel 30 mm higher. The stairs flatten because the chain's path levels out; the narration, heading and prediction now say so. Every example has its topics with a source, its claims and a review.
+
+  The first reviews found 56 problems across the six pages; the numbers held up and the words didn't. On the lock, the near-miss key was one depth too *shallow* and the page said "the chamfers cam it past". A key pin left too high rests on the key, so nothing pushes it down. Locks forgive the other way: a stack left low is cammed up against the driver's spring. The wrong key is now one depth too deep, and the model's allowance is asymmetric (generous low, limited by the key's drop in its keyway high). A worn lock opens for 32 keys; the tight one for 1. On the escalator, the title block's sprocket diameter was a band approximation (now the true pitch diameter), and the step-rise readout stayed at 200 mm on the landing (now live). On LRU, new keys were drawn at the least-recent end.
+- **Concepts in the machines' style: `look: "drawing"`, now the default.** The builder wanted concept pages to match the machine drawings. The new look keeps the 3D layout but draws it like the machines:
+  - ink outlines on the cream stage, with flat light and no cast shadows;
+  - base plates hatched as cut sections; the hatching is in screen space, because world-space hatching bent with the view;
+  - the drawings' palette: ink, blue, teal and red, plus orange for the part the reader follows;
+  - leaders ending in dots;
+  - a title block with the legend as line keys, which moves to whichever right-hand corner no part or label covers once a step settles.
+
+  `examples/lru-3d` uses it, and Clay and Paper stay available on request.
+- **One page and player for every machine (`src/drawing/`).** The lock built for an eval copied the escalator's page and rewrote about 1,000 lines of its player. Now a machine supplies its drawing and a few hooks (its model, the state at a moment of the story, how to draw it, its questions, its lab), and the shared player runs the timeline, the voice tour, the prediction, What if, Now you try, the lab, Details, the theme and the keys. The escalator moved onto it pixel for pixel: 29 captured states, identical before and after.
+- **`examples/lock`, the second machine.** A pin tumbler lock, long section and section A–A to scale, with tests for every one-off key, 2,000 random keys, the insertion sweep, picking and the lab's whole range. It fixes what the blind judge found on the eval's version: a quiz about "6 pins" on a 5-pin lock (questions now read the lock's own count), a callout clipped by the prediction card, and a plug hatched exactly like its housing (the plug's section is now tinted and hatched closer).
+- **Depth on every page.** A plain agent beat the skill on depth in both round-4 evals by opening with the problem, covering the topic's second idea and giving a hands-on lab. A page now does all three: the lock opens with one key among about 92,000 and ends with picking, and both machines have a lab (cut a key; move the orange step and set a track error). The Size row now gives the length as a ceiling.
+- **`check-drawing` tests what a reader can do,** not only the steps: every step of every What if variant, the prediction answered, eight Now you try questions, the lab at every input's minimum and maximum, the narrated tour (with stand-in audio) stopping at the prediction, and the right arrow on a fresh page. A callout under an open card now fails; it catches the eval lock's clipped label, which the old check passed. Missing contract parts are reported instead of crashing.
+- **Arrow keys work on a fresh Clay page.** They did nothing until the reader clicked the page (found on the hashing eval, reproduced on the LRU flagship). A standalone page now passes unfocused keys to the figure; an embedded figure still takes keys only when focused. `verify` presses → on a fresh page, with a planted control.
+- **Codex and Antigravity.** Install paths, a Chrome hint for sandboxed agents, and a compatibility line. These were written for the README change but never reached main.
+
 ## 1.0.0
 
 First release, desktop first.

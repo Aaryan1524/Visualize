@@ -1,6 +1,6 @@
 <h1 align="center">Visualize</h1>
 
-<p align="center"><b>An Agent Skill that turns a one-line request into a step-through explanation you can trust.</b><br>A 3D figure that moves one step at a time, a voice that explains it, and a reader who predicts and practises.<br>Every number on the page is checked against a running model of the idea.</p>
+<p align="center"><b>An Agent Skill that turns a one-line request into a step-through explanation you can trust.</b><br>A figure that moves one step at a time (a to-scale technical cutaway for a machine, the same ink-drawing style in 3D for an idea), a voice that explains it, and a reader who predicts and practises.<br>Every number on the page is checked against a running model of the idea.</p>
 
 <p align="center">
   <a href="https://code.claude.com/docs/en/skills"><img src="https://img.shields.io/badge/Claude_Code-skill-1b1b19?style=flat-square&logo=claude&logoColor=white" alt="Claude Code skill"></a>
@@ -15,6 +15,7 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#gallery">Gallery</a> ·
   <a href="#what-the-reader-gets">What the reader gets</a> ·
+  <a href="#install">Install</a> ·
   <a href="#usage">Usage</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#requirements">Requirements</a> ·
@@ -22,10 +23,10 @@
 </p>
 
 <p align="center">
-  <img src=".github/assets/lru-cache-predict.jpg" width="720" alt="A page titled LRU Cache. Three soft clay keys, B, C and a green A, sit in a cache tray marked least recent to most recent, with a queue of upcoming requests below. A card asks the reader to predict: D is next, which key leaves? A strip under the figure lists each request as a hit or a miss.">
+  <img src=".github/assets/lru-cache-predict.jpg" width="720" alt="A page titled LRU Cache in the drawing look. Three keys drawn in ink, B, C and an orange A, sit in a hatched cache tray marked least recent to most recent, with a queue of upcoming requests below and a title block with the legend at the top right. A card asks the reader to predict: D is next, which key leaves? A strip under the figure lists each request as a hit or a miss.">
 </p>
 
-<p align="center"><sub><code>examples/lru-3d</code>, the flagship: an LRU cache in the Clay look, paused on a prediction before the first eviction.</sub></p>
+<p align="center"><sub><code>examples/lru-3d</code>, the flagship: an LRU cache in the drawing look, paused on a prediction before the first eviction.</sub></p>
 
 ---
 
@@ -46,18 +47,26 @@ Then, in Claude Code:
 /visualize explain how an LRU cache works
 ```
 
-That's it. The folder must be named `visualize`, the same as the skill's `name`. For any other agent that reads Agent Skills, clone it into that agent's skills folder instead.
+That's it. For Codex or Antigravity, clone into that agent's folder instead (see [Install](#install)); in Codex, type `$visualize`.
 
 ## Gallery
 
+<p align="center"><img src=".github/assets/escalator.jpg" width="720" alt="A page titled Escalator: a to-scale side cutaway of an escalator in a hatched building section. A blue chain-wheel track and a green trailer-wheel track run up a 30 degree incline, one step is followed in orange, and Detail A at 2.6 to 1 shows the step's 200 mm rise. Readouts under the drawing give step rise, tread tilt, tread height, speed and step count."></p>
+
+<p align="center"><sub><b>escalator</b>, the flagship for mechanisms: two wheels on two offset tracks keep every tread level. Drawn to scale from a tested model, with a voice, a prediction before the landing and a 30°/35° What if.</sub></p>
+
+<p align="center"><img src=".github/assets/lock.jpg" width="720" alt="A page titled Pin Tumbler Lock, on its Picking step: a to-scale long section of a lock cylinder with five pin stacks. A tension wrench and a pick, in orange, reach into the keyway; two driver pins already sit set on the plug's edge above the blue shear line while the pick lifts a third stack. Section A-A through chamber 3 is shown in a detail circle, with readouts for pins set, allowance and plug turn below."></p>
+
+<p align="center"><sub><b>lock</b>: why only the right key turns, from the problem (one key among about 92,000) to the second idea, picking. The reader can cut a key of their own in the lab and watch each pin land.</sub></p>
+
 <table>
   <tr>
-    <td width="50%"><img src=".github/assets/lru-cache-evict.jpg" alt="The LRU cache a few steps later: C has been evicted and B enters as the most recent key, shown in orange. The strip reads 1 hit, 5 misses, 2 evictions."></td>
-    <td width="50%"><img src=".github/assets/lru-cache-paper.jpg" alt="The same LRU cache in the Paper look: white parts outlined in ink on a grey grid, with B outlined in red as it enters."></td>
+    <td width="50%"><img src=".github/assets/lru-cache-evict.jpg" alt="The LRU cache a few steps later in the drawing look: C has been evicted and B enters as the most recent key, in orange. The strip reads 1 hit, 5 misses, 2 evictions."></td>
+    <td width="50%"><img src=".github/assets/lru-cache-clay.jpg" alt="The same LRU cache in the Clay look: soft matte keys on a warm tray with soft shadows, B in solid orange as it enters."></td>
   </tr>
   <tr>
     <td><sub><b>lru-3d</b>: C leaves and B enters. The strip and the counts come from the same model that moves the keys.</sub></td>
-    <td><sub><b>lru-3d, Paper</b>: the same scene in the second look, outlined in ink. Clay is the default; Paper is on request.</sub></td>
+    <td><sub><b>lru-3d, Clay</b>: the same scene in the soft look, on request. The drawing look is the default, so concepts match the machines.</sub></td>
   </tr>
   <tr>
     <td><img src=".github/assets/attention.jpg" alt="Scaled dot-product attention on an isometric board: query, key and value bars for the words the, cat and sat, softmax weights 0.09, 0.77 and 0.13 as gauges, with the equation and the weight grid in linked panels."></td>
@@ -69,7 +78,7 @@ That's it. The folder must be named `visualize`, the same as the skill's `name`.
   </tr>
 </table>
 
-Every screenshot is the light theme of a page built from [`examples/`](examples) with `node scripts/build.mjs` and captured with [`scripts/shoot.mjs`](scripts/shoot.mjs).
+Every screenshot is the light theme of a page built from [`examples/`](examples) with `node scripts/build.mjs` and captured with [`scripts/shoot.mjs`](scripts/shoot.mjs). The escalator and the lock build with their own `build.mjs`.
 
 ## What the reader gets
 
@@ -77,14 +86,61 @@ Every screenshot is the light theme of a page built from [`examples/`](examples)
 |---|---|
 | **A checked picture** | Every value, order, size, highlight and caption is declared by the model and read back from the rendered page at every step. Planted faults prove the checks can fail. |
 | **The field's own shape** | A tree over its array, a ring, a stock with its refill and gate, a row with pointers, a sequence diagram for timing. The kit's parts never choose the picture. |
-| **A directed 3D stage** | Soft matte Clay parts, lettering printed on the parts, and a camera that opens flat, moves to each step's focus and ends flat. An isometric SVG stage is also available. |
+| **The right look for the subject** | A real machine is a sharp technical cutaway, drawn to scale, with hatched sections, dimensions and a magnified detail for each step. An idea is built from 3D parts in the same style (ink outlines, hatched base plates, the same palette and title block) on a directed stage that opens flat, moves to each step's focus and ends flat. Clay and Paper looks remain on request. |
 | **A voice** | Recorded locally by an open-source voice model, offline after one download. It explains the concept first, then narrates each step in one take and lights each part as it is named. ▶ plays the narrated tour and waits for every sentence. |
 | **Predict, What if, Now you try** | A pause to predict before the key moment, the same idea on other inputs, and questions the model makes and marks. |
 | **A page you own** | One standalone HTML file per scene, light and dark themes, reduced motion, keyboard control, `#step=` links and a text version of every step. Also an SVG of any step, or a React component. |
 
+## Install
+
+Visualize is a standard [Agent Skill](https://agentskills.io): a folder with a `SKILL.md` at its root. This repository is that folder. Clone it into your agent's skills folder under the name `visualize`, then run `npm install` in it once.
+
+| Agent | Command | Run it with |
+|---|---|---|
+| **Claude Code** | `git clone https://github.com/Aaryan1524/Visualize.git ~/.claude/skills/visualize` | `/visualize …` |
+| **Codex** | `git clone https://github.com/Aaryan1524/Visualize.git ~/.agents/skills/visualize` | `$visualize …` |
+| **Antigravity** (CLI) | `git clone https://github.com/Aaryan1524/Visualize.git ~/.gemini/config/skills/visualize` | `/visualize …` |
+| **Antigravity** (app) | `git clone https://github.com/Aaryan1524/Visualize.git ~/.gemini/antigravity/skills/visualize` | `/visualize …` |
+| **One project, any agent** | clone into `.claude/skills/visualize` or `.agents/skills/visualize` in the project | as above |
+
+Then, in the folder you cloned into:
+
+```sh
+npm install
+```
+
+Each agent picks the skill up in a new session. To update later, `git pull` in that folder.
+
+<details>
+<summary><b>Codex: if the checks can't start Chrome</b></summary>
+
+<br>
+
+The skill checks every page in headless Chrome. Codex's sandbox can stop Chrome from starting; the page is still built, and only the checks fail, with a message that says so. When Codex asks to run the check outside the sandbox, approve it for that command (this needs the default `approval_policy = "on-request"`). Or run the check yourself in a normal terminal: `node ~/.agents/skills/visualize/scripts/verify.mjs <scene folder>`.
+
+</details>
+
+<details>
+<summary><b>Antigravity: running without prompts</b></summary>
+
+<br>
+
+In headless mode (`agy -p`), Antigravity can't ask for permission, so it needs allow rules for the skill folder and for `node`. Add them under `permissions.allow` in its `settings.json`, or pass them for one session with `--settings`:
+
+```json
+{ "permissions": { "allow": [
+  "read_file(~/.gemini/config/skills/visualize)",
+  "command(node ~/.gemini/config/skills/visualize/scripts/)"
+] } }
+```
+
+Add `read_file` and `write_file` rules for your project folder too. In the interactive app, approve each command when asked.
+
+</details>
+
 ## Usage
 
-Type `/visualize` and say what the reader should understand:
+Type `/visualize` (in Codex, `$visualize`) and say what the reader should understand:
 
 ```text
 /visualize explain how an LRU cache works
@@ -138,14 +194,15 @@ visualize/
 ├── SKILL.md            the skill: governing idea, decision table, workflow, parts, gates
 ├── src/
 │   ├── core/           trace, steps, timeline, keyed interpolation, scene types
-│   ├── unfold/         the 3D stage, directed camera and looks (Clay, Paper)
+│   ├── unfold/         the 3D stage, directed camera and looks (drawing, Clay, Paper)
 │   ├── iso/            the isometric projection and depth sort
 │   ├── parts/          finished parts: rail, ring, tree, network, flow
+│   ├── drawing/        the Drawing page and player shared by every machine
 │   ├── render/         the player, SVG stage, panels, components, styles
 │   └── react/          the React adapter
 ├── references/         kit.md, authoring.md, craft.md, verify.md
 ├── scripts/            build, verify, voice, shoot, export-svg, new-scene
-├── examples/           lru-3d (flagship), lru, attention, retries
+├── examples/           lru-3d (concept flagship), escalator (mechanism flagship), lock, lru, attention, retries
 ├── test/fixtures/      gallery scenes and the planted faults
 └── evals/evals.json    test prompts and what a good answer contains
 ```
@@ -174,7 +231,7 @@ node scripts/shoot.mjs dist/lru-3d.html --out shot.png --step 4 --scale 4
 
 | | Needed for | Notes |
 |---|---|---|
-| **[Claude Code](https://code.claude.com/docs/en/overview)** or another agent that reads [Agent Skills](https://agentskills.io) | everything | Written for Claude Code; the skill follows the open Agent Skills format. |
+| **[Claude Code](https://code.claude.com/docs/en/overview)**, [Codex](https://developers.openai.com/codex/skills) or [Antigravity](https://antigravity.google) | everything | The skill follows the open Agent Skills format, so any agent that reads it can load it. Tested end to end in all three. |
 | **Node.js 24+** | builds, checks | TypeScript runs directly through type stripping. Run `npm install` (or `pnpm install`) once in the skill folder. |
 | **Chrome or Chromium** | the checks | Found in the usual places on macOS, Linux and Windows. Set `CHROME_PATH` for any other binary. |
 | **About 90 MB, once** | the voice | The open-source voice model downloads on first use, then works offline. |
@@ -182,9 +239,10 @@ node scripts/shoot.mjs dist/lru-3d.html --out shot.png --step 4 --scale 4
 ## Limits
 
 - **Desktop first.** Pages work on phones, but the phone layout is not polished yet.
-- **The voice needs one extra step.** After writing the script, run `node scripts/voice.mjs <scene>`. Clips are compressed on macOS; elsewhere they stay WAV and pages get larger. What if versions are not voiced yet.
+- **The voice needs one extra step.** After writing the script, run `node scripts/voice.mjs <scene>`. Clips are compressed to AAC on macOS; elsewhere they stay WAV and pages get larger. What if versions are not voiced yet.
 - **The 3D checks are not yet complete.** Sizes, tones, order, highlights, contrast and phone layout are checked on the isometric stage, not yet on the 3D one.
-- **The reader cannot type their own input yet.** What if offers prepared inputs; a free-input explorer is planned.
+- **Each machine's drawing is still its own code.** The page, the player, the voice tour, the prediction, the lab and the checks are shared (`src/drawing/`); the drawing and the machine's motion are written per machine, starting from `examples/lock/`. `verify` does not read Drawing pages; `check-drawing` and the model tests do.
+- **Labs are on machine pages only.** On a machine page the reader sets their own values (cut a key, move a step). Concept pages still offer prepared What if inputs.
 - **It is slow on purpose.** A page takes a long session: the model and its reference, the view, the checks, and a read of every screenshot.
 
 ## License

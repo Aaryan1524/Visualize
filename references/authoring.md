@@ -71,7 +71,7 @@ Every step carries a trust level shown with the action. Use `sourced` only with 
 ```ts
 export default defineScene({
   ...scene,
-  look: "clay",                        // the default look; "paper" on request; omit for the isometric SVG stage
+  look: "drawing",                     // the default look, matching the machine drawings; "clay" or "paper" on request; omit for the isometric SVG stage
   about: "Keeps what you used lately and drops what you haven't.",   // top-left, under the title
   voice: (s, e, k) => !e ? "Here's a cache with room for three keys..." : `[${e.key}|entry-${e.key}] is new...`,
   practice: (seed) => ({ question, choices, answer, explanation }),   // all computed by the model

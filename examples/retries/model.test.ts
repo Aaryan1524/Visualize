@@ -69,3 +69,17 @@ test("a lost request is retried, and the client gives up after the last attempt"
   assert.equal(s.client.status, "failed");
   assert.equal(s.ledger.length, 0);
 });
+
+test("with a key, every attempt carries the one key the client made; without, none does", () => {
+  const sent = (idempotent: boolean) =>
+    simulate({ ...SCENARIO, idempotent }).flatMap((r) => (r.event.type === "send" && r.event.message.kind === "request" ? [r.event.message] : []));
+  assert.deepEqual(sent(true).map((m) => m.key), [SCENARIO.key, SCENARIO.key]);
+  assert.ok(sent(false).every((m) => m.key === undefined));
+});
+
+test("the reply leaves replyTime after the database work", () => {
+  const run = simulate({ ...SCENARIO, idempotent: true });
+  const charge = run.find((r) => r.event.type === "charge")!.event.t;
+  const reply = run.find((r) => r.event.type === "send" && r.event.message.kind === "response")!.event.t;
+  assert.equal(reply - charge, SCENARIO.replyTime);
+});

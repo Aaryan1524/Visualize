@@ -80,3 +80,9 @@ test("matrix helpers: transpose and shape checks", () => {
   assert.throws(() => matmul([[1, 2]], [[1, 2]]), /shape mismatch/);
   assert.throws(() => attention(["a"], [[1, 2]], [[1]], [[1]]), /share d_k/);
 });
+
+test("dividing by √d_k flattens every row: the top weight drops", () => {
+  a.scores.forEach((row, i) => assert.ok(Math.max(...softmax(row)) > Math.max(...a.weights[i]!), `row ${i}`));
+  const sat = tokens.indexOf("sat"), cat = tokens.indexOf("cat");
+  assert.ok(close(softmax(a.scores[sat]!)[cat]!, Math.exp(4) / (Math.exp(1) + Math.exp(4) + Math.exp(1.5))));
+});

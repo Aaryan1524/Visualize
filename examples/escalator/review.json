@@ -1,0 +1,39 @@
+{
+ "stamp": "a6319464d8f4e7fd",
+ "reviewer": "independent",
+ "summary": "No findings remain open. The step-rise readout now measures from the step below and reads 200, 0 and '\u2013' at steps 2, 3 and 4, and the rail-offset sentence gives 12 / cos(incline) (about 14 mm at 30\u00b0, 15 mm at 35\u00b0), both checked against the rebuilt page. I accept the two answered findings: the side-elevation naming convention and the wheel-centre-path convention are each stated plainly in Details and the step-2 caption, and neither changes the mechanism taught.",
+ "findings": [
+  {
+   "where": "readout 'mm step rise' (r-rise), steps 3 and 4",
+   "text": "6 mm step rise (step 3, orange step on the upper landing); 661 mm step rise (step 4, turning over)",
+   "severity": "misleading",
+   "finding": "The readout measured to the step ahead, so it showed 6 mm on the landing and 661 mm while turning over. Fixed: it now measures from the step below to the followed step, only while both are on the passenger run, and shows '\u2013' otherwise. Verified on the rebuilt page: step 2 reads 200, step 3 reads 0, step 4 reads '\u2013'.",
+   "resolved": true,
+   "fixed": true
+  },
+  {
+   "where": "variants.standard.captions[2]; variants.steep.captions[2]",
+   "text": "the trailer wheel is 12 mm smaller, so its rail sits that much higher still",
+   "severity": "wrong",
+   "finding": "The old sentence gave '12 mm smaller' for a wheel that is 24 mm smaller in diameter, and used 12 mm as the vertical offset on the slope. Fixed: it now reads 'The trailer wheel's radius is 12 mm smaller, so on the slope its rail sits about 14 mm higher still' (15 mm at 35\u00b0). This matches 12 / cos 30\u00b0 = 13.9 and 12 / cos 35\u00b0 = 14.6.",
+   "resolved": true,
+   "fixed": true
+  },
+  {
+   "where": "steps.1.heading; about; variants.*.voice[2]; steps.2.heading",
+   "text": "One endless chain carries every step. / One chain, two wheel tracks / Each step rolls on two wheels.",
+   "severity": "misleading",
+   "finding": "The headline text names one chain and two wheels; a real escalator has two chains and four wheels per step. Accepted as answered: the page is a side elevation, its convention of naming what one side shows is standard, Details states the real count plainly, and the mechanism is identical on both sides.",
+   "response": "this is a side elevation, and the textbook convention for one is to name what one side shows. Details states plainly that there are two chains and four wheels per step. Adding \"one each side\" to the subtitle, heading and narration would add words to every line for no gain in the mechanism, which works identically on both sides.",
+   "resolved": true
+  },
+  {
+   "where": "variants.*.voice[3]; predict.explanation",
+   "text": "The trailer-wheel track comes down with it, to just thirty millimetres above the chain-wheel track / The trailer-wheel track, now only 30 mm above the chain-wheel track",
+   "severity": "misleading",
+   "finding": "The narration and the prediction quote 30 mm between 'tracks'; rail to rail the gap is 42 mm. Accepted as answered: the page uses one convention throughout, offsets between wheel-centre paths (the 168.6 mm is measured the same way), and the step-2 caption and Details state both that convention and the rail-to-rail difference.",
+   "response": "the narration is meant to be heard, and keeps to the one convention the page uses throughout: offsets between wheel-centre paths (the 168.6 mm in the same sentence family is measured the same way). The step-2 caption and Details state the convention and the rail-to-rail difference. Repeating the qualifier in the voice would make the sentence harder to follow without changing what it teaches.",
+   "resolved": true
+  }
+ ]
+}

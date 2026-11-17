@@ -1,0 +1,63 @@
+{
+  "stamp": "63842cec8f601ad9",
+  "reviewer": "independent",
+  "summary": "Round 3: all seven findings are closed. Six are fixed, including step 1, which now says the client keeps the key until a final answer, matching Details. One, the folded first key lookup, is resolved with the author's answer, which I accept. No new findings: the only change from round 2 is that line.",
+  "findings": [
+    {
+      "where": "step:1, step:6, step:8",
+      "text": "the client times out and sends the same payment again",
+      "severity": "missing",
+      "finding": "The whole mechanism depends on the client generating the key once per logical payment, before the first attempt, and sending the same key on every retry. A new key per attempt defeats it entirely. The page never says the retry carries pay_7f3a again: the model treats the key as a global constant, and the message carries no key. Step 6 should say that in the keyed system the retry carries the same Idempotency-Key, pay_7f3a. Step 1 or Details should say the client creates the key (Stripe recommends a V4 UUID or another high-entropy random string) and keeps it until it gets a final answer.",
+      "fixed": true,
+      "resolved": false
+    },
+    {
+      "where": "scene.steps.0.heading; setup",
+      "text": "Two identical payment systems.",
+      "severity": "misleading",
+      "finding": "The very next sentence, and the picture, show two different systems: only the front one has a key store. They are identical except for the key store, and they run the same script with the same faults. Something like 'Two payment systems, one difference: a key store' would agree with the caption and the drawing.",
+      "fixed": true,
+      "resolved": false
+    },
+    {
+      "where": "step:2, step:3, step:8; scene.assumptions[1]",
+      "text": "With a key, it finds pay_7f3a already stored and returns the saved response instead.",
+      "severity": "misleading",
+      "finding": "The server cannot tell a first attempt from a retry, so it must check the key on every request, including attempt 1. In the model the keyed server skips the lookup on attempt 1 (40 -> 60 ms, one DB operation) but pays 20 ms for the lookup on attempt 2. So the page never shows the first-request lookup that misses, and step 8's 'finds ... already stored' depends on a check the page never showed happening the first time. Show the lookup (or an atomic insert-if-absent of the key) at step 2–3, and make the timing agree with '20 ms per database operation'.",
+      "resolved": true,
+      "response": "The timing model stands: adding a separate first-request lookup would shift every later time on the page without changing the outcome. Instead the text now shows the lookup that misses: step 3's caption says the keyed server first looks up pay_7f3a and finds nothing, so it charges and stores the key. Details says the server checks the key on every request, that the first lookup is folded into the charge's database write (so it adds no time), and that on the retry the lookup is the one database operation. Reviewer: accepted. Folding the first lookup into the write is what a real server does (an insert-if-absent of the key inside the charge transaction), and the text now shows that the first lookup finds nothing."
+    },
+    {
+      "where": "scene.assumptions[2]; step:3",
+      "text": "The charge and the stored key are written in one transaction. Without that, a crash between them would reopen the problem.",
+      "severity": "misleading",
+      "finding": "This only works when the 'charge' is a row in the same database as the key store. A real payment is a call to an external processor or card network, which cannot join a local transaction. The standard pattern (Stripe's own design, Brandur Leach's 'atomic phases', the AWS Builders' Library) is to record the key as in-progress first, call the processor with a downstream idempotency key, then record the result, with recovery for crashes in between. The crash also fails in two directions, not one. A charge without a stored key means a later retry double-charges. A stored key/success without a charge replays a success for money that was never taken. Details should say the single-transaction case is a simplification and name both failure directions.",
+      "fixed": true,
+      "resolved": false
+    },
+    {
+      "where": "scene.steps.4, scene.steps.5, scene.steps.9; scene.assumptions[1]",
+      "text": "70 ms: server sends success for attempt 1. / 110 ms: the success response is lost on the network.",
+      "severity": "misleading",
+      "finding": "The assumptions list only 40 ms latency and 20 ms per database operation, but the reply leaves 10 ms after the commit (60 -> 70, 1060 -> 1070). That 10 ms of processing comes from the model's hard-coded 'done + 10' and is never stated, so a reader cannot derive 70 or 1070 from the stated values. Also, 110 ms is when the reply would have arrived, not when it was lost, and the picture draws the lost message halfway along the wire at that time. Add a server-processing time to the assumptions, and word step 5 as 'by 110 ms the reply should have arrived; it was lost on the way'.",
+      "fixed": true,
+      "resolved": false
+    },
+    {
+      "where": "coverage / Details",
+      "text": "the server stores the key with its result and replays it",
+      "severity": "missing",
+      "finding": "The cited Stripe reference says two more things a reader needs. First, keys are kept only for a limited time (Stripe may prune them after 24 hours), so a retry after that is treated as a new request. Second, reusing a key with different parameters is rejected as an error instead of being replayed, which protects against client bugs. Details should mention retention and the parameter check in a sentence each. Neither needs a step.",
+      "fixed": true,
+      "resolved": false
+    },
+    {
+      "where": "scene.steps.1.caption",
+      "text": "which the client made once for this payment and keeps until it gets an answer.",
+      "severity": "misleading",
+      "finding": "Details correctly says \"until it gets a final answer\", but step 1 says \"until it gets an answer\". The difference matters. A 5xx, a 409 (another request with this key is still running) or a timeout is an answer, yet the client must retry with the same key. Only a definite success or a definite rejection of the payment ends the key. Say \"keeps until it gets a final answer\", as Details does.",
+      "resolved": false,
+      "fixed": true
+    }
+  ]
+}

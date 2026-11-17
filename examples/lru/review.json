@@ -1,0 +1,100 @@
+{
+  "stamp": "6fbf9b4c047c9ec3",
+  "stamps": [
+    "0563d770033d71a4"
+  ],
+  "reviewer": "independent",
+  "summary": "Round 2: all 10 round-1 findings are fixed in the text and the pictures (iso and flat checked step by step). The new claims are correct: FIFO 2 hits, Belady 4, hit rate 3/9, FIFO missing at steps 7 and 9, and the 4-keys-through-3-slots loop missing every time. No new problems found. The flat variant (stamp 0563d770033d71a4) differs only in its title and projection.",
+  "findings": [
+    {
+      "where": "scene.steps.3.heading",
+      "text": "Cache full. Read A again.",
+      "severity": "misleading",
+      "finding": "Step 3's event is get(C), a cold miss that fills the last slot (its caption says so, and the picture shows C just loaded in the miss colour). Reading A again is step 4. The heading describes the next step, not this one. Use something like 'C fills the last slot. Cache full.'",
+      "resolved": false,
+      "fixed": true,
+      "fix_note": "Heading is now 'C fills the last slot. Cache full.', matching get(C)."
+    },
+    {
+      "where": "picture at scene.steps.1 and scene.steps.2 (all variants)",
+      "text": "A is loaded and stored at the most-recent end; 1 of 3 slots used. / B is loaded and stored at the most-recent end; 2 of 3 slots used.",
+      "severity": "wrong",
+      "finding": "While the cache fills, the picture contradicts the caption. At step 1 A sits alone in slot 01, directly under the 'Least recent' pointer, while the 'Most recent' pointer marks an empty slot 03. At step 2 B sits in the middle slot 02, and 'Most recent' still points at the empty slot. The caption says each key is stored 'at the most-recent end'. The view packs entries from the least-recent end, while the two labels are pinned to the first and last physical slots. Until the cache is full, the 'Most recent' label therefore points at nothing, and the newest key appears under 'Least recent' (its hover title even reads 'A, least recently used'). Pin the 'Most recent' label to the newest entry, or fill from the most-recent end, so the picture matches the words.",
+      "resolved": false,
+      "fixed": true,
+      "fix_note": "New keys now land at the most-recent end on all three pages (checked steps 1 and 2 on iso, flat and drawing)."
+    },
+    {
+      "where": "scene.steps.9.caption / scene.steps.9.heading",
+      "text": "LRU tracks the last read, not the first arrival. ... This run ends with 3 hits, 6 misses and 3 evictions.",
+      "severity": "missing",
+      "finding": "Step 9 is the 9th request, get(B), a hit. The picture shows B highlighted green at the most-recent end, the request strip marks it 'B hit', and it is one of the '3 hits' counted. No caption or heading ever describes it: the step-9 caption swaps the event for a summary. Describe get(B) (a hit on a key that was evicted at step 5 and reloaded at step 6) before giving the totals.",
+      "resolved": false,
+      "fixed": true,
+      "fix_note": "Step 9 heading and caption now describe get(B) as a hit and note it was evicted at step 5 and reloaded at step 6."
+    },
+    {
+      "where": "scene.steps.9.caption (coverage: 'hits, misses and the hit rate' at step:9)",
+      "text": "This run ends with 3 hits, 6 misses and 3 evictions.",
+      "severity": "missing",
+      "finding": "The coverage list says the hit rate is covered at step 9, but no hit rate appears anywhere. Here it is 3/9 = 33%. Five of the six misses are compulsory (the first request for each of A, B, C, D and E), and only the step-6 miss on B is caused by the eviction policy. On the same nine requests FIFO scores 2 hits and 7 misses (22%), and Belady's optimal policy scores 4 hits and 5 misses (44%). Giving these numbers would put LRU's 3 hits in context. As it stands, the whole-run comparison that justifies LRU is missing.",
+      "resolved": false,
+      "fixed": true,
+      "fix_note": "The hit rate is given (3 in 9, 33%), with FIFO at 2 hits and Belady at 4. I recomputed both: FIFO hits at steps 4 and 6; Belady's optimal policy evicts C at step 5 and A or D at step 8, giving hits at steps 4, 6, 7 and 9."
+    },
+    {
+      "where": "scene.steps.5.caption / scene.steps.6.caption (and setup 'Why not drop the oldest?')",
+      "text": "B has gone longest without being read, so it is evicted ... A first-in-first-out cache holding the same keys would have dropped A",
+      "severity": "missing",
+      "finding": "The page frames evicting B instead of A as the better decision. But the very next request (step 6) is B, the key LRU just evicted, and FIFO would have kept B and hit there. The picture makes this obvious: at step 5 the next request on the belt is B. The page never acknowledges it, so an attentive reader sees the example undercut its own argument. Say that LRU is a bet that recent use predicts future use, and that it can lose on a single request. Over the whole run it still wins (3 hits vs FIFO's 2) because A is requested again at step 7 and B is reloaded.",
+      "resolved": false,
+      "fixed": true,
+      "fix_note": "Step 6 now says LRU's bet lost on B and that FIFO would have hit. Step 7 notes that FIFO would have missed there. Both are correct."
+    },
+    {
+      "where": "scene.steps.6.caption, scene.steps.8.caption, scene.steps.9.caption, scene.assumptions.1",
+      "text": "C has gone longest without being read / D has gone longest without being read / LRU tracks the last read / Recency is updated on every read",
+      "severity": "misleading",
+      "finding": "The legend defines 'Hit: read from the cache' and 'Miss: loaded and stored'. By that vocabulary C and D were never read: each was only loaded on a miss (steps 3 and 5) and evicted without a hit. In LRU every access updates recency, the miss that inserts a key included. That is why C and D rank where they do. Say 'used', 'requested' or 'accessed' instead of 'read' ('gone longest without being used'; 'LRU tracks the last use'; 'Recency is updated on every access, hit or miss').",
+      "resolved": false,
+      "fixed": true,
+      "fix_note": "'Read' is replaced by 'used', 'access' and 'found'. The assumption now says recency is updated on every access, hit or miss."
+    },
+    {
+      "where": "picture (slots 01-03) / scene.steps.1.caption / scene.steps.4.caption",
+      "text": "A takes an empty slot ... stored at the most-recent end; A moves to the most-recent end",
+      "severity": "misleading",
+      "finding": "The rail is drawn as numbered storage slots 01-03, and entries physically slide between them on every hit and eviction. A real LRU cache does not copy entries between storage locations. The entry stays where it is, and only its position in the recency order (the doubly linked list's pointers) changes. The page shows the policy, which is fair, but it should label the rail as a recency ranking rather than numbered slots, or say so in Details. Otherwise readers learn that a hit costs a data move.",
+      "resolved": false,
+      "fixed": true,
+      "fix_note": "The slot numbers are gone, and Details now says the rail is the linked list's recency order: a hit relinks the entry and copies no data."
+    },
+    {
+      "where": "coverage (topic list)",
+      "text": "(absent)",
+      "severity": "missing",
+      "finding": "A good reference on LRU (e.g. the Wikipedia section the page cites) covers its known failure mode. A loop or scan over more distinct keys than the cache holds makes LRU miss every time: with 3 slots, A B C D A B C D ... gives 0 hits, because LRU always evicts the key needed soonest. That weakness is why LRU-K, 2Q and ARC exist. The page should also mention Belady's optimal policy (evict the key used furthest in the future) as the benchmark LRU approximates. At least one sentence in Details is expected.",
+      "resolved": false,
+      "fixed": true,
+      "fix_note": "Step 9 adds Belady's optimal policy as the benchmark and the loop weak case: cycling 4 keys through 3 slots misses every time. Verified."
+    },
+    {
+      "where": "scene.steps.0.caption vs picture",
+      "text": "and 9 requests waiting",
+      "severity": "misleading",
+      "finding": "The request belt in the figure shows only 6 tokens (A B C A D B), with nothing to say more follow. The strip below shows all 9. A reader counting the belt gets 6, not the 9 the caption states. Show all 9 on the belt or mark the overflow (e.g. '+3').",
+      "resolved": false,
+      "fixed": true,
+      "fix_note": "The belt now reads 'Next 6 of 9 requests', and 'Next 6 of N' as requests are served."
+    },
+    {
+      "where": "scene.practice.*.question",
+      "text": "Requests so far: C A A B A. Next comes D. Which key leaves?",
+      "severity": "missing",
+      "finding": "The questions never state the cache size or that it starts empty. 'Which key leaves?' can only be answered if you assume 3 slots and a cold start, and a reader who opens a practice question directly has no way to know that. Add 'In a 3-slot cache that starts empty, ...'. (All ten answers and explanations were checked by hand against a 3-slot LRU and are correct.)",
+      "resolved": false,
+      "fixed": true,
+      "fix_note": "Each question now begins 'A 3-slot cache starts empty.' All ten answers are rechecked and correct."
+    }
+  ]
+}

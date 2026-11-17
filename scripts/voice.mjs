@@ -89,7 +89,7 @@ for (const [name, scene] of Object.entries(files)) {
     const tmp = join(dir, "voice", `.${name}-${k}`);
     writeFileSync(`${tmp}.wav`, wav);
     let encoded, type;
-    try { execFileSync("afconvert", ["-f", "m4af", "-d", "aac", "-b", "96000", `${tmp}.wav`, `${tmp}.m4a`], { stdio: "ignore" }); encoded = readFileSync(`${tmp}.m4a`); type = "audio/mp4"; }
+    try { execFileSync("afconvert", ["-f", "m4af", "-d", "aac", "-b", "64000", `${tmp}.wav`, `${tmp}.m4a`], { stdio: "ignore" }); encoded = readFileSync(`${tmp}.m4a`); type = "audio/mp4"; }
     catch { encoded = wav; type = "audio/wav"; }
     rmSync(`${tmp}.wav`, { force: true }); rmSync(`${tmp}.m4a`, { force: true });
     tracks.push({ duration: t, type, audio: encoded.toString("base64"), links: links.map((l) => ({ start: at[l.from], end: at[l.to] ?? t, ids: l.ids })), text: plain });

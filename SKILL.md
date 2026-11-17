@@ -1,8 +1,8 @@
 ---
 name: visualize
-description: Build step-through visual explanations whose picture is checked against an executable model, drawn in one constrained isometric style from finished parts (rails, rings, markers, reservoirs, sources, gates, terminals, servers, ledgers, cables, plates) in the shape the field already draws, with flat linked panels for equations, grids and sequence diagrams. Use whenever someone wants an algorithm, data structure, protocol, distributed-system behaviour, ML mechanism or paper method explained visually, animated or step by step, for docs, a blog, a course, onboarding or a paper companion, even if they never say "visualize". Outputs a standalone HTML page, a standalone SVG of any step, or a React component; every number on the page is verified against the model in headless Chrome.
+description: Build step-through visual explanations whose picture is checked against an executable model, with a narrating voice, a prediction and practice questions. Real machines and physical systems (an escalator, an engine, a lock) are drawn as sharp, to-scale technical cutaways; abstract concepts are built from finished 3D parts in the same ink-drawing style (rails, rings, trees, markers, reservoirs, gates, servers, ledgers, cables) in the shape the field already draws, with flat linked panels for equations, grids and sequence diagrams. Use whenever someone wants a machine or device (how an escalator, lock or engine works), an algorithm, data structure, protocol, distributed-system behaviour, ML mechanism or paper method explained visually, animated or step by step, even if they never say "visualize". Outputs a standalone HTML page (concepts also as SVG or React), checked in headless Chrome.
 license: MIT
-compatibility: Node.js 24+ (runs TypeScript directly) and Google Chrome or Chromium for verification. Run `npm install` (or `pnpm install`) once in this folder.
+compatibility: Works in Claude Code, Codex and Antigravity. Needs Node.js 24+ (runs TypeScript directly) and Google Chrome or Chromium for verification. Run `npm install` (or `pnpm install`) once in this folder.
 metadata:
   version: "1.0.0"
 ---
@@ -17,7 +17,7 @@ Three reference explanations ship in `examples/`. Open the closest one before st
 - `examples/retries/`: two payment systems on two plates (terminal, server, key store, ledger), run on the same faults. The ledger without idempotency keys ends with two coins, the one with keys with one.
 - `examples/attention/`: scaled dot-product attention. Gauges morph from score to scaled score to weight, linked to the equation and grids in a side column.
 
-`examples/lru-3d/` is the flagship in the 3D Clay look with a voice. `test/fixtures/gallery-ring/` and `test/fixtures/gallery-flow/` show the ring, marker, reservoir, source, gate and sequence parts on their own.
+`examples/lru-3d/` is the flagship for concepts, in the drawing look with a voice. `examples/escalator/` is the flagship for mechanisms: a technical cutaway drawn to scale, with a voice, a prediction, What if, a lab and Now you try. `examples/lock/` is the second, built on the same shared page and player (`src/drawing/`), and shows depth: it opens with the problem, ends with the second idea (picking) and lets the reader cut their own key. Any real machine must reach their standard (`references/drawing.md`). `test/fixtures/gallery-ring/` and `test/fixtures/gallery-flow/` show the ring, marker, reservoir, source, gate and sequence parts on their own.
 
 ## The one idea that matters
 
@@ -51,7 +51,8 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
 | Representation | The shape the field draws (write the one line), built at rung 1 of the ladder | A reader recognises the shape they were taught; the evals lost wherever it was missing |
 | Pointers and indices | `marker`s standing at their slot (`ring.outside(i)`, `rail.front(i)`), never a separate track in front | A pointer on a lane in front read as being on the wrong slot |
 | Time | A `sequence` side panel whenever timing is the point (timeouts, retries, rates) | Time with no axis lives only in captions |
-| Size | A **figure**: one system, 6–11 steps, 3–5 chapters. A **reference**: two systems compared, at most 12 steps. Larger: refuse and propose a split | Past 12 steps, readers lose the thread; two systems is the most a stage holds legibly |
+| Size | A **figure**: one system, 6–11 steps, 3–5 chapters. A **reference**: two systems compared, at most 12 steps. A **mechanism**: 5–8 steps. Narration of at most about 3 minutes in all; a short concept can be one minute. Larger: refuse and propose a split | Past 12 steps or about 3 minutes, readers lose the thread; two systems is the most a stage holds legibly |
+| Depth | **The problem first**: the opening says what the idea must achieve and the number that makes it hard (a lock must refuse about 92,000 other keys; a naive scheme that breaks badly). **The second idea**: one step for what the field teaches right after the core (picking for a lock; for a concept, the standard fix for the core idea's weakness). **Hands-on**: on a Drawing page, a lab where the reader sets their own values and the model answers (`DATA.lab`, checked by `check-drawing`); on a Clay page, What if with inputs that cover the interesting cases, since Clay has no lab yet | In blind evals a plain agent beat the skill on depth both times by doing exactly these three; one core idea on prepared inputs taught less |
 | Number of systems | One; two only when the point is a contrast run on the same inputs | Two lanes halve the size of everything |
 | Input sequence | Chosen so every interesting case happens, each asserted in `model.test.ts` | A run without the eviction or loss explains nothing |
 | Prediction | Exactly one, just before the causal decision | Predicting forces the reader to hold the rule |
@@ -61,20 +62,33 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
 | Words | Title 8 words or fewer; one action of 12 words or fewer per step; part names of 1–3 words, in a row with leaders | Paragraphs get read instead of the figure |
 | Flat maths | Only when the concept has equations or matrices; terms linked to solids | Maths on a tilted face is unreadable |
 | Theme | Follow the reader's preference; review in light first, then dark | Both are checked |
-| Stage | **`look: "clay"` always**: soft matte parts on a warm table, one look for every figure so they all belong together. `"paper"` only when the reader asks for the textbook page. Leave `look` out only for a still SVG or a dense isometric machine | Consistency is the product: the builder rejected a mix of looks across figures |
+| Stage | **By subject.** A real machine or physical system (escalator, engine, lock, gearbox, pump) is a **Drawing**: a sharp 2D technical cutaway drawn to scale, built to `references/drawing.md` from `examples/escalator/`. An abstract concept with no physical figure (searches, caches, heaps, protocols, attention) is **`look: "drawing"`**: the kit's 3D parts drawn like the machines, in ink outlines on the cream stage, base plates hatched as sections, the drawings' palette and a title block. `"clay"` (soft matte solids) or `"paper"` (the textbook page) only when the reader asks. Leave `look` out only for a still SVG | Machines in Clay became rows of identical blobs that hid the mechanism, and read as unprofessional; a to-scale cutaway shows the cause and is trusted. The builder asked for concepts to match the machines, so every page now looks like a plate from one book |
 | Learning | Always `practice(seed)`: a fresh question the model makes and marks. Add `whatIf` when one input changes the outcome (capacity, a fault, a size) | A reader who answers a new case has understood; a figure that only plays has not proved it |
 | Voice | Write `voice()` for every figure. **Step 0 explains the concept in two or three spoken sentences before anything moves** ("An LRU cache is a small, fast store that keeps what you used most recently and throws away the one you haven't touched the longest..."). The figure's title is `title` alone (the concept's name, e.g. "LRU Cache") in the display face, with `about` as one line under it; the question lives in Details. The voice is on by default and the reader can mute it. While it is on, ▶ is the narrated tour and moves on only after each sentence, so speech is never cut by the next step. Never say letters or abbreviations aloud: say "the new key", not "A". Record with `scripts/voice.mjs` | A reader who does not know the idea needs it said before the demo; the title block tells them what they are looking at |
 | Letters | Text on a top face is printed on it (a decal), never floated above it | Floating labels read as detached from the cube they name |
 | Trust | `computed` for exact models, `model` for simplified ones, `sourced` only with an exact location | The badge must be true |
 | Where files go | In the user's project: the scene in an explanations folder, the built page in its public or static folder, screenshots beside the scene (verify puts them there) | Keeps the skill folder clean |
 
+## Correctness: what the page says is checked too
+
+A model checks the picture; nothing checked the words, and that is where the skill lost round 5 of the evals. A derailleur page said the cage spring swings the cage forward (it pulls it back), a heading said 60° where its readout said 37°, and limit screws were never taught because no list of topics existed to miss them from. A plain model reasoning straight from physics got all three right. Every page now carries four checks, run by `src/claims/audit.mjs` at build time:
+
+1. **Topics before pictures.** Before any drawing, find what a good reference teaches for the subject (a manual, a textbook, a reference page; search when you can) and write the list with its source: `coverage: { source, topics: [{ topic, where }] }`. Each core topic is a step (`"step:3"`), the lab, What if or Now you try, or `"deferred"` with a reason that Details also states. At least three in four core topics are taught. The topics decide the number of steps, within the Size row.
+2. **No typed numbers.** Every number in the voice, headings, captions, cards and Details must exist in the model at the precision shown ("about" allows 5%). Write numbers from the model into the text; a number that is not a quantity of the subject (a test's step size) goes in `allow` with a reason.
+3. **Claims.** Each cause-and-effect sentence (what pushes, what pulls, which way a part moves, why something happens) goes in `claims` word for word as the page says it, with a test against every variant's model. The audit fails if the sentence is not on the page or the model disagrees.
+4. **A reviewer who did not build it.** `node <skill>/scripts/review-brief.mjs <name>.audit.json <dir>/review.json <page>` prints a brief; give it to a fresh agent (a subagent) or a person. It writes `review.json`, stamped with the text it read. Fix each finding (the edit makes the review stale, so review again) or answer it (`resolved: true` with a `response`). Your own review does not count: it is anchored on your reasoning.
+
+**Show the working.** Put the mechanism's intermediate values on screen, not only its result: a Bloom filter shows word → hash → mod m → bit, not an arrow from word to bit. And keep one camera through a concept page; a view that jumps between steps loses the reader.
+
 ## Workflow
 
 `<skill>` is this folder. Scenes can live in any project: the scripts take paths, and scene files import the kit from `<skill>/src`, which the scaffold sets up.
 
 
+**For a real machine, follow `references/drawing.md` instead of this list.** The steps below are for concept scenes (`scene.ts`, `scripts/voice.mjs <dir>`, `verify.mjs`). A Drawing page keeps the same ideas: a tested model first, a draft early, one prediction, a voice, What if, a lab and Now you try. It uses its own files instead: `model.mjs` and `model.test.mjs`, a `build.mjs` that hands the drawing and the machine's hooks to the shared page and player in `src/drawing/`, a `voice.mjs`, and `scripts/check-drawing.mjs`. Start by copying `examples/lock/`, the smaller of the two. It ships as a standalone page only, with no SVG or React export yet. Pass the correctness audit to `drawingPage({ audit })`; `check-drawing` fails until it is clean. Deliver with the same report, with `check-drawing: passed` and `audit: clean (<n> claims, <m> topics, review current)` in place of `verify: passed`.
+
 1. **Write the model** (`model.ts`): pure functions returning the state after every event. Test it against a separately written reference implementation and edge cases (`model.test.ts`). Choose the input sequence so the interesting cases happen: a hit, a full-cache miss, a lost message, a divergence.
-2. **Scaffold the scene**: `node <skill>/scripts/new-scene.mjs <name> --dir <folder>` writes a model, a test and an editorial scene that build and verify as generated. Replace the model first, then the view.
+2. **Scaffold the scene**: `node <skill>/scripts/new-scene.mjs <name> --dir <folder>` writes a model, a test and an editorial scene that build and verify as generated, except for the audit, which needs your topics, claims and review. Replace the model first, then the view. Write the topic list (Correctness, 1) before the view.
 3. **Assemble the view from parts.** Use `src/parts/`. Every mark's `key` is a model entity id: keys carry identity across steps, so motion, linking and checks follow them. Position things with the parts' anchors, not by eye.
 4. **Teach in beats** (`teaching`). Use 3–5 chapters and one short action per step (12 words at most). Add one prediction just before the causal moment, such as "D is next. Which key leaves?". The longer caption, assumptions and transcript go in the Details drawer automatically.
 5. **Declare observations** (`observe`): every value shown, every order that matters, every size that encodes a number (`extent`), what must be visible and what must be gone, semantic tones, and what is lit.
@@ -84,7 +98,7 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask t
 
    ```text
    Built <title>: <n> steps in <chapters> chapters, from <parts>. Model tested against <reference>.
-   verify: passed (<n> observations; depth, focus, labels, layout, both themes). Files: <page>, <scene dir>.
+   verify: passed (<n> observations; depth, focus, labels, layout, both themes; audit clean: <n> claims, <m> topics, review current). Files: <page>, <scene dir>.
    Open: <page>#step=<the key step>. Not verified by machine: <whatever you judged only by eye>.
    ```
 8. **Teach back and narrate.** Add `practice(seed)` from the model (the answer must be computed, never typed), `whatIf` versions built by the same scene factory, and `voice()`. Record the voice: `node <skill>/scripts/voice.mjs <dir>` (a local open-source voice; one model download, then offline). Rebuild; the page now has Listen, What if and Now you try, and verify checks every version and 40 practice questions.
@@ -117,7 +131,7 @@ When a concept needs a part that does not exist, build it in `src/parts/` from b
 
 `references/craft.md` gives the reasons.
 
-- **One constrained style.** Use the fixed isometric camera, the shared tones and the kit's shading. Colour carries meaning (hit, miss, lost, duplicate, stored), one meaning per tone, stated in the legend.
+- **One constrained style per look.** In concept scenes, use the fixed camera, the shared tones and the look's shading; the drawing look gives them the machines' ink, hatching and palette. In a machine Drawing, use ink lines, hatched sections, at most three path colours plus one followed part, and the title block (`references/drawing.md`). Colour carries meaning (hit, miss, lost, duplicate, stored), one meaning per tone, stated in the legend.
 - **Finished parts, not slabs.** Housings have seams, screens are recessed, servers show rack units and vents, round things are turned. Detail belongs to a part and follows its motion.
 - **Motion means something.** Use `enter` and `exit` for coming and going, `leaving` for "goes there" (evicted, consumed, delivered), `arc` to pass over neighbours, travel along a cable for messages, and `pulse` for a moment of emphasis. Nothing moves for decoration. A thing consumed travels to what consumed it.
 - **Identity is drawn.** Which slot, which connection, which pointer: names a scene gives are never dropped, and a cable's tone shows whether it is in use.
@@ -134,6 +148,7 @@ When a concept needs a part that does not exist, build it in `src/parts/` from b
 | `pnpm verify:controls` | `all … planted faults caught; clean fixture passes` (after changing the kit or checks) |
 | `node scripts/export-svg.mjs …` | no `differs` beyond tolerance (when exporting) |
 | `pnpm check:embed` | `embed: passed` (after changing the player or styles) |
+| `node scripts/check-drawing.mjs <page>` | `drawing: passed` (for a Drawing page) |
 
 Then read the PNGs. Fix in the kit, not the scene, when a problem would recur elsewhere. `references/verify.md` explains every failure line and its usual fix.
 
@@ -142,5 +157,6 @@ Then read the PNGs. Fix in the kit, not the scene, when a problem would recur el
 - `references/authoring.md`: the scene contract (model, trace, view, teaching, observe, panels), editorial layout, predictions, copy budgets, embedding in React, and SVG export.
 - `references/kit.md`: marks, surface details, motion vocabulary, label rules, every part's options and anchors, components and maths.
 - `references/craft.md`: the visual rules, each with the defect that taught it.
+- `references/drawing.md`: the Drawing look for real machines: what every cutaway page has, the page contract, the check and the length rule.
 - `references/verify.md`: every check, what its failures mean, how to fix them, and what the checks cannot see.
 - `evals/evals.json`: held-out prompts for testing the skill on unfamiliar concepts.
