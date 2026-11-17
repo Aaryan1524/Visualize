@@ -1,0 +1,56 @@
+/* The rig's look: Visualize tokens for solids drawn by src/rig/draw.ts.
+   Each material is a pair, lit and dark; a face's fill is mixed between them by how square it
+   stands to the key light. Outlines are the page's ink: the silhouette heavier than creases.
+   --recede (0% to 100%) fades a part toward the stage without making it see-through. */
+.vz{
+  --rig-ink:var(--ink);
+  --rig-sil-w:1.5px;--rig-crease-w:.7px;--rig-shine:#ffffff;--rig-shine-w:1.1px;
+  --rig-contact:#2b2416;
+  --rig-steel-lit:#ecebe6;--rig-steel-dark:#46443f;
+  --rig-alloy-lit:#ffffff;--rig-alloy-dark:#8d897f;
+  --rig-chain-lit:#77736b;--rig-chain-dark:#1b1a18;
+  --rig-subject-lit:#ffcfae;--rig-subject-dark:#b8461b;
+  --rig-slate-lit:#a9b6c5;--rig-slate-dark:#26303d;
+  --rig-frame-lit:#f3f0e8;--rig-frame-dark:#cbc5b8;
+  --recede:0%;
+}
+@media (prefers-color-scheme:dark){.vz:not([data-theme="light"]){
+  --rig-shine:#ffffff;--rig-contact:#000000;
+  --rig-steel-lit:#d2d0ca;--rig-steel-dark:#2d2b28;
+  --rig-alloy-lit:#f2f1ec;--rig-alloy-dark:#55524c;
+  --rig-chain-lit:#9b978e;--rig-chain-dark:#262421;
+  --rig-subject-lit:#ffb489;--rig-subject-dark:#8d3311;
+  --rig-slate-lit:#b2c0d0;--rig-slate-dark:#2b3644;
+  --rig-frame-lit:#46433d;--rig-frame-dark:#26241f;
+}}
+.vz[data-theme="dark"]{
+  --rig-shine:#ffffff;--rig-contact:#000000;
+  --rig-steel-lit:#d2d0ca;--rig-steel-dark:#2d2b28;
+  --rig-alloy-lit:#f2f1ec;--rig-alloy-dark:#55524c;
+  --rig-chain-lit:#9b978e;--rig-chain-dark:#262421;
+  --rig-subject-lit:#ffb489;--rig-subject-dark:#8d3311;
+  --rig-slate-lit:#b2c0d0;--rig-slate-dark:#2b3644;
+  --rig-frame-lit:#46433d;--rig-frame-dark:#26241f;
+}
+/* No ancestor in these selectors: they must also match inside <use> copies. */
+.rig-m-steel{--rig-a:var(--rig-steel-lit);--rig-b:var(--rig-steel-dark)}
+.rig-m-alloy{--rig-a:var(--rig-alloy-lit);--rig-b:var(--rig-alloy-dark)}
+.rig-m-chain{--rig-a:var(--rig-chain-lit);--rig-b:var(--rig-chain-dark)}
+.rig-m-subject{--rig-a:var(--rig-subject-lit);--rig-b:var(--rig-subject-dark)}
+.rig-m-slate{--rig-a:var(--rig-slate-lit);--rig-b:var(--rig-slate-dark)}
+.rig-m-frame{--rig-a:var(--rig-frame-lit);--rig-b:var(--rig-frame-dark)}
+.rig-solid{
+  --rig-lit:color-mix(in oklab,var(--rig-a) calc(100% - var(--recede)),var(--stage));
+  --rig-dark:color-mix(in oklab,var(--rig-b) calc(100% - var(--recede)),var(--stage));
+  --rig-line:color-mix(in oklab,var(--rig-ink) calc(100% - var(--recede)),var(--stage));
+}
+.rig-face{stroke:none}
+.rig-sil,.rig-crease,.rig-shine{fill:none;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.rig-sil{stroke:var(--rig-line);stroke-width:var(--rig-sil-w)}
+.rig-crease{stroke:var(--rig-line);stroke-width:var(--rig-crease-w);stroke-opacity:.7}
+.rig-shine{stroke:var(--rig-shine);stroke-width:var(--rig-shine-w);stroke-opacity:calc(.85 - var(--recede) / 100%)}
+.rig-contact{fill:var(--rig-contact);fill-opacity:.16;stroke:var(--rig-contact);stroke-opacity:.07;stroke-width:6px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.rig-part[data-recede]{--recede:50%}
+.rig-part[data-recede] .rig-contact{display:none}
+.rig-part[data-named]{--rig-sil-w:2.4px}
+@media (prefers-reduced-motion:reduce){.rig-part{transition:none}}

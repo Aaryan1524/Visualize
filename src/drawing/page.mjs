@@ -56,6 +56,8 @@ function labPanel(lab) {
  * @param {string[]} o.facts      "How it is computed" bullets (HTML)
  * @param {string} o.css          the drawing's own CSS (line weights, accents)
  * @param {string} o.modelSrc     the model, inlined (export keywords removed)
+ * @param {string} [o.scripts]    optional code the machine needs besides the model (a bundled figure engine),
+ *                                placed before the model in the page's script
  * @param {Function} o.machine    (DATA) => machine hooks, serialized into the page
  * @param {object} o.audit        the correctness audit (src/claims/audit.mjs): { models, claims, coverage,
  *                                facts?, allow?, reviewFile, report? }. Its result rides in the page as
@@ -163,7 +165,7 @@ ${o.facts.map((f) => `        <li>${f}</li>`).join("\n")}
 </article>
 </div>
 <script>
-${o.modelSrc}
+${o.scripts ? o.scripts + "\n" : ""}${o.modelSrc}
 const DATA = ${JSON.stringify(o.data)};
 (${player.toString()})(DATA, (${o.machine.toString()})(DATA));
 </script>

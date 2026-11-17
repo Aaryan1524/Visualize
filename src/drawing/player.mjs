@@ -13,6 +13,10 @@
 //   heading(k)          optional, the step heading when it depends on the variant
 //   lit(ids)            optional, after the parts named by the voice are lit
 //   info(state)         optional, extra fields for __viz.state()
+//   focus({ focus, lit }) optional: the machine fades out-of-focus parts itself (painted solids must
+//                       not turn see-through); without it, the player dims .part groups by opacity
+//   anchors()           optional: { name: [x, y] } each frame; a callout with data-at="name" points
+//                       its leader there, so leaders follow moving parts
 //   lab(values)         optional, the free-input lab: { state, verdict, rows: [string] } for the
 //                       reader's own values (DATA.lab lists the inputs); state is drawn by render()
 //
@@ -57,6 +61,7 @@ export function player(DATA, machine) {
   // Leaders run from the measured text box to the dot on the part, and the title-block key is
   // laid out by measured widths; both wait for the web fonts, or they measure the fallback face.
   function layoutText() {
+    boxes.clear();
     for (const g of E.labels) {
       const lead = g.querySelector(".leader");
       if (!lead || !g.dataset.to) continue;
@@ -79,9 +84,32 @@ export function player(DATA, machine) {
   }
 
   // ------------------------------------------------ focus, and the parts the voice names
+  // Leaders that follow moving parts: a callout with data-at points at machine.anchors()[name].
+  const boxes = new Map();
+  function followLeaders() {
+    const at = machine.anchors?.();
+    if (!at) return;
+    for (const g of E.labels) {
+      const name = g.dataset.at, to = name && at[name];
+      if (!to || g.style.display === "none") continue;
+      let bb = boxes.get(g);
+      if (!bb) boxes.set(g, (bb = g.querySelector("text").getBBox()));
+      const cy = bb.y + bb.height * 0.56;
+      const right = to[0] > bb.x + bb.width / 2;
+      const ax = right ? bb.x + bb.width + 45 : bb.x - 45, ex = ax + (right ? 110 : -110);
+      g.querySelector(".leader")?.setAttribute("d", `M${fx(ax)},${fx(cy)}L${fx(ex)},${fx(cy)}L${fx(to[0])},${fx(to[1])}`);
+      const dot = g.querySelector(".ldot");
+      if (dot) (dot.setAttribute("cx", fx(to[0])), dot.setAttribute("cy", fx(to[1])));
+    }
+  }
   function applyFocus() {
     const focus = STEPS[S.step]?.focus;
     const lit = S.lit.flatMap((id) => [id, ...(ALIAS[id] || [])]);
+    if (machine.focus) {
+      machine.focus({ focus: labOpen ? null : focus ?? null, lit });
+      machine.lit?.(S.lit);
+      return;
+    }
     for (const el of E.parts) {
       const part = el.dataset.part;
       let o = !focus || focus.includes(part) ? 1 : 0.35;
@@ -159,6 +187,7 @@ export function player(DATA, machine) {
     const still = reduced || S.pinPose;
     S.state = machine.at(k, still ? poseT(k) - SEG.s[k] : S.T - SEG.s[k], still, SEG);
     machine.render(S.state, S);
+    followLeaders();
     scrub.value = String(S.T);
   }
   // Go to a step: paused, show its still frame; running, start the step from its beginning.
