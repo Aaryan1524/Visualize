@@ -5,7 +5,8 @@ import { plate, planeOf, pointOn, circlePoints, rod, sprocket, turned, type Mesh
 import { drawMesh, keyLight, shadeOf } from "./draw.ts";
 import { applyAffine, moveInPlane, planeKey, slotKey } from "./motion.ts";
 import { keepInPlace } from "./stage.ts";
-import { dot, sub, type V3 } from "./vec.ts";
+import { carry, checkContacts } from "./contacts.ts";
+import { dot, sub, type P2, type V3 } from "./vec.ts";
 
 const rng = (a: number) => () => {
   a = (a + 0x6d2b79f5) | 0;
@@ -170,4 +171,24 @@ test("stage: reordering moves as few groups as it can: one part crossing the who
     }
     assert.equal(stay.length, best, `keeps the most it can in ${pos}`);
   }
+});
+
+// ---------------------------------------------------------------- contacts
+test("contacts: a wheel moving with its chain passes; reversed, stopped or slow, it fails", () => {
+  const along = (p: P2, d: P2): readonly [P2, P2] => [p, [p[0] + d[0], p[1] + d[1]]];
+  const good = { where: "cog", chain: along([0, 0], [3, 1]), wheel: along([0, 0], [3.1, 0.9]) };
+  assert.deepEqual(checkContacts([good]).faults, []);
+  assert.equal(checkContacts([good]).byWhere.cog, 1);
+  // a planted fault: the wheel turned the wrong way
+  const reversed = { where: "guide", chain: along([0, 0], [3, 1]), wheel: along([0, 0], [-3, -1]) };
+  assert.match(checkContacts([good, reversed]).faults.join(), /^guide: the wheel moves against the chain/);
+  assert.match(checkContacts([{ where: "t", chain: along([0, 0], [3, 0]), wheel: along([0, 0], [0.1, 0]) }]).faults.join(), /does not move/);
+  assert.match(checkContacts([{ where: "t", chain: along([0, 0], [3, 0]), wheel: along([0, 0], [1.5, 0]) }]).faults.join(), /0\.50 of the chain's speed/);
+  assert.equal(checkContacts([]).checked, 0, "an empty list checks nothing, so a caller must assert its counts");
+});
+
+test("contacts: carry() takes a point drawn under one transform to where the next one puts it", () => {
+  assert.deepEqual(carry(null, "translate(5 -2)", [1, 1]), [6, -1]);
+  const p = carry("matrix(0 1 -1 0 10 0)", "matrix(1 0 0 1 0 0)", [10, 1]);
+  assert.ok(Math.abs(p[0] - 1) < 1e-12 && Math.abs(p[1]) < 1e-12);
 });
