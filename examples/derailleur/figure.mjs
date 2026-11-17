@@ -26,6 +26,7 @@ import {
 } from "../../src/rig/index.ts";
 import { pathAt } from "./model.mjs";
 export { RigStage, screenOf } from "../../src/rig/index.ts";
+export { rearView, VIEW_A } from "./rear.mjs";
 
 export const W = (x, y, e) => [x, -e, y];
 const TAU = Math.PI * 2;
@@ -51,7 +52,6 @@ export const BINS = {
 };
 
 export const VIEW = { azimuth: 244, elevation: 21 }; // from outboard and a little behind
-export const VIEW_A = { azimuth: 208, elevation: 14 }; // from behind and a little outboard
 
 /**
  * Where to set the cassette so the chain's rollers sit in the valleys of the cog it is on: the cog

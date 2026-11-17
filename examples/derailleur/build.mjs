@@ -14,7 +14,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildSync } from "esbuild";
 import { MODELS, VARIANTS, DR, makeModel, clickPull, indexing, BANDS, shares } from "./model.mjs";
-import { cameraFor, figure, XCUT, VIEW_A } from "./figure.mjs";
+import { cameraFor, figure, XCUT } from "./figure.mjs";
+import { VIEW_A } from "./rear.mjs";
 import { screenOf } from "../../src/rig/index.ts";
 import { drawingPage, esc } from "../../src/drawing/page.mjs";
 
@@ -28,9 +29,9 @@ const VBW = 14200, VBH = 6550, FS = 150, UNIT = 10;
 const f1 = (v) => (Math.round(v * 10) / 10).toString();
 // The main view: each cassette's camera is fitted to its own gears, so the figure fills the stage.
 const BOX = { x: 4300, y: 260, w: 5100, h: 6080 };
-// The inset: View A, from behind and a little outboard, magnified, following the guide pulley.
+// The inset: View A, a true rear elevation (straight from behind), following the guide pulley.
 const INSET = { c: [12180, 2260], r: 2000, azimuth: VIEW_A.azimuth, elevation: VIEW_A.elevation };
-INSET.scale = INSET.r / 27; // 27 mm either side of its centre
+INSET.scale = INSET.r / 50; // 50 mm either side of its centre: the whole cassette's width and the guide pulley
 
 // ---------------------------------------------------------------- the story
 const PRED_STEP = 4;
@@ -310,7 +311,7 @@ function machine(DATA) {
     // only place them each frame.
     const cam = FIG.cameraFor(model, DATA.box);
     figM = FIG.figure(model, cam, { prefix: "m" });
-    figA = FIG.figure(model, { azimuth: IN.azimuth, elevation: IN.elevation, scale: IN.scale, origin: [0, 0] }, { prefix: "a", inset: true });
+    figA = FIG.rearView(model, { scale: IN.scale, prefix: "a" });
     defsM = $("rigDefs");
     defsA = $("rigDefsA");
     defsM.replaceChildren();
@@ -329,7 +330,7 @@ function machine(DATA) {
   function poseOf(s) {
     return model.pose(s.pull, s.chainK, s.lOut ?? 0);
   }
-  let lastAt = null, lastFocus = { focus: null, lit: [] };
+  let lastAt = null, lastA = null, lastFocus = { focus: null, lit: [] };
   function render(state, S) {
     cur = state;
     const pose = poseOf(state);
@@ -339,13 +340,11 @@ function machine(DATA) {
     addDefs(defsM, out.defs);
     stageM.apply(out.items);
     lastAt = out.at;
-    // View A is drawn once at the world origin and only slides to keep the guide pulley centred
-    const focus = [pose.G[0], (-model.cogR(pose.chainK) + pose.G[1] + model.r) / 2 - 3, (pose.e + pose.chainE) / 2];
-    const fa = FIG.screenOf({ azimuth: IN.azimuth, elevation: IN.elevation, scale: IN.scale, origin: [0, 0] }, FIG.W(focus[0], focus[1], focus[2]));
-    $("insetScene").setAttribute("transform", `translate(${(IN.c[0] - fa[0]).toFixed(1)} ${(IN.c[1] - fa[1]).toFixed(1)})`);
+    // View A, straight from behind: drawn once, slid to follow the guide pulley
     const ina = figA.pose(st);
-    addDefs(defsA, ina.defs);
+    $("insetScene").setAttribute("transform", `translate(${(IN.c[0] - ina.focus[0]).toFixed(1)} ${(IN.c[1] - ina.focus[1]).toFixed(1)})`);
     stageA.apply(ina.items);
+    lastA = ina.at;
     focusParts();
     readouts(state, pose);
   }
@@ -353,7 +352,7 @@ function machine(DATA) {
   function focusParts() {
     const { focus, lit } = lastFocus;
     const lab = root.hasAttribute("data-lab");
-    const test = (part) => ({ recede: lit.length ? !lit.includes(part) : !lab && focus ? !focus.includes(part) : false, named: lit.includes(part) });
+    const test = (part) => (part === "overlay" ? { recede: false, named: false } : { recede: lit.length ? !lit.includes(part) : !lab && focus ? !focus.includes(part) : false, named: lit.includes(part) });
     stageM?.focus(test);
     stageA?.focus(test);
   }
@@ -564,6 +563,22 @@ text{font-family:var(--sans);fill:var(--ink)}
 .engrave{font:600 64px var(--mono);fill:var(--ink-2)}
 .inset-bg{fill:color-mix(in oklab,var(--stage) 94%,var(--ink))}
 .inset-ring{fill:none;stroke:var(--ink);stroke-width:1.2}
+.rv-frame{fill:color-mix(in oklab,var(--rig-frame-lit) calc(100% - var(--recede)),var(--stage));stroke:color-mix(in oklab,var(--rig-frame-dark) calc(100% - var(--recede)),var(--stage));stroke-width:1px;vector-effect:non-scaling-stroke}
+.rv-spokes path{fill:none;stroke:var(--rig-frame-dark);stroke-width:1.2px;stroke-dasharray:6 5;vector-effect:non-scaling-stroke}
+.rv-note{font-size:${FS * 0.8}px;fill:var(--ink-2);paint-order:stroke;stroke:var(--stage);stroke-width:40px}
+.rv-freehub{fill:color-mix(in oklab,var(--rig-steel-dark) calc(70% - var(--recede) * .5),var(--stage));stroke:var(--rig-ink);stroke-width:.8px;vector-effect:non-scaling-stroke}
+.rv-hanger{fill:color-mix(in oklab,var(--rig-slate-dark) calc(100% - var(--recede)),var(--stage));stroke:var(--rig-ink);stroke-width:1.2px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.rv-arm{fill:color-mix(in oklab,var(--rig-slate-lit) calc(100% - var(--recede)),var(--stage));stroke:var(--rig-ink);stroke-width:1.1px;vector-effect:non-scaling-stroke}
+.rv-link path{fill:none;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.rv-link-edge{stroke:color-mix(in oklab,var(--rig-ink) calc(100% - var(--recede)),var(--stage));stroke-width:13px}
+.rv-link-face{stroke:color-mix(in oklab,var(--rig-slate-lit) calc(100% - var(--recede)),var(--stage));stroke-width:10px}
+.rv-chain .rv-roller{fill:var(--rig-lit);stroke:var(--rig-line);stroke-width:.8px;vector-effect:non-scaling-stroke}
+.rv-chain .rv-plate{fill:var(--rig-dark);stroke:var(--rig-line);stroke-width:.6px;vector-effect:non-scaling-stroke}
+.rv-line{fill:none;stroke-width:1.4px;stroke-dasharray:10 7;vector-effect:non-scaling-stroke}
+.rv-line-cog{stroke:var(--ink)}
+.rv-line-pulley{stroke:var(--orange)}
+.rv-gap{fill:none;stroke:var(--t-bad);stroke-width:2px;vector-effect:non-scaling-stroke}
+.rv-gap-text{font-size:${FS * 0.86}px;font-weight:600;fill:var(--t-bad);paint-order:stroke;stroke:var(--stage);stroke-width:44px;stroke-linejoin:round}
 .inset-title{font-size:${FS * 0.82}px;letter-spacing:.08em;font-weight:600;paint-order:stroke;stroke:var(--stage);stroke-width:48px;stroke-linejoin:round}
 .vz[data-practice] #fig .inset,.vz[data-practice] #fig .label{visibility:hidden}
 .leader{fill:none;stroke:var(--ink);stroke-width:.5}
