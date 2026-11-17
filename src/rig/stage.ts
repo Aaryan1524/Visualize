@@ -65,6 +65,7 @@ export class RigStage {
   add(id: string, part: string, svg: string): void {
     const g = document.createElementNS(SVGNS, "g") as Slot;
     g.setAttribute("class", "rig-part");
+    g.dataset.item = id;
     g.dataset.part = part;
     g.innerHTML = svg;
     g._svg = svg;
@@ -88,6 +89,7 @@ export class RigStage {
       if (!g) {
         g = document.createElementNS(SVGNS, "g") as Slot;
         g.setAttribute("class", "rig-part");
+        g.dataset.item = it.id;
         this.groups.set(it.id, g);
       }
       if (g._hidden) (g.style.display = ""), (g._hidden = false);

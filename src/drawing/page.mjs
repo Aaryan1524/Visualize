@@ -11,6 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { player } from "./player.mjs";
+import { cameraKit } from "./camera.mjs";
 import { audit, textsOf } from "../claims/audit.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -167,7 +168,7 @@ ${o.facts.map((f) => `        <li>${f}</li>`).join("\n")}
 <script>
 ${o.scripts ? o.scripts + "\n" : ""}${o.modelSrc}
 const DATA = ${JSON.stringify(o.data)};
-(${player.toString()})(DATA, (${o.machine.toString()})(DATA));
+(${player.toString()})(DATA, (${o.machine.toString()})(DATA), (${cameraKit.toString()})());
 </script>
 </body>
 </html>
