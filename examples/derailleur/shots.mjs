@@ -12,10 +12,11 @@
 // Writes PNGs to examples/derailleur/shots/ (or --out <dir>) and prints each one's time. A shot older
 // than the page it was taken of shows a page that no longer exists: --check-fresh lists those and fails.
 
-import { mkdirSync, readdirSync, statSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { launch, openPage, settle } from "../../scripts/lib/browser.mjs";
+import { reportFreshness, stamp } from "../../scripts/lib/fresh.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -23,15 +24,7 @@ const opt = (k, d) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1
 const page = resolve(opt("page", join(HERE, "../../dist/derailleur.html")));
 const outDir = resolve(opt("out", join(HERE, "shots")));
 mkdirSync(outDir, { recursive: true });
-// local time, as `ls -l` shows it
-const stamp = (f) => new Date(statSync(f).mtimeMs - new Date().getTimezoneOffset() * 60000).toISOString().replace("T", " ").slice(0, 19);
-if (args.includes("--check-fresh")) {
-  const built = statSync(page).mtimeMs;
-  const stale = readdirSync(outDir).filter((f) => f.endsWith(".png") && statSync(join(outDir, f)).mtimeMs < built);
-  for (const f of stale) console.log(`stale: ${f} (${stamp(join(outDir, f))}) is older than ${page} (${stamp(page)})`);
-  console.log(stale.length ? `shots: ${stale.length} older than the page; take them again` : `shots: all newer than the page (${stamp(page)})`);
-  process.exit(stale.length ? 1 : 0);
-}
+if (args.includes("--check-fresh")) process.exit(reportFreshness(outDir, page));
 
 // The stage at 1440 x 900 is about x 62..1378, y 148..748.
 const STAGE = [62, 148, 1316, 600];
