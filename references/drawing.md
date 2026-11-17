@@ -153,6 +153,8 @@ It cannot judge beauty. Shoot every step with `node scripts/shoot.mjs <page> --s
 
 ## Isometric machine figures
 
+`references/figures.md` is the recipe: start there, from `node scripts/new-machine.mjs <name>`. This section is the rig's reference.
+
 Two drawings serve a machine. Pick by what the reader must see.
 
 | Use | When | Example |
@@ -164,7 +166,7 @@ An isometric figure keeps everything else on this page: the model and its tests,
 
 ### Build one with `src/rig/`
 
-- **Camera** (`camera.ts`): `fitCamera(points, box, azimuth, elevation)` fits an orthographic view to the figure's bounds; fit it to every pose the story reaches, so nothing leaves the stage. `insetCamera` makes a second, magnified view, such as the derailleur's View A, which follows the guide pulley by sliding its group.
+- **Camera** (`camera.ts`): `fitCamera(points, box, azimuth, elevation)` fits an orthographic view to the figure's bounds; fit it to every pose the story reaches, so nothing leaves the stage. `insetCamera` makes a second, magnified view. When alignment is the point, an inset is a true elevation instead: the derailleur's View A is drawn straight from behind (`examples/derailleur/rear.mjs`), where every part only slides. See `references/figures.md`, "Insets".
 - **Shapes** (`shapes.ts`): every part is a closed mesh whose faces carry their outward normals.
   - `plate(plane, { outer, holes }, t0, t1)` extrudes any outline: teeth, windows and slots included.
   - `turned(origin, axis, profile)` makes pulleys, bolts and barrels.

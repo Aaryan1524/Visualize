@@ -46,6 +46,31 @@ What a machine needs. The escalator built in Clay came out as about forty identi
 
     The first version's page fails them. A fourth planted fault, a shot pushed off centre, fails too. `shots.mjs --check-fresh` fails on a screenshot older than its page.
   - The escalator and lock have no shots and are pixel-identical.
+- **View A is a true view from behind.** The builder: "It is not showing the side view, it's at an angle." The inset's camera sat a little outboard and above, so the cogs showed slanted faces, and the reader could not judge alignment by eye.
+  - It is now a rear elevation: orthographic, azimuth 180°, elevation 0. Each cog is a bar as tall as its diameter and as thick as the cog, at its lateral position.
+  - The chain is a ladder of links running down from its cog through the pulleys. The guide pulley sits between the cage plates.
+  - Dashed centrelines mark the cog's line and the pulley's. When they differ, the gap is written in mm from the model, in red.
+  - From behind everything only slides, so every part is drawn once and moved by a translate.
+  - Tests hold:
+    - the camera to 180° and 0;
+    - each cog's bar to the model's lateral position, within a pixel;
+    - the drawn offset to the model's, across the lab's whole range.
+- **What the derailleur taught is now the kit, not one page's memory.**
+  - `references/figures.md` is the recipe for a machine figure on the rig: when to use one, the look, draw once and move, the camera, insets, and every failure with the check that now catches it.
+  - `node scripts/new-machine.mjs <name>` writes a gear pair. As generated, it builds and passes `check-drawing`, all but the independent review. It has:
+    - a model with a tested contact pair;
+    - a rig figure;
+    - a shot per step;
+    - a recorded voice;
+    - claims, topics, a lab and Now you try.
+
+    Its first build drew every solid black, because `rig.css` was missing, and passed every check. So `check-drawing` now fails solids with no material colours.
+  - **Shared checks:**
+    - `checkContacts` in `src/rig/contacts.ts`: where a chain or gear drives a wheel, the two move together on screen.
+    - `scripts/check-arithmetic.mjs`: every printed equation, re-done from the printed digits. It is in `check:drawing`.
+    - `scripts/shoot-steps.mjs`: every step, theme, variant, lab end and Now you try, each printed with its time. `--check-fresh` fails on a shot older than the page.
+  - Each fails a planted fault: a reversed gear, a wrong sum, a day-old screenshot.
+  - `SKILL.md` routes machines to the recipe and the scaffold. A machine's report now states the contacts checked, the equations checked and the fresh shots looked at.
 - **The player takes figures that build their own parts:** optional hooks to fade parts by tone instead of opacity, and to keep callouts on moving parts. The escalator and lock are pixel-identical.
 - **What a page says is checked, not only what its model computes (`src/claims/audit.mjs`).** Round 5 lost both topics to a plain agent, and the losses were words: a derailleur page said the cage spring swings the cage forward (it pulls it back), a heading said 60° where the readout said 37°, and limit screws were never taught. The audit runs in every build (`drawingPage`) and in `verify`, and fails on any of these:
   - a number in the text that the model doesn't have at the precision shown;
