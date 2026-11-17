@@ -1,0 +1,25 @@
+// node --test claims.test.mjs
+//
+// Every claim holds for every variant's model, and its words are on the page: in a heading, a
+// caption or the narration (story.mjs).
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { MODELS } from "./model.mjs";
+import { CLAIMS, COVERAGE, STEPS, captions, headings, script } from "./story.mjs";
+
+for (const [name, M] of Object.entries(MODELS)) {
+  const words = [...headings(M), ...captions(M), ...script(M).map((s) => s.replace(/\[([^\]|]+)\|[^\]]+\]/g, "$1"))].join("\n");
+  for (const c of CLAIMS) {
+    test(`${name}: "${c.text}" holds, and the page says it`, () => {
+      assert.ok(c.test(M), "the model contradicts it");
+      assert.ok(words.includes(c.text), "the page does not say it");
+    });
+  }
+}
+
+test("every core topic is placed on a step, the lab or What if", () => {
+  const places = new Set([...STEPS.map((_, k) => `step:${k}`).slice(1), "whatif", "lab", "practice"]);
+  for (const t of COVERAGE.topics) assert.ok(places.has(t.where) || t.where === "deferred", `${t.topic}: ${t.where}`);
+  assert.ok(COVERAGE.topics.filter((t) => t.core !== false).length >= 4);
+});

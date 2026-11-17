@@ -160,6 +160,13 @@ try {
     else if (!au.ok) for (const q of au.problems) fail(`audit: ${q}`);
     if (contract.ids.length) fail(`${at}: missing #${contract.ids.join(", #")}`);
     if (!contract.voice) fail(`${at}: no recorded voice is embedded (run the example's voice script)`);
+    // A rig figure without the rig's look draws every solid black, and every other check still passes
+    // (the scaffold's first build did): its material tokens must resolve.
+    const look = await p.evaluate(() => {
+      const solid = document.querySelector("#fig .rig-solid");
+      return solid ? getComputedStyle(solid).getPropertyValue("--rig-lit").trim() : null;
+    });
+    if (look === "") fail(`${at}: the figure's solids have no material colours; put src/rig/rig.css in the page's CSS`);
     if (contract.missingFns.includes("seekStep") || contract.missingFns.includes("state")) continue;
     const has = (f) => !contract.missingFns.includes(f);
 

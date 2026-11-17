@@ -1,0 +1,46 @@
+// node --test model.test.mjs
+//
+// The model's physics, and the one test every machine with a driving contact needs: where the
+// driving gear meets the driven gear, the two must move together on screen (src/rig/contacts.ts). A
+// sign slip in an angle, a mirrored camera or a gear turned the wrong way fails it.
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { MODELS } from "./model.mjs";
+import { cameraFor, figure, W, THICK } from "./figure.mjs";
+import { carry, checkContacts, screenOf } from "__ROOT__/src/rig/index.ts";
+
+const BOX = { x: 4400, y: 500, w: 4900, h: 5500 };
+
+for (const [name, M] of Object.entries(MODELS)) {
+  test(`${name}: the pitch circles move at the same speed, and the driven gear turns ${M.ratio} times slower, the other way`, () => {
+    const v = M.pitchSpeed(60);
+    assert.ok(Math.abs(v.driver - v.driven) < 1e-9);
+    assert.ok(Math.abs(M.pose(1).out - M.z1 / M.z2) < 1e-12);
+    assert.ok(Math.sign(M.pose(0.1).a2 - M.pose(0).a2) === -1 && Math.sign(M.pose(0.1).a1 - M.pose(0).a1) === 1);
+    assert.ok(Math.abs(M.torqueOut(10) * M.speedOut(60) - 10 * 60) < 1e-9, "power in equals power out");
+  });
+
+  // where the gears mesh, the driving tooth and the driven tooth move together on screen
+  const contactsOf = (reverse = false) => {
+    const cam = cameraFor(M, BOX), F = figure(M, cam), contacts = [];
+    const shown = (items, name) => items.find((i) => i.id.startsWith(name) && /\d$/.test(i.id) && !i.hidden && !i.id.startsWith("mark"));
+    for (const t of [0, 0.013, 0.31, 0.77]) {
+      const dt = 0.002;
+      const a = F.pose({ turns: t }).items, b = F.pose({ turns: t + dt }).items;
+      const da = shown(a, "driver"), db = shown(b, "driver"), ga = shown(a, "driven"), gb = shown(b, "driven");
+      if (da.id !== db.id || ga.id !== gb.id) continue; // a different drawing between the frames
+      const P = screenOf(cam, W(M.r1, 0, THICK / 2));
+      contacts.push({ where: "mesh", chain: [P, carry(da.transform, db.transform, P)], wheel: [P, reverse ? carry(gb.transform, ga.transform, P) : carry(ga.transform, gb.transform, P)] });
+    }
+    return contacts;
+  };
+  test(`${name}: where the teeth meet, the driving and the driven gear move together`, () => {
+    const r = checkContacts(contactsOf());
+    assert.deepEqual(r.faults, []);
+    assert.ok((r.byWhere.mesh ?? 0) >= 3, `only ${r.byWhere.mesh ?? 0} contacts checked`);
+  });
+  test(`${name}: a planted fault, the driven gear turned the wrong way, fails the contact test`, () => {
+    assert.ok(checkContacts(contactsOf(true)).faults.some((f) => /against the chain/.test(f)));
+  });
+}

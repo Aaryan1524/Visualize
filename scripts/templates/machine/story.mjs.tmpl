@@ -1,0 +1,75 @@
+// __TITLE__: the story, in one place: steps, headings, captions, the narration, and the claims and
+// topics the audit holds the page to. build.mjs, voice.mjs and the tests all read it.
+//
+// Every number is written from the model (src/claims/audit.mjs fails a number the model lacks), whole
+// numbers in words in the narration, and each cause-and-effect sentence in CLAIMS appears on the page
+// word for word, with a test against every variant's model.
+
+// Steps: step 0 is the concept (no tab). `shot` names the parts the camera centres on (the step's
+// subject, lit); `focus` the parts kept at full tone. Names are data-part names from figure.mjs, or
+// "mesh" (where the teeth meet).
+export const STEPS = [
+  { tab: null, focus: null },
+  { tab: "The parts", focus: null },
+  { tab: "The mesh", focus: ["driver", "driven"], shot: ["mesh"] },
+  { tab: "Speed", focus: ["driver", "driven"], shot: ["driver", "driven"] },
+  { tab: "Force", focus: ["driver", "driven"], shot: ["driven"] },
+];
+export const PRED_STEP = 2;
+
+const ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+const words = (n) => (n < 20 ? ONES[n] : n < 100 ? TENS[Math.floor(n / 10)] + (n % 10 ? "-" + ONES[n % 10] : "") : String(n));
+const fmt = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
+
+/** The headings, one a step, from the model. */
+export const headings = (M) => [
+  "How do two gears trade speed for force?",
+  "A small driving gear meshes with a larger driven gear.",
+  "Where the teeth meet, both pitch circles move at the same speed.",
+  `The ${M.z2}-tooth gear turns once for every ${fmt(M.ratio)} turns of the ${M.z1}-tooth gear.`,
+  `It turns ${fmt(M.ratio)} times slower and pushes with ${fmt(M.ratio)} times the torque.`,
+];
+
+/** The Details caption for each step. */
+export const captions = (M) => [
+  `A ${M.z1}-tooth gear drives a ${M.z2}-tooth gear. Their teeth are the same size, so the bigger gear has more of them round a longer circle. The small gear turns fast and lightly; the large one turns slowly and hard.`,
+  `The driving gear (orange) turns on its shaft and meshes with the driven gear on a second shaft, ${fmt(M.centre)} mm away.`,
+  `At the pitch point, each tooth pushes the next one along: both pitch circles move at the same speed, so the driven gear turns the other way.`,
+  `Each turn of the driving gear passes ${M.z1} teeth through the mesh; the driven gear needs ${M.z2} to turn once, so it turns ${fmt(M.N.inv)} of a turn.`,
+  `The same force acts at both pitch circles, and the driven gear's radius is ${fmt(M.ratio)} times larger, so its torque is ${fmt(M.ratio)} times larger: ${fmt(M.N.torque)} N·m in gives ${fmt(M.N.torqueOut)} N·m out.`,
+];
+
+/**
+ * The narration, one string a step. [phrase|part ...] lights those parts while the words are spoken
+ * and may lead the camera to them; the part names must be ones the figure can frame.
+ */
+export const script = (M) => [
+  `A gear pair trades speed for force. The small gear turns fast and lightly; the large one turns slowly and hard.`,
+  `[The driving gear|driver] turns on its shaft. Its teeth mesh with [the driven gear|driven] on the second shaft.`,
+  `Where [the teeth meet|mesh], each tooth pushes the next one along. Both pitch circles move at the same speed, so the driven gear turns the other way.`,
+  `[The driving gear|driver] has ${words(M.z1)} teeth and [the driven gear|driven] has ${words(M.z2)}. The ${M.z2}-tooth gear turns once for every ${fmt(M.ratio)} turns of the ${M.z1}-tooth gear.`,
+  `The same force acts at both pitch circles. [The driven gear|driven] has the larger radius, so it turns ${fmt(M.ratio)} times slower and pushes with ${fmt(M.ratio)} times the torque.`,
+];
+
+/** Each claim: words that must be on the page, and a test of them against a model. */
+export const CLAIMS = [
+  { text: "both pitch circles move at the same speed", test: (m) => Math.abs(m.pitchSpeed(60).driver - m.pitchSpeed(60).driven) < 1e-9 },
+  { text: "so the driven gear turns the other way", test: (m) => Math.sign(m.pose(0.1).a2 - m.pose(0).a2) === -Math.sign(m.pose(0.1).a1 - m.pose(0).a1) },
+  { text: "the driven gear needs", test: (m) => Math.abs(m.pose(1).out - m.z1 / m.z2) < 1e-12 },
+  { text: "so its torque is", test: (m) => Math.abs(m.torqueOut(10) - 10 * m.r2 / m.r1) < 1e-9 },
+  { text: "turns slowly and hard", test: (m) => m.speedOut(60) < 60 && m.torqueOut(10) > 10 },
+];
+
+/** The field's core topics, each placed on the page, and the source the list came from. */
+export const COVERAGE = {
+  source: "any machine-design text's chapter on spur gears (gear ratio, pitch circles, torque and speed)",
+  topics: [
+    { topic: "the parts: driving gear, driven gear, shafts", where: "step:1" },
+    { topic: "the mesh: equal pitch-circle speed, opposite turning", where: "step:2" },
+    { topic: "the speed ratio from the tooth counts", where: "step:3" },
+    { topic: "torque rises as speed falls", where: "step:4" },
+    { topic: "a different pair of tooth counts", where: "whatif" },
+    { topic: "your own speed and torque", where: "lab" },
+  ],
+};

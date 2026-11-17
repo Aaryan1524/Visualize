@@ -1,0 +1,73 @@
+// __TITLE__: the figure, on Visualize's rig (src/rig). Every part is a closed solid shaded by one key
+// light, drawn once; each frame only places it (references/figures.md, "Draw once, then move").
+//
+//   const F = figure(M, camera)   // once per variant
+//   F.parts                       // drawings put in the page once: { id, part, svg }
+//   F.pose(state)                 // each frame: { items, at } (at: callout anchors on screen)
+//
+// A gear turning in its own plane moves by one exact 2D transform (moveInPlane). A thick gear is exact
+// on the plane it is placed by and off elsewhere by its thickness times the turn left over, so each
+// gear is drawn at BINS angles across one tooth and turned only by the rest. The mark on each face
+// breaks that symmetry, so it is a part of its own, turned by the whole angle on the face's plane.
+
+import { affineString, angleBin, circlePoints, drawMesh, fitCamera, moveInPlane, planeOf, plate, screenOf, sprocket, turned } from "__ROOT__/src/rig/index.ts";
+export { RigStage, screenOf } from "__ROOT__/src/rig/index.ts";
+
+export const W = (x, y, e) => [x, -e, y]; // the rig's world is [x, y, z] with z up
+export const VIEW = { azimuth: 236, elevation: 22 };
+export const BINS = 4;
+export const THICK = 8; // mm, each gear's face width
+const FRONT = [0, -1, 0]; // toward the viewer's side (+e)
+const SIDE = planeOf([0, 0, 0], FRONT, [1, 0, 0]);
+const AXES = { origin: [0, 0, 0], u: SIDE.u, v: SIDE.v, n: SIDE.n };
+const TAU = Math.PI * 2;
+
+/** The camera for one variant, fitted to both gears and the plate behind them. */
+export function cameraFor(M, box) {
+  const pts = [];
+  for (const [cx, R] of [[0, M.r1 + M.tip + 16], [M.centre, M.r2 + M.tip + 14]])
+    for (let a = 0; a < 360; a += 20) for (const e of [-14, THICK + 10]) pts.push(W(cx + R * Math.cos((a * Math.PI) / 180), R * Math.sin((a * Math.PI) / 180), e));
+  return fitCamera(pts, box, VIEW.azimuth, VIEW.elevation);
+}
+
+export function figure(M, cam) {
+  const parts = [];
+  const once = (id, part, svg) => parts.push({ id, part, svg });
+  const S = (x, y, e) => screenOf(cam, W(x, y, e));
+  const place = (theta, to, n) => affineString(moveInPlane(cam, AXES, theta, to, n, n));
+  // the plate the shafts stand in, behind the gears: quiet context
+  const R = Math.max(M.r1, M.r2) + M.tip + 12;
+  const plateOutline = [[-M.r1 - M.tip - 14, -R], [M.centre + M.r2 + M.tip + 14, -R], [M.centre + M.r2 + M.tip + 14, R], [-M.r1 - M.tip - 14, R]];
+  once("plate", "plate", drawMesh(plate(SIDE, { outer: plateOutline }, -14, -10), cam, { material: "frame" }));
+  // the two gears, each drawn at BINS angles across one tooth, at the origin, in the plane e = 0..THICK
+  const gear = (z, r, rot, material) => drawMesh(plate(SIDE, { outer: sprocket(z, r, M.tip, rot), holes: [circlePoints(5, 24)] }, 0, THICK), cam, { material, shine: true });
+  for (let b = 0; b < BINS; b++) {
+    once(`driver${b}`, "driver", gear(M.z1, M.r1, (b * TAU) / M.z1 / BINS, "subject"));
+    once(`driven${b}`, "driven", gear(M.z2, M.r2, (b * TAU) / M.z2 / BINS, "steel"));
+  }
+  // a mark on each face, so a reader can count the turns
+  const mark = (r) => drawMesh(turned(W(r * 0.62, 0, THICK), FRONT, [[0, 2.8], [0.6, 2.8]], 16, [1, 0, 0]), cam, { material: "slate" });
+  once("mark1", "driver", mark(M.r1));
+  once("mark2", "driven", mark(M.r2));
+  // the shafts: turned, so they look the same at every angle; drawn once, placed once
+  const shaft = drawMesh(turned(W(0, 0, -10), FRONT, [[0, 5], [THICK + 16, 5]], 24, [1, 0, 0]), cam, { material: "alloy", shine: true });
+  once("shaft1", "driver", shaft);
+  once("shaft2", "driven", shaft);
+
+  function pose(st) {
+    const p = M.pose(st.turns ?? 0), items = [], at = {};
+    items.push({ id: "plate", key: 0, transform: null });
+    for (const [name, a, z, c, k] of [["driver", p.a1, M.z1, [0, 0], 10], ["driven", p.a2, M.z2, [M.centre, 0], 11]]) {
+      const { bin, rest } = angleBin(a, TAU / z, BINS);
+      for (let b = 0; b < BINS; b++) items.push(b === bin ? { id: `${name}${b}`, key: k, transform: place(rest, c, THICK / 2) } : { id: `${name}${b}`, key: k, hidden: true });
+    }
+    items.push({ id: "mark1", key: 15, transform: place(p.a1, [0, 0], THICK) }, { id: "mark2", key: 15, transform: place(p.a2 - Math.PI + Math.PI / M.z2, [M.centre, 0], THICK) });
+    items.push({ id: "shaft1", key: 20, transform: place(0, [0, 0], 0) }, { id: "shaft2", key: 20, transform: place(0, [M.centre, 0], 0) });
+    at.driver = S(-M.r1 * 0.55, M.r1 * 0.5, THICK);
+    at.driven = S(M.centre + M.r2 * 0.5, -M.r2 * 0.45, THICK);
+    at.mesh = S(M.r1, 0, THICK);
+    at.shaft = S(M.centre, 0, THICK + 6);
+    return { items, at };
+  }
+  return { parts, pose };
+}
