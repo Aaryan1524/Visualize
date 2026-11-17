@@ -19,7 +19,10 @@
 //                       its leader there, so leaders follow moving parts
 //   boundsOf(names)     optional: the bounds of the named parts, in the figure's own units (the camera's
 //                       transform excluded), or null. With it, a step's `shot` (a list of part names in
-//                       DATA.steps) moves the camera: see "The camera" below and camera.mjs
+//                       DATA.steps: the step's subject, centred and lit) moves the camera, and
+//                       DATA.camera.around[k] (parts the subject attaches to) stays in view;
+//                       DATA.camera.alias adds names the camera may light: see "The camera" below
+//                       and camera.mjs
 //   clearArea()         optional: { x0, y0, x1, y1 } in the figure's units, where framed parts may go
 //   lab(values)         optional, the free-input lab: { state, verdict, rows: [string] } for the
 //                       reader's own values (DATA.lab lists the inputs); state is drawn by render()
@@ -33,7 +36,9 @@ export function player(DATA, machine, kit) {
   const pad2 = (n) => String(n).padStart(2, "0");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const STEPS = DATA.steps, LAST = STEPS.length - 1, PRED = DATA.predict.step;
-  const ALIAS = DATA.alias || {};
+  // The camera's own data (DATA.camera: names it may light, and each step's parts to keep in view) is
+  // not reader text, so it stays out of the audit's stamp.
+  const ALIAS = { ...(DATA.alias || {}), ...(DATA.camera?.alias || {}) }, AROUND = DATA.camera?.around || {};
   const S = { variant: null, step: -1, T: 0, pinPose: true, state: null, running: false, touring: false, voiceOn: true, armed: false, answer: null, last: 0, lit: [], heard: -1 };
   let V = null, E = null;
 
@@ -141,7 +146,7 @@ export function player(DATA, machine, kit) {
   // cont: the story reached this step by running on from the one before (or by its time, a seek or the
   // scrubber), so the step's track starts with the move from that step's camera; flow: it is running on
   // now, so the track itself makes the move and no blend is needed.
-  const C = { el: null, clear: null, tracks: [], cur: null, target: null, blend: null, instant: false, raf: 0, cont: false, flow: false };
+  const C = { el: null, clear: null, tracks: [], cur: null, target: null, blend: null, instant: false, raf: 0, cont: false, flow: false, on: null }; // on: the voice-led shot's names, lit while it is shown
   function defaultClear() {
     const vb = fig.viewBox.baseVal, inv = fig.getScreenCTM().inverse();
     const ux = (x) => new DOMPoint(x, 0).matrixTransform(inv).x;
@@ -169,11 +174,12 @@ export function player(DATA, machine, kit) {
       const names = STEPS[k].shot;
       let shot = CAM.ID;
       if (names?.length) {
-        // the shot holds the parts wherever they go in the step, and at its still frame
-        let b = sampleBounds(k, names, SEG.s[k], SEG.s[k + 1] - 0.01, 8);
+        // centred on the subject at the step's still frame; the subject wherever it goes in the step,
+        // and the parts around it (`around`), stay in view
+        const keepNames = [...names, ...(AROUND[k] ?? [])];
+        const keep = sampleBounds(k, keepNames, SEG.s[k], SEG.s[k + 1] - 0.01, 8);
         machine.render(machine.at(k, poseT(k) - SEG.s[k], true, SEG), S);
-        b = CAM.union(b, boundsOfIds(names));
-        shot = CAM.frame(b, C.clear);
+        shot = CAM.frame(boundsOfIds(names), C.clear, { keep: CAM.union(keep, boundsOfIds(keepNames)) });
       }
       const links = (V.voice?.[k]?.links ?? []).map((l) => {
         const a = SEG.s[k] + SEG.lead + l.start, e = SEG.s[k] + SEG.lead + l.end;
@@ -206,6 +212,9 @@ export function player(DATA, machine, kit) {
       else m = CAM.lerp(C.blend.from, target, CAM.ease(u), C.clear);
     }
     C.target = target;
+    // a voice-led shot lights what it shows, with or without the voice
+    const tr = C.tracks[S.step], on = tr && !S.pinPose ? CAM.subjectAt(tr, S.T, !C.cont) : null;
+    if ((on ?? []).join() !== (C.on ?? []).join()) ((C.on = on), applyFocus());
     if (!C.cur || !CAM.same(C.cur, m)) {
       C.cur = m;
       C.el.setAttribute("transform", CAM.same(m, CAM.ID) ? "" : `matrix(${m.s.toFixed(5)} 0 0 ${m.s.toFixed(5)} ${m.x.toFixed(2)} ${m.y.toFixed(2)})`);
@@ -218,9 +227,12 @@ export function player(DATA, machine, kit) {
       });
   }
 
+  // With the camera on, a step's shot is its subject: lit while the voice names nothing else, so the
+  // parts around it recede by tone and stay recognisable.
+  const subject = () => (!C.el || labOpen || practiceOpen ? [] : C.on ?? STEPS[S.step]?.shot ?? []);
   function applyFocus() {
     const focus = STEPS[S.step]?.focus;
-    const lit = S.lit.flatMap((id) => [id, ...(ALIAS[id] || [])]);
+    const lit = (S.lit.length ? S.lit : subject()).flatMap((id) => [id, ...(ALIAS[id] || [])]);
     if (machine.focus) {
       machine.focus({ focus: labOpen ? null : focus ?? null, lit });
       machine.lit?.(S.lit);
@@ -614,6 +626,7 @@ export function player(DATA, machine, kit) {
     if (practiceOpen) renderPractice();
     showPredict();
     syncCards();
+    if (C.el) applyFocus(); // the step's subject is lit only while the story is showing
     camBlend();
     camApply();
     followLeaders();
@@ -649,6 +662,7 @@ export function player(DATA, machine, kit) {
     heading.textContent = DATA.lab.heading ?? DATA.lab.title;
     showPredict();
     syncCards();
+    if (C.el) applyFocus();
     camBlend();
     renderLab();
     lab.querySelector("input")?.focus();
@@ -751,7 +765,10 @@ export function player(DATA, machine, kit) {
       C.instant = false;
     },
     // The camera: where it is, where it is going, the clear area, and each step's track (camera.mjs).
-    camera: () => ({ active: !!C.el, m: C.cur, target: C.target, blending: !!C.blend, cont: C.cont, clear: C.clear, T: S.T, step: S.step, pinned: S.pinPose, running: S.running, starts: SEG.s, lead: SEG.lead, shots: STEPS.map((s) => s.shot ?? null), tracks: C.tracks.map((t) => ({ shot: t.shot, enter: t.enter, start: t.start, end: t.end, moves: t.moves.map((m) => ({ t0: m.t0, d: m.d, from: m.from, to: m.to, ids: m.ids, enter: !!m.enter })) })), links: V.voice ? V.voice.map((tr) => tr.links.map((l) => ({ start: l.start, end: l.end, ids: l.ids }))) : [] }),
+    camera: () => ({ active: !!C.el, m: C.cur, target: C.target, blending: !!C.blend, cont: C.cont, clear: C.clear, T: S.T, step: S.step, pinned: S.pinPose, running: S.running, starts: SEG.s, lead: SEG.lead, shots: STEPS.map((s) => s.shot ?? null), around: STEPS.map((s, k) => AROUND[k] ?? null), tracks: C.tracks.map((t) => ({ shot: t.shot, enter: t.enter, start: t.start, end: t.end, moves: t.moves.map((m) => ({ t0: m.t0, d: m.d, from: m.from, to: m.to, ids: m.ids, enter: !!m.enter })) })), links: V.voice ? V.voice.map((tr) => tr.links.map((l) => ({ start: l.start, end: l.end, ids: l.ids }))) : [] }),
+    // The named parts' bounds and the callout anchors, in the figure's own units (no camera).
+    boundsOf: (names) => (C.el ? boundsOfIds(names) : null),
+    anchors: () => machine.anchors?.() ?? {},
     // The named parts as the camera shows them now, in page pixels (null if the figure has none of them).
     partsOnScreen(names) {
       if (!C.el) return null;

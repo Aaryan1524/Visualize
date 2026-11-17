@@ -49,6 +49,23 @@ test("camera: a shot centres its parts in the clear area, zoomed no further than
   assert.deepEqual(K.frame(null, C), K.ID, "no bounds: the whole figure");
 });
 
+test("camera: the zoom stops at 2x, and parts kept around the subject limit it and stay in view", () => {
+  assert.equal(K.CAP, 2);
+  const sub = box(6000, 3000, 100, 100);
+  const alone = K.frame(sub, C);
+  assert.equal(alone.s, 2);
+  // context that fits: the subject stays centred
+  const near = K.frame(sub, C, { keep: box(5600, 2600, 900, 900) });
+  const on = K.onScreen(near, sub);
+  assert.ok(Math.abs((on.x0 + on.x1) / 2 - (C.x0 + C.x1) / 2) < 1e-6);
+  // context to one side, too far to centre the subject with it in view: the camera slides only as far as it must
+  const keep = box(5900, 2900, 2400, 300), m = K.frame(sub, C, { keep });
+  assert.ok(inside(K.onScreen(m, keep), C, 1e-6), "what must stay in view does");
+  const s2 = K.onScreen(m, sub), cx = (s2.x0 + s2.x1) / 2;
+  assert.ok(cx < (C.x0 + C.x1) / 2, "the subject moves off centre, toward where it can");
+  assert.ok(Math.abs(K.onScreen(m, keep).x1 - C.x1) < 1e-6, "and only as far as it must");
+});
+
 test("camera: framed() asks for the part inside the clear area and at least MIN_FRAC of its shorter side", () => {
   const b = box(6000, 3000, 400, 300);
   assert.ok(K.framed(b, K.frame(b, C), C));
@@ -86,7 +103,7 @@ test("camera: a move takes long enough that the picture never moves faster than 
 });
 
 const SHOT = K.frame(box(5500, 2000, 2000, 2000), C);
-const FAR = box(8600, 5800, 150, 150); // a small part away from the shot
+const FAR = box(8550, 5750, 200, 200); // a small part away from the shot
 const NEAR = box(6000, 2500, 900, 900); // a part the shot already frames well
 
 test("camera: a part the step's shot frames well needs no move; a step that arrives from another camera eases in first", () => {
@@ -115,7 +132,7 @@ test("camera: a voice-led shot arrives before its words, holds, and comes back t
 });
 
 test("camera: links too close to have a shot each share one; the camera never chases every word", () => {
-  const OTHER = box(4300, 5900, 150, 150);
+  const OTHER = box(4300, 5850, 200, 200);
   const t = K.stepTrack({ start: 10, end: 40, shot: SHOT, links: [{ a: 20, b: 20.3, ids: ["far"], bounds: FAR }, { a: 20.5, b: 21, ids: ["other"], bounds: OTHER }] }, C);
   const voiced = t.moves.filter((m) => m.ids.length);
   assert.equal(voiced.length, 1, "one shot for both");
@@ -127,8 +144,8 @@ test("camera: links too close to have a shot each share one; the camera never ch
 });
 
 test("camera: with no room to come back between two links, the camera goes from one shot straight to the next", () => {
-  const OTHER = box(4300, 5900, 150, 150);
-  const t = K.stepTrack({ start: 10, end: 40, shot: SHOT, links: [{ a: 20, b: 21, ids: ["far"], bounds: FAR }, { a: 24.2, b: 25, ids: ["other"], bounds: OTHER }] }, C);
+  const OTHER = box(4300, 5850, 200, 200);
+  const t = K.stepTrack({ start: 10, end: 40, shot: SHOT, links: [{ a: 20, b: 21, ids: ["far"], bounds: FAR }, { a: 23.5, b: 24.3, ids: ["other"], bounds: OTHER }] }, C);
   assert.deepEqual(t.moves.map((m) => m.ids.join() || "shot"), ["far", "other", "shot"]);
   // with room, it comes back in between
   const spaced = K.stepTrack({ start: 10, end: 40, shot: SHOT, links: [{ a: 20, b: 21, ids: ["far"], bounds: FAR }, { a: 30, b: 31, ids: ["other"], bounds: OTHER }] }, C);

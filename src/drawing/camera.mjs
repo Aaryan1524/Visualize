@@ -1,7 +1,8 @@
 // The figure's camera: zoom and pan only, as one transform on the figure's group, so nothing is redrawn.
 //
-// A shot is a list of part names. The machine's boundsOf(names) gives their bounds in the figure's own
-// units; frame() turns bounds into the zoom and offset that set them in the stage's clear area, never
+// A shot is a list of part names, the subject, with optional parts around it to keep in view. The
+// machine's boundsOf(names) gives their bounds in the figure's own units; frame() turns bounds into the
+// zoom and offset that centre the subject in the stage's clear area, never
 // past the zoom cap and never below 1 (shot 0, the whole figure, is the identity). stepTrack() lays out,
 // for each step, the move into the step's shot, then the voice-led shots: when the narration names a part the
 // current shot does not frame well, the camera eases to it before the words reach it, holds at least
@@ -11,7 +12,9 @@
 // The kit runs in the page: page.mjs serializes cameraKit with toString(), so it must not reference
 // anything outside its own body. Tests import it directly.
 export function cameraKit() {
-  const CAP = 3, PAD = 0.12, MIN_FRAC = 0.06, HOLD = 0.8, MIN_DUR = 0.6, SPEED = 2.0;
+  // CAP: the closest the camera goes. At 3x the derailleur lost its context (a field of teeth around a
+  // 4 mm part); at 2x the parts a part attaches to stay recognisable.
+  const CAP = 2, PAD = 0.12, MIN_FRAC = 0.06, HOLD = 0.8, MIN_DUR = 0.6, SPEED = 2.0;
   const ID = { s: 1, x: 0, y: 0 };
   const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u)); // smoothstep: peak speed 1.5x the mean
   const union = (a, b) => (!a ? b : !b ? a : { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) });
@@ -20,19 +23,30 @@ export function cameraKit() {
   const short = (c) => Math.min(c.x1 - c.x0, c.y1 - c.y0);
   const same = (a, b) => Math.abs(a.s - b.s) < 1e-9 && Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6;
 
-  /** The camera that sets bounds `b` in the clear area `c`: centred, zoomed up to the cap, never below 1. */
-  function frame(b, c, { cap = CAP, pad = PAD } = {}) {
+  /**
+   * The camera that sets bounds `b` (the subject) in the clear area `c`: centred, zoomed up to the cap and
+   * never below 1. `keep` (bounds that hold the subject wherever it moves, and the parts around it the
+   * reader needs to recognise it) stays in the clear area too: it limits the zoom, and the subject moves
+   * off centre only as far as keeping it in view needs.
+   */
+  function frame(b, c, { cap = CAP, pad = PAD, keep = null } = {}) {
     if (!b) return { ...ID };
-    const bw = Math.max(1e-6, b.x1 - b.x0), bh = Math.max(1e-6, b.y1 - b.y0), padU = pad * Math.max(bw, bh);
-    let s = Math.min(cap, (c.x1 - c.x0) / (bw + 2 * padU), (c.y1 - c.y0) / (bh + 2 * padU));
+    const k = union(b, keep);
+    const kw = Math.max(1e-6, k.x1 - k.x0), kh = Math.max(1e-6, k.y1 - k.y0), padU = pad * Math.max(b.x1 - b.x0, b.y1 - b.y0, 1e-6);
+    let s = Math.min(cap, (c.x1 - c.x0) / (kw + 2 * padU), (c.y1 - c.y0) / (kh + 2 * padU));
     // no zoom is needed: keep the figure where it was laid out, if it already sits in the clear area
     if (s <= 1) {
-      const inside = b.x0 >= c.x0 && b.x1 <= c.x1 && b.y0 >= c.y0 && b.y1 <= c.y1;
+      const inside = k.x0 >= c.x0 && k.x1 <= c.x1 && k.y0 >= c.y0 && k.y1 <= c.y1;
       if (inside) return { ...ID };
       s = 1;
     }
     const cx = (c.x0 + c.x1) / 2, cy = (c.y0 + c.y1) / 2;
-    return { s, x: cx - s * (b.x0 + b.x1) / 2, y: cy - s * (b.y0 + b.y1) / 2 };
+    let x = cx - (s * (b.x0 + b.x1)) / 2, y = cy - (s * (b.y0 + b.y1)) / 2;
+    // slide (no further than needed) so what must stay in view does
+    const slide = (lo, hi, c0, c1) => (hi - lo > c1 - c0 ? (c0 + c1) / 2 - (lo + hi) / 2 : lo < c0 ? c0 - lo : hi > c1 ? c1 - hi : 0);
+    x += slide(s * k.x0 + x, s * k.x1 + x, c.x0, c.x1);
+    y += slide(s * k.y0 + y, s * k.y1 + y, c.y0, c.y1);
+    return { s, x, y };
   }
 
   /** Is `b`, seen through camera `m`, inside the clear area and large enough to read? */
@@ -141,5 +155,16 @@ export function cameraKit() {
     return m;
   }
 
-  return { CAP, PAD, MIN_FRAC, HOLD, MIN_DUR, SPEED, ID, ease, union, apply, onScreen, frame, framed, lerp, dist, duration, stepTrack, at, same };
+  /** What the camera is showing at T: the names of the voice-led shot it is on or moving to, or null for the step's own shot. */
+  function subjectAt(track, T, cut = false) {
+    let ids = null;
+    for (const mv of track.moves) {
+      if (cut && mv.enter) continue;
+      if (T < mv.t0) break;
+      ids = mv.ids.length ? mv.ids : null;
+    }
+    return ids;
+  }
+
+  return { subjectAt, CAP, PAD, MIN_FRAC, HOLD, MIN_DUR, SPEED, ID, ease, union, apply, onScreen, frame, framed, lerp, dist, duration, stepTrack, at, same };
 }
