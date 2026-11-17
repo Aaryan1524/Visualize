@@ -37,13 +37,13 @@ const PRED_STEP = 4;
 const G3 = 3; // the story starts in the fourth gear
 const STEPS = [
   { tab: null, heading: "How does one cable choose among eleven cogs?", focus: null },
-  { tab: "The parts", heading: "A sprung parallelogram hangs a cage of two pulleys under the cassette.", focus: null, shot: ["cassette", "hanger", "bknuckle", "links", "pknuckle", "cage", "guide", "tension"] },
-  { tab: "One click", heading: null, shot: ["barrel", "wire", "links"], focus: ["cable", "links", "pknuckle", "bknuckle", "guide", "tension", "cage", "chain", "cassette", "barrel"] },
+  { tab: "The parts", heading: "A sprung parallelogram hangs a cage of two pulleys under the cassette.", focus: null },
+  { tab: "One click", heading: null, shot: ["barrel", "wire"], around: ["links"], focus: ["cable", "links", "pknuckle", "bknuckle", "guide", "tension", "cage", "chain", "cassette", "barrel"] },
   { tab: "Return spring", heading: "Let cable out, and the return spring pulls the derailleur back out.", shot: ["links", "rspring"], focus: ["rspring", "links", "pknuckle", "bknuckle", "guide", "tension", "cage", "chain", "cassette", "cable"] },
   { tab: "Pedal to shift", heading: "The pulley moves at once; the chain waits for a ramp to come round.", shot: ["ramp"], focus: ["guide", "tension", "cage", "pknuckle", "chain", "cassette"] },
   { tab: "Slack", heading: null, shot: ["cage", "guide", "tension", "forces"], focus: ["cage", "guide", "tension", "chain", "cassette", "forces", "pknuckle"] },
   { tab: "Limit screws", heading: "Two screws stop the swing at the end cogs; a third sets the gap.", shot: ["hscrew", "lscrew", "bscrew"], focus: ["bknuckle", "links", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "hanger"] },
-  { tab: "Barrel adjuster", heading: "A slack cable puts every cog but the smallest off line; the barrel adjuster takes it up.", shot: ["barrel"], focus: ["cable", "barrel", "bknuckle", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "links"] },
+  { tab: "Barrel adjuster", heading: "A slack cable puts every cog but the smallest off line; the barrel adjuster takes it up.", shot: ["barrel"], around: ["links"], focus: ["cable", "barrel", "bknuckle", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "links"] },
 ];
 const STRETCH = -1.0; // mm of cable slack in the barrel adjuster step
 const OVER = 2.0; // mm of extra cable pull against the L screw in the limit screw step
@@ -87,6 +87,8 @@ const PLANTS = {
   // the voice names a part the figure does not have
   "unknown-link": () => VOICE.variants.road[2].links[0].ids.splice(0, 1, "sprocket"),
   // the clear area runs under the cards and the title block, so a framed part lands under them
+  // a shot that keeps far-off parts in view, so its subject (the barrel) cannot be centred
+  "off-centre": () => (STEPS[7].around = ["tension", "cassette"]),
   "under-card": () => (PLANT_CLEAR = { x0: 9900, y0: 3900, x1: VBW - 100, y1: VBH - 100 }),
 };
 const PLANT = process.argv.includes("--plant") ? process.argv[process.argv.indexOf("--plant") + 1] : null;
@@ -104,7 +106,7 @@ function skeleton(M, name) {
   // the housing and the chain fade out toward the cut; the frame's stays fade away from the dropout
   const xa = screenOf(cam, [XCUT - 60, -20, 0])[0], xb = screenOf(cam, [XCUT - 4, -20, 0])[0];
   const dz = screenOf(cam, [4, -12, 0]);
-  const defs = `<defs><linearGradient id="fadeXg" gradientUnits="userSpaceOnUse" x1="${f1(xa)}" x2="${f1(xb)}" y1="0" y2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><mask id="fadeX" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeXg)"/></mask><radialGradient id="fadeStaysG" gradientUnits="userSpaceOnUse" cx="${f1(dz[0])}" cy="${f1(dz[1])}" r="${f1(cam.scale * 95)}"><stop offset=".45" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient><mask id="fadeStays" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeStaysG)"/></mask>${camFade()}<clipPath id="insetClip"><circle cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/></clipPath></defs>`;
+  const defs = `<defs><linearGradient id="fadeXg" gradientUnits="userSpaceOnUse" x1="${f1(xa)}" x2="${f1(xb)}" y1="0" y2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><mask id="fadeX" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeXg)"/></mask><radialGradient id="fadeStaysG" gradientUnits="userSpaceOnUse" cx="${f1(dz[0])}" cy="${f1(dz[1])}" r="${f1(cam.scale * 95)}"><stop offset=".45" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient><mask id="fadeStays" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeStaysG)"/></mask><clipPath id="insetClip"><circle cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/></clipPath></defs>`;
   const inset = `<g id="insetG" class="inset"><circle class="inset-bg" cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/><g clip-path="url(#insetClip)"><defs id="rigDefsA"></defs><g id="insetScene"></g></g><circle class="inset-ring" data-camera-avoid="" cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/><text class="inset-title" data-camera-avoid="" x="${INSET.c[0]}" y="${INSET.c[1] - INSET.r - 110}" text-anchor="middle">VIEW A · FROM BEHIND · FOLLOWS THE GUIDE PULLEY</text></g>`;
   // the title block
   const x0 = 10200, x1 = VBW - 80, y0 = 4950, y1 = VBH - 80;
@@ -119,18 +121,14 @@ function skeleton(M, name) {
   tb += `<g id="tbkey" data-x0="${x0 + 110}">`;
   for (const [cls, t] of [["k-blue", "Cable"], ["k-green", "Springs"], ["k-orange", "Followed part"], ["k-red", "Off line"]]) tb += `<g class="tbk"><path class="${cls}" d="M0,${y1 - 140}h240"/><text class="tb-text tb-key" x="0" y="${y1 - 100}">${t}</text></g>`;
   tb += "</g></g>";
-  return `${defs}<defs id="rigDefs"></defs><g mask="url(#camFade)"><g id="scene" data-camera=""></g></g>${inset}<g id="labels">${LABELS.map(labelSvg).join("")}</g>${tb}`;
+  return `${defs}<defs id="rigDefs"></defs><g id="scene" data-camera=""></g>${inset}<g id="labels">${LABELS.map(labelSvg).join("")}</g>${tb}`;
 }
 
-// Zoomed in, the figure fades out sideways before it reaches the callout columns, the heading on the left
-// and View A and the title block on the right, so the camera never paints under them. The fade does not
-// move with the camera.
+// Where the camera centres a shot: between the two columns of callouts, clear of the heading, View A,
+// the title block and the cards. Zoomed in, the figure runs on to the stage's edge, under the callouts
+// (their text has a halo), the heading (a soft wash of the stage behind it) and View A (an opaque disc).
 const LX = 3900, RX = 9420;
 const CLEAR = { x0: LX + 150, y0: 150, x1: RX - 150, y1: VBH - 150 };
-function camFade() {
-  const a = LX - 150, b = RX + 150, w = b - a, at = (x) => ((x - a) / w).toFixed(4);
-  return `<linearGradient id="camFadeG" gradientUnits="userSpaceOnUse" x1="${a}" x2="${b}" y1="0" y2="0"><stop offset="0" stop-color="#000"/><stop offset="${at(CLEAR.x0)}" stop-color="#fff"/><stop offset="${at(CLEAR.x1)}" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><mask id="camFade" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#camFadeG)"/></mask>`;
-}
 
 // Callouts: text placed in units; the leader is drawn live to the part's projected point (`to`,
 // a name in the scene's anchor table), so it follows the part as it moves.
@@ -292,7 +290,12 @@ function machine(DATA) {
         if (!r.width && !r.height) continue;
         const m = inv.multiply(el.getCTM());
         const pts = [[r.x, r.y], [r.x + r.width, r.y], [r.x, r.y + r.height], [r.x + r.width, r.y + r.height]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
-        add(Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1])));
+        const x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0]));
+        add(x0, Math.min(...pts.map((p) => p[1])), x1, Math.max(...pts.map((p) => p[1])));
+        // the B screw is a 5 mm head, too small to read alone at the camera's closest; it turns the
+        // whole derailleur about the mounting bolt beside it, so it is framed with that bolt's head
+        const o = n === "bscrew" && lastAt?.bbolt, half = x1 - x0;
+        if (o) add(o[0] - half, o[1] - half, o[0] + half, o[1] + half);
       }
     }
     return b;
@@ -471,6 +474,7 @@ const std = VARIANT_DATA.road, M0 = MODELS.road;
 // meets the next cog. An unknown name stops the build; scripts/check-drawing.mjs then checks, in the
 // page, that every name has bounds and sits clear of the cards where it is framed.
 const CAM_ITEMS = { hscrew: ["m-screwH"], lscrew: ["m-screwL"], bscrew: ["m-bscrew"], barrel: ["m-barrel"], wire: ["m-wire"], cable: ["m-barrel", "m-wire"], housing: ["m-housing"] };
+const CAM_LIGHT = { wire: ["cable"], ramp: ["cassette", "chain"] }; // names only the camera uses, and the parts they light
 const CAM_ALIAS = { forces: ["forces", "cage", "tension"], gates: ["cassette", "chain"], lscrew: ["bknuckle"], hscrew: ["bknuckle"], bscrew: ["bknuckle", "hanger"], barrel: ["cable"], housing: ["cable"] };
 function framable() {
   const names = new Set(["ramp", "gates", ...Object.keys(CAM_ITEMS)]);
@@ -489,7 +493,7 @@ function framable() {
 }
 function cameraNames() {
   const can = framable(), bad = [];
-  STEPS.forEach((st, k) => (st.shot ?? []).forEach((n) => can.has(n) || bad.push(`step ${k}'s shot names "${n}"`)));
+  STEPS.forEach((st, k) => [...(st.shot ?? []), ...(st.around ?? [])].forEach((n) => can.has(n) || bad.push(`step ${k}'s shot names "${n}"`)));
   for (const [v, tracks] of Object.entries(VOICE?.variants ?? {}))
     tracks.forEach((tr, k) => tr.links.forEach((l) => l.ids.forEach((n) => can.has(n) || bad.push(`the voice (${v}, step ${k}, at ${l.start.toFixed(2)} s) names "${n}"`))));
   if (!bad.length) return;
@@ -504,8 +508,9 @@ const DATA = {
   base: "road",
   steps: STEPS.map(({ heading, focus, shot }) => ({ heading, focus, ...(shot ? { shot } : {}) })),
   // the camera: where framed parts may go (between the two columns of callouts, clear of the heading,
-  // View A, the title block and the cards), and the drawn items a camera name can mean
-  camera: { clear: PLANT_CLEAR ?? CLEAR, items: CAM_ITEMS },
+  // View A, the title block and the cards), the drawn items a camera name can mean, the names only it
+  // lights, and the parts each step keeps in view around its subject
+  camera: { clear: PLANT_CLEAR ?? CLEAR, items: CAM_ITEMS, alias: CAM_LIGHT, around: Object.fromEntries(STEPS.flatMap((s, k) => (s.around ? [[k, s.around]] : []))) },
   alias: CAM_ALIAS,
   predict: {
     step: PRED_STEP,
@@ -559,7 +564,7 @@ text{font-family:var(--sans);fill:var(--ink)}
 .engrave{font:600 64px var(--mono);fill:var(--ink-2)}
 .inset-bg{fill:color-mix(in oklab,var(--stage) 94%,var(--ink))}
 .inset-ring{fill:none;stroke:var(--ink);stroke-width:1.2}
-.inset-title{font-size:${FS * 0.82}px;letter-spacing:.08em;font-weight:600}
+.inset-title{font-size:${FS * 0.82}px;letter-spacing:.08em;font-weight:600;paint-order:stroke;stroke:var(--stage);stroke-width:48px;stroke-linejoin:round}
 .vz[data-practice] #fig .inset,.vz[data-practice] #fig .label{visibility:hidden}
 .leader{fill:none;stroke:var(--ink);stroke-width:.5}
 .ldot{fill:var(--ink)}
@@ -567,6 +572,8 @@ text{font-family:var(--sans);fill:var(--ink)}
 .label text{paint-order:stroke;stroke:var(--stage);stroke-width:48px;stroke-linejoin:round}
 .tb-frame{fill:var(--stage);stroke:var(--ink);stroke-width:.9}
 .vz-step-heading{text-shadow:0 0 6px var(--stage),0 0 12px var(--stage),0 0 18px var(--stage)}
+#fig{overflow:visible}
+.vz-caption::before{content:"";position:absolute;z-index:-1;inset:-60px -70px -70px -60px;background:radial-gradient(closest-side,var(--stage) 62%,color-mix(in oklab,var(--stage) 0%,transparent))}
 .tb-rule{fill:none;stroke:var(--ink);stroke-width:.5}
 .tb-title{font-size:${FS * 0.8}px;font-weight:600;letter-spacing:.06em}
 .tb-text{font-size:${FS * 0.78}px}

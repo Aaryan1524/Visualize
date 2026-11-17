@@ -174,7 +174,7 @@ export function figure(M, cam, o = {}) {
     });
     const hp = pathThrough(bez.map((q) => screenOf(cam, k3(q), ax)), false);
     once("housing", "cable", `<g mask="url(#fadeX)"><path class="housing" d="${hp}"/><path class="housing-core" d="${hp}"/></g>`);
-    var anchorsStatic = { housing: screenOf(cam, k3(bez[8]), ax), hanger: S(mx * 0.45, my * 0.45 - 4, 19), bknuckle: S(BK[0] + 2, BK[1] + 2, topE), bscrew: S(mx + 9, my + 7, topE + 2.2), barrel: screenOf(cam, k3(add(barrelA, scale(dirB, 6))), ax) };
+    var anchorsStatic = { housing: screenOf(cam, k3(bez[8]), ax), hanger: S(mx * 0.45, my * 0.45 - 4, 19), bknuckle: S(BK[0] + 2, BK[1] + 2, topE), bscrew: S(mx + 9, my + 7, topE + 2.2), bbolt: S(mx, my, topE + 3), barrel: screenOf(cam, k3(add(barrelA, scale(dirB, 6))), ax) };
     var barrel = { barrelA, dirB };
   }
 
