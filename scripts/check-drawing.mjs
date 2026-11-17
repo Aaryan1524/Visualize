@@ -22,7 +22,9 @@
 //   frame and as each spoken [phrase|part] begins, every named part has bounds (a name the figure
 //   cannot frame fails), sits in the clear area, off the cards, the heading and anything marked
 //   [data-camera-avoid], and is at least 6% of the stage's shorter side, and its callout points at it
-//   on the stage and off the cards; a step's camera is the same by seekStep and by its tab, and a
+//   on the stage and off the cards; a shot's subject is centred (the middle half of the clear area),
+//   spans 15% of it and outweighs the other parts in focus; nothing clips the figure but the stage;
+//   every name's bounds are smaller than the figure and hold its anchor; a step's camera is the same by seekStep and by its tab, and a
 //   time's the same by seek and by playing up to it; through the whole story, frame by frame, the
 //   picture never moves faster than 2 clear-area short sides a second and every shot it stops on is
 //   held at least 0.8 s, and the eased move a tab click makes keeps to the same speed;
@@ -36,7 +38,8 @@
 //   max(1, measured / reference), capped at 3. Set VIZ_CPU_THROTTLE=2.5 to run the check as if on
 //   a machine 2.5 times slower (Chrome's CPU throttling applies to the reference and the page alike).
 //   A page that is clearly over its limit stops being timed once 800 frames of a variant have been,
-//   so a failing page fails in seconds. VIZ_ONLY_PLAYBACK=1 skips every other check, to time a page alone.
+//   so a failing page fails in seconds. VIZ_ONLY_PLAYBACK=1 skips every other check, to time a page alone;
+//   VIZ_ONLY_CAMERA=1 runs only the camera's checks.
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -58,6 +61,7 @@ const REFERENCE_MS = 0.28;
 const MAX_SCALE = 3;
 const THROTTLE = Number(process.env.VIZ_CPU_THROTTLE || 1);
 const ONLY_PLAYBACK = !!process.env.VIZ_ONLY_PLAYBACK;
+const ONLY_CAMERA = !!process.env.VIZ_ONLY_CAMERA;
 const throttle = async (page) => THROTTLE > 1 && (await (await page.createCDPSession()).send("Emulation.setCPUThrottlingRate", { rate: THROTTLE }));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -127,7 +131,7 @@ const fakeAudio = () => {
 
 const browser = await launch();
 try {
-  for (const [w, h] of ONLY_PLAYBACK ? [] : [[1440, 900], [1280, 800]]) {
+  for (const [w, h] of ONLY_PLAYBACK || ONLY_CAMERA ? [] : [[1440, 900], [1280, 800]]) {
     const p = await browser.newPage();
     await p.setViewport({ width: w, height: h });
     await p.evaluateOnNewDocument(fakeAudio);
@@ -355,7 +359,79 @@ try {
         }
         return out;
       };
-      let shots = 0, spoken = 0;
+      // The subject of a shot (a step's shot at its still frame, or a voice-led shot once it arrives):
+      // its centre is in the middle half of the clear area, both ways; it spans at least 15% of the clear
+      // area's shorter side; and the parts lit with it (data-named) take more of the frame than every other
+      // part still in focus (not receded) put together, so nothing else reads as the subject.
+      const subject = (names) => {
+        const v = window.__viz, fig = document.getElementById("fig"), ctm = fig.getScreenCTM(), c = v.camera().clear;
+        const c0 = new DOMPoint(c.x0, c.y0).matrixTransform(ctm), c1 = new DOMPoint(c.x1, c.y1).matrixTransform(ctm);
+        const cl = { x: c0.x, y: c0.y, r: c1.x, b: c1.y }, cw = cl.r - cl.x, ch = cl.b - cl.y;
+        const r = v.partsOnScreen(names);
+        if (!r) return { out: [`"${names.join(", ")}" has no bounds`] };
+        const out = [], cx = (r.x + r.r) / 2, cy = (r.y + r.b) / 2;
+        const fx = (cx - cl.x) / cw, fy = (cy - cl.y) / ch;
+        if (fx < 0.25 || fx > 0.75 || fy < 0.25 || fy > 0.75) out.push(`the subject's centre sits at ${(fx * 100).toFixed(0)}% across and ${(fy * 100).toFixed(0)}% down the clear area, outside its middle half`);
+        const span = Math.max(r.r - r.x, r.b - r.y) / Math.min(cw, ch);
+        if (span < 0.15) out.push(`the subject spans ${(span * 100).toFixed(0)}% of the clear area's shorter side, under 15%`);
+        const inFrame = (e) => {
+          const b = e.getBoundingClientRect(), w = Math.max(0, Math.min(b.right, cl.r) - Math.max(b.left, cl.x)), h = Math.max(0, Math.min(b.bottom, cl.b) - Math.max(b.top, cl.y));
+          return w * h;
+        };
+        let lit = 0, rest = 0, biggest = { a: 0, part: "" }, litBox = null;
+        for (const g of fig.querySelectorAll("[data-camera] .rig-part")) {
+          if (g.style.display === "none" || g.hasAttribute("data-recede")) continue;
+          const a = inFrame(g);
+          if (g.hasAttribute("data-named") && a > 0) {
+            const b = g.getBoundingClientRect();
+            litBox = litBox ? { x: Math.min(litBox.x, b.left), y: Math.min(litBox.y, b.top), r: Math.max(litBox.r, b.right), b: Math.max(litBox.b, b.bottom) } : { x: b.left, y: b.top, r: b.right, b: b.bottom };
+          }
+          if (g.hasAttribute("data-named")) lit += a;
+          else {
+            rest += a;
+            if (a > biggest.a) biggest = { a, part: g.dataset.part };
+          }
+        }
+        // and what is lit is the subject: the lit parts cover most of the subject's box
+        const ov = litBox ? Math.max(0, Math.min(litBox.r, r.r) - Math.max(litBox.x, r.x)) * Math.max(0, Math.min(litBox.b, r.b) - Math.max(litBox.y, r.y)) : 0;
+        if (ov < 0.5 * (r.r - r.x) * (r.b - r.y)) out.push(`what is lit is not the subject (the lit parts cover ${Math.round((100 * ov) / Math.max(1, (r.r - r.x) * (r.b - r.y)))}% of its box)`);
+        if (rest > lit) out.push(`parts in focus but not the subject take more of the frame (${Math.round(rest)} px², the largest "${biggest.part}") than the subject (${Math.round(lit)} px²)`);
+        return { out, fx, fy, span, share: lit / Math.max(1, lit + rest) };
+      };
+      // Nothing clips the camera's figure but the stage: no clip-path or mask on it or between it and the
+      // drawing, and the drawing itself does not clip to its own box inside the stage.
+      const crop = () => {
+        const fig = document.getElementById("fig"), out = [];
+        for (let e = fig.querySelector("[data-camera]"); e && e !== fig.parentElement; e = e.parentElement) {
+          const cs = getComputedStyle(e);
+          if (e.getAttribute("clip-path") || (cs.clipPath && cs.clipPath !== "none")) out.push(`<${e.tagName.toLowerCase()}${e.id ? " #" + e.id : ""}> clips it (clip-path)`);
+          if (e.getAttribute("mask") || (cs.mask && cs.mask !== "none" && e !== fig)) out.push(`<${e.tagName.toLowerCase()}${e.id ? " #" + e.id : ""}> masks it`);
+        }
+        const sb = document.querySelector(".vz-stage").getBoundingClientRect(), fb = fig.getBoundingClientRect(), pad = parseFloat(getComputedStyle(fig).paddingLeft) + parseFloat(getComputedStyle(fig).paddingTop);
+        if (getComputedStyle(fig).overflow !== "visible" && (pad > 0 || fb.left > sb.left + 1 || fb.top > sb.top + 1 || fb.right < sb.right - 1 || fb.bottom < sb.bottom - 1)) out.push("the drawing clips it to a box inside the stage (set overflow: visible on #fig)");
+        return out;
+      };
+      // A name's bounds are smaller than the whole figure and hold the point its callouts mark.
+      const sanity = (names) => {
+        const v = window.__viz, g = document.querySelector("#fig [data-camera]"), F = g.getBBox(), out = [], seen = [];
+        if (!v.boundsOf || !v.anchors) return { out: ["the page has no __viz.boundsOf or __viz.anchors, so its bounds cannot be checked"], seen };
+        const A = v.anchors();
+        for (const n of names) {
+          const b = v.boundsOf([n]);
+          if (!b) {
+            out.push(`"${n}" has no bounds`);
+            continue;
+          }
+          const w = b.x1 - b.x0, h = b.y1 - b.y0;
+          if (w * h > 0.5 * F.width * F.height || w >= F.width || h >= F.height) out.push(`"${n}" has bounds ${w.toFixed(0)}×${h.toFixed(0)}, as big as the whole figure (${F.width.toFixed(0)}×${F.height.toFixed(0)})`);
+          const a = A[n], tol = 0.02 * Math.max(F.width, F.height);
+          if (a && (a[0] < b.x0 - tol || a[0] > b.x1 + tol || a[1] < b.y0 - tol || a[1] > b.y1 + tol)) out.push(`"${n}" has bounds (${b.x0.toFixed(0)},${b.y0.toFixed(0)}..${b.x1.toFixed(0)},${b.y1.toFixed(0)}) that miss its own anchor (${a[0].toFixed(0)},${a[1].toFixed(0)})`);
+          seen.push(`${n} ${w.toFixed(0)}×${h.toFixed(0)}${a ? " ⊃ anchor" : ""}`);
+        }
+        return { out, seen };
+      };
+      let shots = 0, spoken = 0, led = 0;
+      const subjects = [], boundsSeen = new Map();
       for (const [w, h] of [[1440, 900], [1280, 800]]) {
         await p.setViewport({ width: w, height: h });
         await wait(150);
@@ -364,20 +440,42 @@ try {
           const cam = await p.evaluate(() => window.__viz.camera());
           for (let k = 0; k < cam.tracks.length; k++) {
             const names = cam.shots[k] ?? [];
+            const at = `${w}×${h} ${v} step ${k}`;
             await p.evaluate((k) => window.__viz.seekStep(k), k);
-            for (const f of await p.evaluate(framing, names, k, true)) fail(`${w}×${h} ${v} step ${k}, its shot: ${f}`);
+            for (const f of await p.evaluate(framing, names, k, true)) fail(`${at}, its shot: ${f}`);
+            for (const f of await p.evaluate(crop)) fail(`${at}: a hard crop: ${f}`);
+            const used = [...new Set([...names, ...(cam.around?.[k] ?? []), ...(cam.links[k] ?? []).flatMap((l) => l.ids)])];
+            const sn = await p.evaluate(sanity, used);
+            for (const f of sn.out) fail(`${at}, bounds: ${f}`);
+            if (w === 1440 && v === variants[0]) for (const s of sn.seen) boundsSeen.set(s.split(" ")[0], s);
+            if (names.length) {
+              const sj = await p.evaluate(subject, names);
+              for (const f of sj.out) fail(`${at}, its shot (${names.join(", ")}): ${f}`);
+              if (w === 1440) subjects.push(`${v} ${k} centre ${(sj.fx * 100).toFixed(0)}%,${(sj.fy * 100).toFixed(0)}% span ${(sj.span * 100).toFixed(0)}% lit ${(sj.share * 100).toFixed(0)}%`);
+            }
             shots++;
             // each spoken link, at the moment its words begin
             for (const l of cam.links[k] ?? []) {
               const T = cam.starts[k] + cam.lead + l.start;
               await p.evaluate((ms) => window.__viz.seek(ms), T * 1000 + 1);
-              for (const f of await p.evaluate(framing, l.ids, k, false)) fail(`${w}×${h} ${v} step ${k}, the voice at ${T.toFixed(2)} s ("${l.ids.join(", ")}"): ${f}`);
+              for (const f of await p.evaluate(framing, l.ids, k, false)) fail(`${at}, the voice at ${T.toFixed(2)} s ("${l.ids.join(", ")}"): ${f}`);
               spoken++;
+            }
+            // each voice-led shot, once it has arrived and its words are lit
+            for (const mv of cam.tracks[k].moves.filter((m) => m.ids.length)) {
+              const l = (cam.links[k] ?? []).find((l) => mv.ids.some((id) => l.ids.includes(id)) && cam.starts[k] + cam.lead + l.start >= mv.t0 + mv.d - 1e-6);
+              const T = Math.max(mv.t0 + mv.d, l ? cam.starts[k] + cam.lead + l.start : 0) + 0.01;
+              await p.evaluate((ms) => window.__viz.seek(ms), T * 1000);
+              const sj = await p.evaluate(subject, mv.ids);
+              for (const f of sj.out) fail(`${at}, the voice-led shot of "${mv.ids.join(", ")}" at ${T.toFixed(2)} s: ${f}`);
+              led++;
             }
           }
         }
       }
-      console.log(`camera framing: ${shots} step shots and ${spoken} spoken names, at 1440×900 and 1280×800, every What if`);
+      console.log(`camera framing: ${shots} step shots, ${spoken} spoken names and ${led} voice-led shots, at 1440×900 and 1280×800, every What if`);
+      console.log(`camera subjects (1440×900; centre across, down the clear area; span of its shorter side; lit share of the parts in focus): ${subjects.join(" | ")}`);
+      console.log(`camera bounds (figure units, ${variants[0] ?? ""}): ${[...boundsSeen.values()].join(", ")}`);
       await p.setViewport({ width: 1440, height: 900 });
       await wait(150);
       if (variants.length) await p.evaluate((v) => window.__viz.variant(v), variants[0]);
@@ -492,7 +590,7 @@ try {
     await p.close();
   }
   // Playback: every frame of the story, for every variant, at 1440 x 900.
-  {
+  if (!ONLY_CAMERA) {
     // The machine: the same kind of work as a frame of the rig (set a transform on a few hundred <g>
     // holding a <use>, read the layout), timed here, in a blank page of the same browser and size.
     const cal = await browser.newPage();

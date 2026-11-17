@@ -26,12 +26,25 @@ What a machine needs. The escalator built in Clay came out as about forty identi
   - every part is drawn once and placed with one SVG transform per frame, in fixed painter's slots, so playback stays far under a frame. The first version of the derailleur redrew everything each frame and ran at about 25 fps with visible jumps, and nothing caught it, because every check read still frames.
 - **`check-drawing` times playback, relative to the machine.** It runs the whole story for each variant and fails if the 95th-percentile frame is over 8 ms or any frame outside a step change is over 16.7 ms, with both limits scaled by how slow the machine is (a fixed reference workload is timed first; the scale is capped at 3). `VIZ_CPU_THROTTLE` runs the check as on a slower machine. It fails the slow derailleur at 1x and at 2.5x throttling, and passes the escalator, lock and the rebuilt derailleur at both. Making the rig move only the parts that are out of place, instead of every part a crossing part passes, cut the derailleur's 95th-percentile frame from 5.3 ms to 1.9 ms.
 - **`examples/derailleur`: the rear derailleur, on the rig.** A blind eval had a plain agent beat the skill on this topic (the cage spring was described as pushing the cage the wrong way, and limit screws and pedalling were never taught). Its model now solves the spring and chain torques, and its steps cover indexing, the return spring, pedalling to shift, slack, limit screws and the barrel adjuster; a lab backs out the L screw and puts the chain in the spokes. A test guards the direction of every tooth against the chain it meets: both jockey pulleys had been turning backwards, and the cassette's angle jumped when the chain changed cog.
-- **The figure shows what is being explained.** The derailleur's limit screws are a few millimetres across, and on a whole-machine figure the reader had to hunt for them. The shared player now has a camera (`src/drawing/camera.mjs`): zoom and pan only, one transform, nothing redrawn. A step names its `shot` (part names), and the camera frames those parts, zoomed up to 3×. While the voice speaks a `[phrase|part]` the shot does not frame well, the camera eases to it, holds at least 0.8 s and comes back. Callouts follow; View A, the title block and the cards stay put. The machine supplies `boundsOf(names)` and `clearArea()`.
+- **The figure shows what is being explained.** The derailleur's limit screws are a few millimetres across, and on a whole-machine figure the reader had to hunt for them. The shared player now has a camera (`src/drawing/camera.mjs`): zoom and pan only, one transform, nothing redrawn. A step names its `shot` (part names), and the camera centres those parts, zoomed up to 2×. While the voice speaks a `[phrase|part]` the shot does not frame well, the camera eases to it, holds at least 0.8 s and comes back. Callouts follow; View A, the title block and the cards stay put. The machine supplies `boundsOf(names)` and `clearArea()`.
   - `check-drawing` checks it:
     - framing at every step and every spoken name;
     - the same camera by seek, play and tab;
     - no move faster than 2 short sides a second, and no hold under 0.8 s.
   - It fails three planted faults: a shot naming a missing part, a voice link to an unknown part, and a shot framed under a card.
+  - The first version passed every check and still read wrong. At 3×, the barrel adjuster sat centred but small on a parallelogram five times its size, so the parallelogram read as the subject. A straight fade cut the zoomed drawing beside the heading, and the drawing clipped to its own box inside the stage. Now:
+    - the zoom stops at 2×;
+    - a shot's parts are lit while the rest recede;
+    - parts a subject attaches to stay in view (`DATA.camera.around`);
+    - nothing clips the drawing but the stage.
+  - New checks would have caught it:
+    - the subject's centre lies in the middle half of the clear area;
+    - it spans 15% of the clear area;
+    - it outweighs the other parts in focus;
+    - nothing clips the drawing but the stage;
+    - every name's bounds are smaller than the figure and hold its anchor.
+
+    The first version's page fails them. A fourth planted fault, a shot pushed off centre, fails too. `shots.mjs --check-fresh` fails on a screenshot older than its page.
   - The escalator and lock have no shots and are pixel-identical.
 - **The player takes figures that build their own parts:** optional hooks to fade parts by tone instead of opacity, and to keep callouts on moving parts. The escalator and lock are pixel-identical.
 - **What a page says is checked, not only what its model computes (`src/claims/audit.mjs`).** Round 5 lost both topics to a plain agent, and the losses were words: a derailleur page said the cage spring swings the cage forward (it pulls it back), a heading said 60° where the readout said 37°, and limit screws were never taught. The audit runs in every build (`drawingPage`) and in `verify`, and fails on any of these:
