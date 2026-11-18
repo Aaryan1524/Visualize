@@ -26,6 +26,10 @@
 //                       DATA.camera.alias adds names the camera may light: see "The camera" below
 //                       and camera.mjs
 //   clearArea()         optional: { x0, y0, x1, y1 } in the figure's units, where framed parts may go
+//   cardShot(state)     optional: the part names to frame while the lab or Now you try is open (else the
+//                       whole figure, unmoved), in cardClear() (the space beside the card they open in);
+//                       the camera may zoom out below 1 there to fit them
+//   question(n, r).state, lab(values).state: what the stage draws while that card is open
 //   lab(values)         optional, the free-input lab: { state, verdict, rows: [string] } for the
 //                       reader's own values (DATA.lab lists the inputs); state is drawn by render()
 //
@@ -195,7 +199,8 @@ export function player(DATA, machine, kit) {
   }
   function camTarget() {
     const tr = C.tracks[S.step];
-    if (!tr || labOpen || practiceOpen) return CAM.ID;
+    if (labOpen || practiceOpen) return C.cardCam ?? CAM.ID;
+    if (!tr) return CAM.ID;
     return S.pinPose ? tr.shot : CAM.at(tr, S.T, reduced, !C.cont);
   }
   // Ease from where the camera is to wherever it should be now (navigation, the scrubber, a step change).
@@ -543,7 +548,7 @@ export function player(DATA, machine, kit) {
     const reveal = k === PRED + 1;
     predict.replaceChildren();
     const kicker = Object.assign(document.createElement("span"), { className: "vz-predict-kicker", textContent: reveal ? "Your prediction" : "Predict" });
-    const q = Object.assign(document.createElement("p"), { textContent: PR.question });
+    const q = Object.assign(document.createElement("p"), { textContent: typeof PR.question === "string" ? PR.question : PR.question[S.variant] });
     const opts = Object.assign(document.createElement("div"), { className: "vz-predict-options" });
     const fb = Object.assign(document.createElement("p"), { className: "vz-predict-feedback" });
     fb.setAttribute("aria-live", "polite");
@@ -582,6 +587,8 @@ export function player(DATA, machine, kit) {
   const shuffle = (r, xs) => xs.map((x) => [r(), x]).sort((a, b) => a[0] - b[0]).map((p) => p[1]);
   function renderPractice() {
     const Q = machine.question(seed, rng(seed * 2654435761));
+    // the stage draws the question's own filter, when the machine gives one
+    if (Q.state) (machine.render(Q.state, S), cardFrame(Q.state), camApply());
     const r = rng(seed * 31 + 7);
     const order = shuffle(r, Q.choices.map((_, i) => i));
     practice.replaceChildren();
@@ -626,6 +633,7 @@ export function player(DATA, machine, kit) {
     tryBtn.setAttribute("aria-pressed", String(practiceOpen));
     practice.hidden = !practiceOpen;
     if (practiceOpen) renderPractice();
+    else if (C.cardCam !== undefined) ((C.cardCam = null), draw());
     showPredict();
     syncCards();
     if (C.el) applyFocus(); // the step's subject is lit only while the story is showing
@@ -644,6 +652,7 @@ export function player(DATA, machine, kit) {
   function renderLab() {
     const out = machine.lab(labValues, S.variant);
     machine.render(out.state, S);
+    cardFrame(out.state);
     S.state = out.state;
     camApply();
     followLeaders();
@@ -669,7 +678,14 @@ export function player(DATA, machine, kit) {
     renderLab();
     lab.querySelector("input")?.focus();
   }
+  // While the lab or Now you try is open, the camera frames what the machine asks (cardShot) in the space
+  // beside the card (cardClear); a machine without them keeps the whole figure, unmoved.
+  function cardFrame(state) {
+    if (!C.el || !machine.cardShot) return;
+    C.cardCam = CAM.frame(boundsOfIds(machine.cardShot(state)), machine.cardClear?.() ?? C.clear, { min: 0.4 });
+  }
   function closeLab() {
+    C.cardCam = null;
     labOpen = false;
     root.toggleAttribute("data-lab", false);
     labBtn.setAttribute("aria-pressed", "false");

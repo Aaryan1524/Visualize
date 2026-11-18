@@ -29,7 +29,7 @@ export function cameraKit() {
    * reader needs to recognise it) stays in the clear area too: it limits the zoom, and the subject moves
    * off centre only as far as keeping it in view needs.
    */
-  function frame(b, c, { cap = CAP, pad = PAD, keep = null } = {}) {
+  function frame(b, c, { cap = CAP, pad = PAD, keep = null, min = 1 } = {}) {
     if (!b) return { ...ID };
     const k = union(b, keep);
     const kw = Math.max(1e-6, k.x1 - k.x0), kh = Math.max(1e-6, k.y1 - k.y0), padU = pad * Math.max(b.x1 - b.x0, b.y1 - b.y0, 1e-6);
@@ -38,7 +38,7 @@ export function cameraKit() {
     if (s <= 1) {
       const inside = k.x0 >= c.x0 && k.x1 <= c.x1 && k.y0 >= c.y0 && k.y1 <= c.y1;
       if (inside) return { ...ID };
-      s = 1;
+      s = Math.min(1, Math.max(min, s)); // 1 for a step's shot; below it only where a caller allows (a card's view)
     }
     const cx = (c.x0 + c.x1) / 2, cy = (c.y0 + c.y1) / 2;
     let x = cx - (s * (b.x0 + b.x1)) / 2, y = cy - (s * (b.y0 + b.y1)) / 2;
