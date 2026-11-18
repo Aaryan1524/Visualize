@@ -24,7 +24,7 @@ import {
   add, affineString, angleBin, axesOf, contactShadow, cross, dot, drawMesh, fitCamera, keyLight, linesOn, moveInPlane,
   pathThrough, planeKey, planeOf, plate, circlePoints, rod, roundedHull, scale, screenOf, slotKey, sprocket, sub, turned, unit,
 } from "../../src/rig/index.ts";
-import { pathAt } from "./model.mjs";
+import { offLine, pathAt } from "./model.mjs";
 export { RigStage, screenOf } from "../../src/rig/index.ts";
 
 export const W = (x, y, e) => [x, -e, y];
@@ -304,7 +304,7 @@ export function figure(M, cam, o = {}) {
     for (const [name, cx, cy, spin] of [["guide", gx, gy, roll / M.r], ["tension", tx, ty, -roll / M.r]]) {
       const { bin, rest } = angleBin(spin, TAU / D.pulleyT, PUL_BINS);
       // off line (the lab, a slack cable): the guide pulley's teeth turn red, out of line with their cog
-      const off = name === "guide" && !!st.show?.offline && Math.abs(p.off) > 0.05;
+      const off = name === "guide" && !!st.show?.offline && Math.abs(p.z - M.cogZ(st.ref ?? p.cog)) > 0.05;
       put(`${name}Teeth`, gap(eG, 0.4), { href: pulleyTeeth(bin), transform: place(rest, [cx, cy], 0, eG), part: name, flags: { off } });
       put(`${name}Hub`, gap(eG, 0.45), { href: pulleyHub, transform: place(0, [cx, cy], 0, eG), part: name });
     }
@@ -454,13 +454,15 @@ export function figure(M, cam, o = {}) {
     // its cog's line, labelled with the model's offset. A real offset (1 to 4 mm) would be a pixel or
     // two here, so the arrow is drawn OFF_ARROW mm long whatever the offset: it shows which way; the
     // number, exact, says how far.
-    if (st.show?.offline && Math.abs(p.off) > 0.05) {
-      const ea = -M.cogZ(p.cog), dir = Math.sign(ea - eG), y = gy - M.r - D.tipAdd - 7;
+    const ol = offLine(M, p.z, st.ref ?? p.cog);
+    if (st.show?.offline && Math.abs(ol.off) > 0.05) {
+      const ea = -M.cogZ(ol.ref), dir = Math.sign(ea - eG), y = gy - M.r - D.tipAdd - 7;
       const t0 = S(gx, y + 3.2, eG), t1 = S(gx, y - 3.2, eG), a = S(gx, y, eG), b = S(gx, y, eG + dir * OFF_ARROW);
       const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, u = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
-      const text = `${Math.abs(p.off).toFixed(2)} mm ${p.off > 0 ? "inboard" : "outboard"}`;
-      const tx2 = b[0] + u[0] * 60, anchor = u[0] >= 0 ? "start" : "end";
-      live("offline", "guide", 1e6, `<g class="offline-mark" data-off="${p.off.toFixed(4)}" data-len="${len.toFixed(1)}"><path class="offline-halo" d="${pathThrough([t0, t1], false)}M${a[0].toFixed(1)},${a[1].toFixed(1)}L${b[0].toFixed(1)},${b[1].toFixed(1)}"/><path class="offline" d="${pathThrough([t0, t1], false)}"/><path class="offline" d="${pathThrough([a, [b[0] - u[0] * 70, b[1] - u[1] * 70]], false)}"/><path class="offline-head" d="${arrowHead(b, u, 110)}"/><text class="offline-text" x="${tx2.toFixed(1)}" y="${(b[1] + 50).toFixed(1)}" text-anchor="${anchor}">${text}</text></g>`);
+      // the words sit at the pulley's end and say where the pulley is; the arrow runs back to the cog's line
+      const text = `pulley ${ol.text}`;
+      const tx2 = a[0] - u[0] * 70, anchor = u[0] >= 0 ? "end" : "start";
+      live("offline", "guide", 1e6, `<g class="offline-mark" data-off="${ol.off.toFixed(4)}" data-len="${len.toFixed(1)}"><path class="offline-halo" d="${pathThrough([t0, t1], false)}M${a[0].toFixed(1)},${a[1].toFixed(1)}L${b[0].toFixed(1)},${b[1].toFixed(1)}"/><path class="offline" d="${pathThrough([t0, t1], false)}"/><path class="offline" d="${pathThrough([a, [b[0] - u[0] * 70, b[1] - u[1] * 70]], false)}"/><path class="offline-head" d="${arrowHead(b, u, 110)}"/><text class="offline-text" x="${tx2.toFixed(1)}" y="${(a[1] + 50).toFixed(1)}" text-anchor="${anchor}">${text}</text></g>`);
       at.offline = a;
     }
     // drawings needed for the first time this frame

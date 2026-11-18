@@ -225,7 +225,7 @@ function machine(DATA) {
     const err = DATA.stretch * (u < 0.55 ? ease(clamp(u / 0.3)) : 1 - ease(clamp((u - 0.55) / 0.35)));
     const barrel = 2.5 * ease(clamp((u - 0.55) / 0.35));
     const x = indexing(m, gear + 1, err);
-    return { ...base, pull: x.pull, chainK: x.on, err, barrel, show: { offline: true } };
+    return { ...base, pull: x.pull, chainK: x.on, ref: x.k, err, barrel, show: { offline: true } };
   }
   // A step's motion fills the stretch before the voice names what it is about (or 6 s silent).
   const anim = (k) => (V.voice?.[k] ? Math.max(2, V.meet[k]) : 0.75 * DATA.plain);
@@ -363,8 +363,10 @@ function machine(DATA) {
     const under = m.cogs[p.cog], on = m.cogs[Math.round(p.chainK)];
     setText("r-cog-unit", under !== on && Math.abs(p.chainK - Math.round(p.chainK)) < 1e-9 ? `teeth · pulley under the ${under}` : "teeth");
     setText("r-pull", (p.pull).toFixed(2));
-    setText("r-off", Math.abs(p.off) < 0.005 ? "0.00" : `${Math.abs(p.off).toFixed(2)}`);
-    setText("r-off-unit", Math.abs(p.off) < 0.005 ? "mm off line" : p.off < 0 ? "mm outboard" : "mm inboard");
+    // measured from the cog the reader asked for (the lab's, step 7's), else from the nearest
+    const ol = offLine(m, p.z, state.ref ?? p.cog);
+    setText("r-off", ol.side === "on" ? "0.00" : ol.mm);
+    setText("r-off-unit", ol.side === "on" ? "mm off line" : `mm ${ol.side} of the ${ol.teeth}`);
     setText("r-swing", `${Math.round(p.alpha - m.N.alpha0)}°`);
     setText("r-tension", p.tension.toFixed(1));
     setText("r-gap", p.gap.toFixed(1));
@@ -376,11 +378,7 @@ function machine(DATA) {
     const gear = Number(values.gear), err = Number(values.err), lOut = Number(values.lout);
     const x = indexing(m, gear, err, lOut);
     const teeth = m.cogs[x.k], onT = m.cogs[x.on];
-    const rows = [
-      `Cable: ${two(m.pullFor(x.k))} mm for cog ${gear}, ${err >= 0 ? "+" : "−"}${Math.abs(err).toFixed(1)} mm error: ${two(Math.max(0, x.pull))} mm pulled.`,
-      `Guide pulley: ${(x.z).toFixed(2)} mm inboard of the smallest cog's line; the ${teeth} is at ${m.cogZ(x.k).toFixed(2)} mm.`,
-      x.stopped === "high" ? "The H screw stops it on the smallest cog's line." : x.stopped === "low" ? (lOut > 0 ? `The L screw, backed out ${lOut.toFixed(1)} mm, stops it ${(x.z - m.zMax).toFixed(1)} mm past the largest cog.` : `The L screw stops it on the ${m.N.big}'s line.`) : `${Math.abs(err).toFixed(1)} × ${m.D.ratio} = ${(Math.abs(err) * m.D.ratio).toFixed(2)} mm off its cog.`,
-    ];
+    const rows = labRows(m, gear, err, lOut);
     const verdict = {
       quiet: `Runs clean on the ${onT}: ${Math.abs(x.off).toFixed(2)} mm off, inside ${DATA.bands.quiet} mm.`,
       rubs: `Rubs: ${Math.abs(x.off).toFixed(2)} mm ${x.side} of the ${onT}, past ${DATA.bands.quiet} mm. Turn the barrel adjuster ${x.off < 0 ? "out" : "in"}.`,
@@ -392,7 +390,7 @@ function machine(DATA) {
     const ok = x.cls === "quiet";
     return {
       ok, verdict, rows,
-      state: { pull: x.pull, chainK: x.on, lOut, roll: 0, err, barrel: 0, show: { offline: true, screws: !!x.stopped }, lab: true, cls: x.cls },
+      state: { pull: x.pull, chainK: x.on, ref: x.k, lOut, roll: 0, err, barrel: 0, show: { offline: true, screws: !!x.stopped }, lab: true, cls: x.cls },
     };
   }
   const two = (v) => v.toFixed(2);
@@ -671,7 +669,7 @@ const HTML = drawingPage({
     ["var(--blue)", "The cable and its pull"],
     ["var(--green)", "The springs, and the cage spring's pull: always back"],
     ["var(--orange)", "The part to follow: the cage and pulleys, the chain's pull on them, the shift gates"],
-    ["var(--t-bad)", "The guide pulley out of line with its cog: its teeth turn red, and an arrow under it points to the cog's line (drawn longer than the offset; the number beside it is exact)"],
+    ["var(--t-bad)", "The guide pulley out of line with the cog it should be on: its teeth turn red, and an arrow under it runs from the pulley back to that cog's line, with where the pulley sits written at the pulley's end (the arrow is drawn longer than the offset; the number is exact)"],
   ],
   facts: [
     `The chain's path is solved, not drawn: ring, cog, guide pulley and tension pulley joined by tangent runs, with the cage angle found so the path is exactly ${M0.links} links of ${DR.p} mm. Tests re-measure every path point by point.`,
