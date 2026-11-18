@@ -53,6 +53,7 @@ A whole-machine figure at every step leaves the reader hunting for a 4 mm screw 
 
 - **A `shot` per step** names the subject: the camera centres it and lights it, and the rest recedes.
 - **`DATA.camera.around[k]`** names the parts it attaches to, which stay in view.
+- **Every part the heading names stays in frame** (`DATA.camera.subject[k]`), checked through the whole step. Name the parts that carry the step's cause, not only the part it is about: "the pulley moves; the chain waits" needs the pulley and the chain run between it and the cog.
 - **The 2× cap** (`CAP` in `src/drawing/camera.mjs`): at 3× the context is gone.
 - **Voice-led shots** follow `[phrase|part]` links in the narration. Two names spoken close together share one shot.
   - A step that names two parts in one breath should frame both. The scaffold's speed step does.
@@ -66,7 +67,10 @@ A whole-machine figure at every step leaves the reader hunting for a 4 mm screw 
 When the main view truly cannot show something, such as an alignment, show it there first:
 - a readout from the model;
 - the lab's rows;
-- a tint on the part that is out of line. The derailleur's guide pulley turns red when off line.
+- a tint on the part that is out of line, and a mark that shows which way and how far. When the derailleur's guide pulley is off line, its teeth turn red, and an arrow under it points to its cog's line, labelled with the model's offset.
+  - A 1–4 mm offset is a pixel or two in the figure, so the arrow is drawn a fixed 30 mm long.
+  - The legend says the arrow is drawn longer than the offset, and the label's number is exact.
+  - A test checks the label and the direction across the lab's whole range.
 
 If an inset is added later, it must earn its place:
 - **Make it a true orthographic elevation, never a near-angle view.** When alignment is the point, as with a chain on its cog, look straight along the line that matters: from behind and level, azimuth 180°, elevation 0.
@@ -87,5 +91,7 @@ An inset at a near angle shows slanted faces, and the reader cannot judge alignm
 | **The hard crop:** a straight fade cut the zoomed drawing beside the heading | No clip-path or mask on the camera's group, and `#fig` must not clip to its own box. The heading reads on a soft wash, never a hard edge. |
 | **Sums that did not add up:** shares of a length rounded one by one, so the printed parts missed the printed whole | `node scripts/check-arithmetic.mjs <page>` re-does every printed equation from the printed digits. A sum must add up exactly; a product or quotient may round. It covers headings, captions, Details, the narration, Now you try and the lab's rows. |
 | **A black figure:** the scaffold's first build left out `rig.css`, and every check passed | `check-drawing` fails solids with no material colours |
+| **A step that lost its subject:** with the inset gone, step 4 framed only the cassette, and the pulley moving ahead of the chain was never seen | `DATA.camera.subject[k]`: every part the heading names stays in frame through the step. The planted fault `missing-subject` fails it. |
+| **An alignment cue too small to see:** the off-line mark was about 1 px long and hidden behind the parallelogram | A red arrow, drawn long, with the exact offset beside it. A test checks its label, direction and on-screen length across the lab. |
 
 The rule under every row is the same: **look at the page as built**. Checks pass frames that read wrong, so open every fresh shot.

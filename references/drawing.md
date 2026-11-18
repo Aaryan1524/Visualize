@@ -212,6 +212,9 @@ A figure that shows the whole machine at every step leaves the reader hunting fo
 
 - **A step names its subject:** `shot: ["barrel"]` in `DATA.steps`. The camera centres those parts in the stage's clear area, zoomed at most 2× (`CAP`), never below 1×. At 3× the derailleur lost its context and became a field of teeth around a 4 mm part.
   - **What it attaches to stays in view:** `DATA.camera.around[k]`, e.g. `["links"]` for the barrel adjuster. These parts limit the zoom, and the subject moves off centre only as far as keeping them in view needs.
+  - **What the heading names stays in frame:** `DATA.camera.subject[k]` lists every part the step's heading names. The derailleur's step 4, "The pulley moves at once; the chain waits for a ramp to come round", lists `["guide", "chainrun", "ramp"]`: the guide pulley, the run of chain from its cog down to the pulley, and the shift gate. Put those names in the shot too.
+    - Its first framing showed only the cassette, so the pulley moving ahead of the chain was never seen.
+    - It lives under `DATA.camera`, not `DATA.steps`, because part names are not reader text and must stay out of the audit's stamp.
   - **No shot:** a step without one shows the whole figure.
 - **The subject is lit.** While the voice names nothing else, the shot's parts are lit and every other part recedes by tone, still recognisable. The camera alone cannot make a small part the subject: the derailleur's barrel at 2× is a fifth of the size of the parallelogram it sits on.
 - **The voice points too.** The narration may speak a `[phrase|part]` that the step's shot does not frame well (inside the clear area and at least 6% of its shorter side). The camera then eases to that part before the words reach it, holds at least 0.8 s, and comes back when there is room. Links too close together share one shot, so the camera never chases every word.
@@ -240,6 +243,7 @@ A figure that shows the whole machine at every step leaves the reader hunting fo
   - have its callout point at it on the stage.
 
   Checked at 1440×900 and 1280×800, for every variant.
+- **The heading's parts.** Every part in `DATA.camera.subject[k]` passes the framing rules at the step's still frame and at four moments through the step.
 - **Centring and subject.** At a step's still frame, and when a voice-led shot has arrived:
   - the subject's centre lies in the middle half of the clear area, both ways;
   - it spans at least 15% of the clear area's shorter side;
@@ -253,7 +257,8 @@ It fails each of the derailleur's planted faults (`node examples/derailleur/buil
 - `missing-shot`: a shot naming a part the figure lacks;
 - `unknown-link`: a voice link to an unknown part;
 - `under-card`: a clear area that frames parts under the cards;
-- `off-centre`: a shot whose `around` pushes the subject off centre.
+- `off-centre`: a shot whose `around` pushes the subject off centre;
+- `missing-subject`: step 4 framing only the cassette, leaving out the pulley its heading names.
 
 Then look. `node examples/derailleur/shots.mjs --only step` shoots every step in both What ifs and themes, plus two frames halfway through voice-led moves, and prints each image's time. `--check-fresh` fails if any shot is older than the page.
 

@@ -55,6 +55,13 @@ What a machine needs. The escalator built in Clay came out as about forty identi
     - the camera to 180° and 0;
     - each cog's bar to the model's lateral position, within a pixel;
     - the drawn offset to the model's, across the lab's whole range.
+- **Round 4 of the review: the picture shows the cause again.**
+  - Step 4's heading, "The pulley moves at once; the chain waits for a ramp to come round", now has all three in frame through the step: the shift gate, the run of chain at an angle, and the guide pulley under the next cog. Its first framing after View A's removal showed only the cassette.
+  - The "Ramp and pin" callout moved off the chain's upper run, so it names the gate on the cog.
+  - New check: every part a step's heading names (`DATA.camera.subject`) stays in frame through the step. A planted step that frames only the cassette fails it.
+  - Off line, the guide pulley's teeth turn red and an arrow under it points to its cog's line, labelled with the model's offset, e.g. "1.40 mm outboard". The arrow is drawn longer than the offset so it reads at 1×; the legend says so, and the number is exact. Before, the only mark was about 1 px long, behind the parallelogram.
+  - Step 7 frames the guide pulley with the barrel adjuster and lights it.
+  - A test holds the arrow's label, direction and length across the lab.
 - **View A is removed; the main figure carries the explanation.** The builder: "remove the side view, we can add that later. I just want the main figure to be robust."
   - The derailleur draws no inset. The callout column on the right moves out, and the figure fits a wider box.
   - The camera's clear area widens with it. Every shot still passes centring, subject and framing; step 7 now frames the barrel adjuster with its cable.
