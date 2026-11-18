@@ -61,6 +61,9 @@
 /* a value printed on a card: the card is light in both themes, so its ink is dark in both */
 .rig-value.rig-on-card{fill:color-mix(in oklab,#1d1b18 calc(100% - var(--recede)),var(--stage))}
 .rig-index{font-family:var(--mono,ui-monospace,monospace);font-weight:500;fill:var(--ink-2,#625f58)}
+/* the working beside a part (parts.ts workingStrip): a card-coloured tag, upright, in the card's dark ink */
+.rig-working-bg{fill:color-mix(in oklab,var(--rig-card-lit) calc(100% - var(--recede)),var(--stage));stroke:color-mix(in oklab,var(--rig-ink) calc(100% - var(--recede)),var(--stage));stroke-width:1.2px;vector-effect:non-scaling-stroke}
+.rig-working-text{font-family:var(--mono,ui-monospace,monospace);font-weight:500;fill:color-mix(in oklab,#1d1b18 calc(100% - var(--recede)),var(--stage));white-space:pre}
 .rig-arrow-halo{fill:none;stroke:var(--stage);stroke-width:7px;stroke-linecap:round;vector-effect:non-scaling-stroke}
 .rig-arrow-line{fill:none;stroke:var(--rig-arrow,var(--ink));stroke-width:2.4px;stroke-linecap:round;vector-effect:non-scaling-stroke}
 .rig-arrow-head{fill:var(--rig-arrow,var(--ink));stroke:var(--stage);stroke-width:1px;paint-order:stroke}

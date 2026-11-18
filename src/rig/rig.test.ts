@@ -6,7 +6,7 @@ import { drawMesh, keyLight, shadeOf } from "./draw.ts";
 import { applyAffine, moveInPlane, planeKey, slotKey } from "./motion.ts";
 import { keepInPlace } from "./stage.ts";
 import { carry, checkContacts } from "./contacts.ts";
-import { arrow, cellDrawing, CONCEPT_VIEW, decalAt, placeAt, railCentres, ringSlots, turnAt } from "./parts.ts";
+import { arrow, cellDrawing, CONCEPT_VIEW, decalAt, placeAt, railCentres, ringSlots, turnAt, workingStrip } from "./parts.ts";
 import { dot, sub, type P2, type V3 } from "./vec.ts";
 
 const rng = (a: number) => () => {
@@ -223,4 +223,18 @@ test("parts: rails, rings and arrows are where they say", () => {
   const want = screenOf(cam, [40, 0, 5]);
   assert.ok(Math.hypot(a.b[0] - want[0], a.b[1] - want[1]) < 1e-6, "the head is at the end");
   assert.match(turnAt(cam, Math.PI / 2, [5, 5, 0]), /^matrix\(/);
+});
+
+test("parts: an arrow routed through points passes them and ends at its end; the working strip fits its rows", () => {
+  const cam = { ...CONCEPT_VIEW, scale: 30, origin: [500, 400] as P2 };
+  const via: V3 = [20, 30, 12], a = arrow(cam, [0, 0, 5], [40, 60, 5], { via: [via] });
+  const want = screenOf(cam, [40, 60, 5]);
+  assert.ok(Math.hypot(a.b[0] - want[0], a.b[1] - want[1]) < 1e-6, "the head is at the end");
+  const v = screenOf(cam, via), d = a.svg.match(/class="rig-arrow-line" d="([^"]+)"/)![1]!;
+  const pts = [...d.matchAll(/(-?\d+(?:\.\d+)?)[ ,](-?\d+(?:\.\d+)?)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+  assert.ok(pts.some(([x, y]) => Math.hypot(x! - v[0], y! - v[1]) < 1), "the curve passes through the point it is routed by");
+  const s = workingStrip(["h1  2,668,802,083 mod 16 = 3", "h2  9 mod 16 = 9"], [10, 20], 100);
+  assert.equal((s.svg.match(/<text/g) ?? []).length, 2);
+  assert.ok(s.w >= 28 * 100 * 0.6 && s.h > 2 * 100, "wide enough for its longest row, tall enough for both");
+  assert.match(s.svg, /translate\(10 20\)/);
 });

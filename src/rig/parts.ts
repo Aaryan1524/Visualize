@@ -92,16 +92,45 @@ export const ringSlots = (n: number, r: number, centre: V3 = [0, 0, 0]): { at: V
  * the straight line between them, with its head at `to`. Rebuilt when its ends move (a short path,
  * not a solid). Returns the SVG and the screen points of its ends.
  */
-export function arrow(cam: Camera, from: V3, to: V3, o: { lift?: number; head?: number; cls?: string } = {}): { svg: string; a: P2; b: P2 } {
-  const ax = axesOf(cam.azimuth, cam.elevation), lift = o.lift ?? 12, n = 24, pts: P2[] = [];
-  for (let i = 0; i <= n; i++) {
-    const t = i / n, h = 4 * lift * t * (1 - t);
-    pts.push(screenOf(cam, [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t, from[2] + (to[2] - from[2]) * t + h], ax));
+export function arrow(cam: Camera, from: V3, to: V3, o: { lift?: number; head?: number; cls?: string; via?: V3[] } = {}): { svg: string; a: P2; b: P2 } {
+  const ax = axesOf(cam.azimuth, cam.elevation), lift = o.lift ?? 12, pts: P2[] = [];
+  if (o.via?.length) {
+    // through the given points, on a smooth curve (Catmull-Rom): to route round parts, such as over
+    // the gap between two cells instead of across the value printed on one
+    const P = [from, ...o.via, to], seg = 14;
+    for (let s = 0; s < P.length - 1; s++) {
+      const p0 = P[Math.max(0, s - 1)]!, p1 = P[s]!, p2 = P[s + 1]!, p3 = P[Math.min(P.length - 1, s + 2)]!;
+      for (let i = 0; i < seg; i++) {
+        const t = i / seg, t2 = t * t, t3 = t2 * t;
+        const c = (k: number) => 0.5 * (2 * p1[k]! + (-p0[k]! + p2[k]!) * t + (2 * p0[k]! - 5 * p1[k]! + 4 * p2[k]! - p3[k]!) * t2 + (-p0[k]! + 3 * p1[k]! - 3 * p2[k]! + p3[k]!) * t3);
+        pts.push(screenOf(cam, [c(0), c(1), c(2)], ax));
+      }
+    }
+    pts.push(screenOf(cam, to, ax));
+  } else {
+    for (let i = 0; i <= 24; i++) {
+      const t = i / 24, h = 4 * lift * t * (1 - t);
+      pts.push(screenOf(cam, [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t, from[2] + (to[2] - from[2]) * t + h], ax));
+    }
   }
-  const b = pts[n]!, p = pts[n - 2]!, len = Math.hypot(b[0] - p[0], b[1] - p[1]) || 1, u: P2 = [(b[0] - p[0]) / len, (b[1] - p[1]) / len];
+  const n = pts.length - 1, b = pts[n]!, p = pts[n - 2]!, len = Math.hypot(b[0] - p[0], b[1] - p[1]) || 1, u: P2 = [(b[0] - p[0]) / len, (b[1] - p[1]) / len];
   const size = (o.head ?? 3.4) * cam.scale, nrm: P2 = [-u[1], u[0]], base: P2 = [b[0] - u[0] * size, b[1] - u[1] * size];
   const head = pathThrough([b, [base[0] + nrm[0] * size * 0.42, base[1] + nrm[1] * size * 0.42], [base[0] - nrm[0] * size * 0.42, base[1] - nrm[1] * size * 0.42]]);
   const line = pathThrough([...pts.slice(0, n - 1), [base[0] + u[0] * size * 0.3, base[1] + u[1] * size * 0.3]], false);
   const cls = o.cls ?? "rig-arrow";
   return { svg: `<g class="${cls}"><path class="rig-arrow-halo" d="${line}"/><path class="rig-arrow-line" d="${line}"/><path class="rig-arrow-head" d="${head}"/></g>`, a: pts[0]!, b };
+}
+
+/**
+ * The working beside a part: a small card of rows of text, upright on screen (not printed on a face, so
+ * long numbers stay legible), its top-left corner at screen point `at`, the text `size` figure units
+ * tall. Rows are plain strings (`h1  2,668,802,083 mod 16 = 3`); swap them as the step goes on. Returns
+ * the SVG and the card's size.
+ */
+export function workingStrip(rows: string[], at: P2, size: number): { svg: string; w: number; h: number } {
+  const lh = size * 1.45, pad = size * 0.6;
+  const w = Math.max(1, ...rows.map((r) => r.length)) * size * 0.62 + 2 * pad, h = Math.max(1, rows.length) * lh - (lh - size) + 2 * pad;
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const text = rows.map((r, i) => `<text class="rig-working-text" x="${f1(pad)}" y="${f1(pad + i * lh + size * 0.8)}" font-size="${f1(size)}">${esc(r)}</text>`).join("");
+  return { svg: `<g class="rig-working" transform="translate(${f1(at[0])} ${f1(at[1])})"><rect class="rig-working-bg" width="${f1(w)}" height="${f1(h)}" rx="${f1(size * 0.35)}"/>${text}</g>`, w, h };
 }
