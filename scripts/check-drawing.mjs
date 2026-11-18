@@ -65,6 +65,31 @@ const ONLY_CAMERA = !!process.env.VIZ_ONLY_CAMERA;
 const throttle = async (page) => THROTTLE > 1 && (await (await page.createCDPSession()).send("Emulation.setCPUThrottlingRate", { rate: THROTTLE }));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// An arrow (src/rig/parts.ts `arrow`) must not run across a value or an index printed on a part: the
+// Bloom filter's first arrows to its back row crossed the front row's 0s and 1s. Samples each visible arrow's line on
+// screen against each visible printed value's box (shrunk by a sixth, since a decal's box is a
+// parallelogram's), and names the part the value is on.
+const arrowsOverValues = () => {
+  const shown = (el) => {
+    for (let e = el; e && e.id !== "fig"; e = e.parentElement) if (e.style?.display === "none" || getComputedStyle(e).display === "none") return false;
+    return true;
+  };
+  const boxes = [...document.querySelectorAll("#fig .rig-value, #fig .rig-index")].filter((t) => t.textContent.trim() && shown(t)).map((t) => {
+    const r = t.getBoundingClientRect(), sx = r.width / 6, sy = r.height / 6;
+    return { name: `${t.closest("[data-part]")?.dataset.part ?? "a part"} "${t.textContent.trim()}"`, x0: r.left + sx, x1: r.right - sx, y0: r.top + sy, y1: r.bottom - sy };
+  });
+  const out = new Set();
+  for (const line of document.querySelectorAll("#fig .rig-arrow-line")) {
+    if (!shown(line)) continue;
+    const L = line.getTotalLength(), m = line.getScreenCTM();
+    for (let d = 0; d <= L; d += Math.max(L / 80, 0.5)) {
+      const q = line.getPointAtLength(d), x = m.a * q.x + m.c * q.y + m.e, y = m.b * q.x + m.d * q.y + m.f;
+      for (const b of boxes) if (x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1) out.add(b.name);
+    }
+  }
+  return [...out];
+};
+
 // Measure what a reader sees right now: scroll, callouts, open cards, and any broken number.
 const measure = () => {
   const doc = document.documentElement;
@@ -202,6 +227,7 @@ try {
         if (r.T <= lastT) fail(`${s}: the timeline goes backwards (${r.T} after ${lastT}); it must run once, start to end`);
         lastT = r.T;
         judge(s, r);
+        for (const name of await p.evaluate(arrowsOverValues)) fail(`${s}: an arrow runs across the value ${name}; route it over a gap between parts (arrow's via) or end it on a face`);
       }
       if (!has("answer") || !has("labInputs") || !has("lab")) continue;
       // The prediction, answered, on the step that reveals it.
