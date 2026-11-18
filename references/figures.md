@@ -42,17 +42,18 @@ The scene.ts route (the Unfold stage, `look: "drawing"` or `"clay"`, `verify.mjs
 | A token or key card | `cardDrawing(cam, { w, d })`, its word by `valueText(word, size, "rig-value rig-on-card")` | Light in both themes, so its ink is dark in both |
 | A ring of slots | `ringSlots(n, r, centre)` and `turnAt(cam, theta, at)` | The first slot at the front |
 | A pointer or marker | `markerDrawing(cam, { h })` | A pin with a ball, in the followed colour |
-| An arrow or link | `arrow(cam, from, to, { lift })` | Drawn in the figure's projection, lifted into an arc; rebuilt when its ends move (a short path, not a solid) |
+| An arrow or link | `arrow(cam, from, to, { lift, via })` | Drawn in the figure's projection, lifted into an arc, or routed through `via` points on a smooth curve; rebuilt when its ends move (a short path, not a solid) |
+| The working | `workingStrip(rows, at, size)` | A small card-coloured tag of rows of text beside a part, upright on screen so long numbers read: `h1  2,668,802,083 mod 16 = 3`. A row appears as its step happens |
 | A floor | `boardDrawing(cam, { w, d })` | Quiet context, in `frame` |
 
 Put the camera at `CONCEPT_VIEW` (azimuth 247°, elevation 32°), a three-quarter view from the front left, so tops, fronts and printed values all read.
 
 **How the concept parts are used well** (each learned on the Bloom filter):
-- **An arrow ends on the front face of its cell**, not on its top: a head on the top covers the value printed there. An arrow to a back row arcs over the front row.
+- **An arrow ends on the front face of its cell**, beside the index printed in front of it, never on its top: a head on the top covers the value printed there. An arrow to a back row goes over the gap between two front cells (`via`), never across one; a lift alone still crossed the front row's values. `check-drawing` fails any arrow that runs across a printed value or index at a still frame.
 - **The card goes where its arrows are short**: in front of the cells it points at, or walking with the key along the rail (the scaffold's card stays in front of the slot it is looking at).
-- **Don't label every arrow.** h1, h2, h3 at arrow heads sat on the cells and read as noise; the caption and the lab's rows print each function's working.
+- **Show the working on stage, beside the subject**, in a `workingStrip` that belongs to the subject's part, so the camera frames them together. In captions and lab rows alone, the working was hidden: an eval lost on a Bloom filter that "hides the hashing". Names on the arrows themselves (h1, h2, h3 at their heads) sat on the cells and read as noise. Keep the strip clear of every cell and of the cards at the lower right.
 - **A group the story is about gets a camera name**: the scaffold's `"run"` (the slots a key has looked at), the Bloom filter's `"hashed"` (the bits a word's hashes pick). `boundsOf` and the lighting expand it to the parts it is this step. A name may not be as big as the whole figure (half its area): frame the run, not the rail, and give a step whose subject spans everything no shot.
-- **Show the working.** The working is on screen as printed values and in the caption and the lab's rows: word → hash → mod m → bit, not an arrow from word to bit alone.
+- **Frame the overview to the figure.** Fit the camera to the cells and the card's place, not the board's rim, and fill the clear area with it; keep the clear area itself above the cards that open at the stage's lower right (`CLEAR.y1`), since the camera centres a subject in it at every size and nothing else keeps the subject from under a card.
 
 The rest of this page applies to both kinds: one followed part, a camera shot per step, contact tests where one part drives another.
 
@@ -136,6 +137,8 @@ An inset at a near angle shows slanted faces, and the reader cannot judge alignm
 | **The old route for a concept:** a fresh agent built a Bloom filter as a scene.ts page, a flat pale plan view with none of the rig, the lit subject or the camera, and two of these checks crashed on it | One route in `SKILL.md`; the Drawing checks refuse an old page with a clear message; the concept scaffold |
 | **A value nobody could read:** white figures on a cell's lit top, and dark ones on a light card in the dark theme | Toned cells print their value in the tone's dark shade; a set cell and a card have their own ink in each theme. Look at both themes |
 | **A remainder printed wrong:** concept pages print "27 mod 8 = 3" | `check-arithmetic` re-does every `a mod m = r`, thousands separators included |
+| **Hidden hashing:** the working (word → hash → mod 16 → bit) was only in captions and lab rows; on stage, arrows went from word to bit with no numbers | The working strip beside the card, framed with it |
+| **Arrows across the values:** arrows to the back row crossed the front row's 0s and 1s, and the ones along the front crossed the indices | `check-drawing` samples every arrow at each step's still frame against every printed value and index. A planted fault (`VIZ_PLANT=straight-arrows node examples/bloom/build.mjs`) must fail it |
 | **A heading that gave the answer away:** the prediction was set on the step it asks about, so the heading above it said "A false positive" | The prediction sits on the step before (`PRED_STEP`); `check-drawing` checks it is revealed on the next step |
 
 The rule under every row is the same: **look at the page as built**. Checks pass frames that read wrong, so open every fresh shot.

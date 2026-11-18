@@ -42,12 +42,12 @@ Open the closest example before starting:
 The evals taught this. Without it, four of five subjects came out as a straight rail of slots because that was the part at hand, and a plain flat diagram drawn without the skill taught them better each time.
 
 The parts (`src/rig/`, `references/figures.md`):
-- **Concepts:** `cellDrawing` (a cell or slot, with a printed value by `decalAt` and `valueText`, and a tone by flag), `railCentres` (a row with indices), `cardDrawing` (a token or key card), `ringSlots` and `turnAt` (a ring of slots), `markerDrawing` (a pointer), `arrow` (a link drawn in the figure's projection), `boardDrawing` (the floor).
+- **Concepts:** `cellDrawing` (a cell or slot, with a printed value by `decalAt` and `valueText`, and a tone by flag), `railCentres` (a row with indices), `cardDrawing` (a token or key card), `ringSlots` and `turnAt` (a ring of slots), `markerDrawing` (a pointer), `arrow` (a link drawn in the figure's projection, routed with `via`), `workingStrip` (the working beside a part), `boardDrawing` (the floor).
 - **Machines:** `plate`, `turned`, `rod`, `sprocket` and `roundedHull` meshes, `moveInPlane` and `angleBin` for motion, `checkContacts` for what drives what.
 
 One part per real element, counted true. Draw the cause, not only the states. Do not draw boxes-and-arrows diagrams, and do not invent a decorative machine whose parts mean nothing. A part the subject needs and the rig lacks is a kit gap: build it in `src/rig/`, drawn once and moved, and record it.
 
-**Show the working.** Put the intermediate values on screen, not only the result: a Bloom filter prints word → hash → mod 16 → bit in the caption and the lab, and each bit's 0 or 1 on its cell. Drawing pages have no flat side panels yet: equations go in the caption and the lab's rows; a subject that cannot be taught without a sequence diagram or a matrix is a kit gap to report, not a reason to take the legacy route.
+**Show the working, on stage.** Put the intermediate values where the reader is looking, not only the result: a Bloom filter shows each hash function's row (`h1  2,668,802,083 mod 16 = 3`) in a working strip beside the word card (`workingStrip`), framed with it, and each bit's 0 or 1 on its cell. Captions and lab rows alone hide it. Drawing pages have no flat side panels yet: a short sum goes in a working strip, a longer one in the caption and the lab's rows; a subject that cannot be taught without a sequence diagram or a matrix is a kit gap to report, not a reason to take the legacy route.
 
 ## Decisions this skill makes
 
@@ -115,7 +115,7 @@ A model checks the picture; nothing checked the words, and that is where the ski
 - **Bold shaded solids** in the rig's materials (`src/rig/rig.css`, included before the page's own CSS), with a heavier silhouette than creases and a shine on lit edges. Out-of-focus parts recede by tone, never by opacity.
 - **Draw once, then move.** A figure rebuilt every frame stutters; `check-drawing` times every frame.
 - **Values are printed on parts** and read in both themes; a toned cell prints in its tone's dark ink.
-- **Arrows stay short and end on a face**, never on a printed value.
+- **Arrows end on a face and never cross a printed value or index** (route them over a gap with `via`); `check-drawing` checks it.
 - **Motion means something:** a bit turns as its arrow lands; a key walks to the slot it looks at. Nothing moves for decoration.
 - **The figure dominates.** One desktop viewport holds the title, the figure, the heading, the readouts and the controls.
 
