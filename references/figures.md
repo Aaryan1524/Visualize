@@ -60,9 +60,13 @@ The rest of this page applies to both kinds: one followed part, a camera shot pe
 ## The page
 
 - **Step 0 is the concept**, with no tab: the problem the idea solves, before anything moves (`headings(M)[0]` is the question). A topic it teaches is placed at `"step:0"`.
-- **The prediction** is asked on `PRED_STEP` about what the next step shows, and revealed there. Ask it the step before the causal moment.
+- **The prediction** is asked on `PRED_STEP` about what the next step shows, and revealed there. Ask it the step before the causal moment. Build it for each What if variant from that variant's model (`question`, `answer` and `explanation` may each be keyed by variant): one question frozen to the base variant contradicted the others' explanations.
+- **Every What if variant keeps every lesson.** A variant that changes an input (the number of hash functions) can lose a case: the Bloom filter's one-hash run had no false negative, its six-hash run no "definitely not". Let the model choose each variant's inputs so every case still happens (`opsFor`), name the tabs by lesson, not by input, and test that each variant says each lesson at its step and never repeats the previous step's paragraph.
+- **What if compares expectations, not one run's luck.** Show the expected value for the variant beside this run's value, each labelled, and the expected values side by side where the trade-off is taught.
 - **The lab** (`DATA.lab.inputs`) is the reader's own values: a number on a slider (`min`, `max`, `step`), or a typed entry, `{ type: "text", samples: [...] }`, for a word or a key. The checks try each slider's two ends, or each sample and an empty entry.
-- **Now you try** is `question(n, r)` from the model, with three choices or more.
+- **Now you try** is `question(n, r)` from the model, with three choices or more. Return the question's own `state` too, and the stage draws it: a question about one filter over a picture of another misleads.
+- **The lab asks of what the stage shows**: the step on screen, and its first row says which state it is.
+- **While the lab or Now you try is open**, `cardShot(state)` names what the camera frames and `cardClear()` the space beside the card they open in; the camera may zoom out below 1 there. Without them the figure stays where it is, under the card.
 
 ## The look
 
@@ -139,6 +143,9 @@ An inset at a near angle shows slanted faces, and the reader cannot judge alignm
 | **A remainder printed wrong:** concept pages print "27 mod 8 = 3" | `check-arithmetic` re-does every `a mod m = r`, thousands separators included |
 | **Hidden hashing:** the working (word → hash → mod 16 → bit) was only in captions and lab rows; on stage, arrows went from word to bit with no numbers | The working strip beside the card, framed with it |
 | **Arrows across the values:** arrows to the back row crossed the front row's 0s and 1s, and the ones along the front crossed the indices | `check-drawing` samples every arrow at each step's still frame against every printed value and index. A planted fault (`VIZ_PLANT=straight-arrows node examples/bloom/build.mjs`) must fail it |
+| **A lit bit cut off, or under the lab card:** the camera framed only what the step named, and the lab card hid the bit that decided the answer | Every part lit (by the shot, the voice or the current operation) must be wholly on the stage and under no open card, at every step's still frame and every lab sample. The Bloom filter's operation lights its word and every bit it touches; a planted fault (`VIZ_PLANT=card-only-shot`) must fail |
+| **An estimate called exact:** the page called Bloom's classic formula the exact expected rate, and it ranked the hash counts wrongly at 16 bits | The model computes the true expectation by counting, tested against an exact reference and a seeded simulation; the page names each formula for what it is |
+| **What if variants that lost lessons:** one hash function never showed a false negative, six never a "definitely not" | The model chooses each variant's words so every case happens; a test checks every lesson in every variant |
 | **A heading that gave the answer away:** the prediction was set on the step it asks about, so the heading above it said "A false positive" | The prediction sits on the step before (`PRED_STEP`); `check-drawing` checks it is revealed on the next step |
 
 The rule under every row is the same: **look at the page as built**. Checks pass frames that read wrong, so open every fresh shot.
