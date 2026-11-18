@@ -86,7 +86,7 @@ export function figure(M, cam) {
     const card = cardAt(L, st.picked ?? []);
     if (st.word) {
       items.push({ id: "card", key: 20, transform: placeAt(cam, card) });
-      items.push({ id: "cardValue", key: 21, part: "card", transform: decalAt(cam, [card[0], card[1], CARD.h]), svg: valueText(st.word, 9, "rig-value rig-on-card") });
+      items.push({ id: "cardValue", key: 21, part: "card", transform: decalAt(cam, [card[0], card[1], CARD.h]), svg: valueText(st.word, Math.min(9, (CARD.w - 4) / (0.62 * st.word.length)), "rig-value rig-on-card") });
     } else items.push({ id: "card", key: 20, hidden: true }, { id: "cardValue", key: 21, hidden: true });
     // one arrow a hash function, from the card's back edge into the front face of the bit it picks, so
     // no head covers a value. An arrow to the back row goes over the gap between two front cells (on the
@@ -125,8 +125,8 @@ export function figure(M, cam) {
       const size = workingStrip(rows, [0, 0], fs), end = card[0] < L.width * 0.15;
       const c = screenOf(cam, [card[0] + (end ? 0 : CARD.w / 4), card[1] - CARD.d / 2, 0]);
       const corner = end ? [c[0] - size.w / 2, c[1] + 110] : [c[0] - size.w, c[1] + 110];
-      items.push({ id: "working", key: 22, part: "card", transform: null, svg: workingStrip(rows, corner, fs).svg });
-    } else items.push({ id: "working", key: 22, hidden: true });
+      items.push({ id: "working", key: 45, part: "card", transform: null, svg: workingStrip(rows, corner, fs).svg });
+    } else items.push({ id: "working", key: 45, hidden: true });
     at.card = screenOf(cam, [card[0] - CARD.w / 2, card[1], CARD.h]);
     at.rail = screenOf(cam, [L.bits[0][0] - CELL.w / 2, L.bits[0][1], CELL.h / 2]);
     at.index = screenOf(cam, [L.bits[M.m - ROW][0], L.bits[M.m - ROW][1] - CELL.d / 2 - 6, 0]);
