@@ -20,16 +20,21 @@ const out = outArg > 0 ? process.argv[outArg + 1] : join(HERE, "..", "..", "dist
 
 // The drawing's units: about 10 to a screen pixel at 1440 x 900. The figure fills BOX, between the two
 // columns of callouts (LX, RX), clear of the heading on the left and the cards on the right.
-const VBW = 14200, VBH = 6550, FS = 150, LX = 3900, RX = 10560;
-const BOX = { x: 4300, y: 700, w: 6100, h: 5200 };
-const CLEAR = { x0: LX + 150, y0: 150, x1: RX - 150, y1: VBH - 150 };
+const VBW = 14200, VBH = 6550, FS = 150, LX = 3000, RX = 10560;
+// the board fills the clear area on the overview steps (step 0, and a step with no shot), as the
+// derailleur's figure does; it stays inside it, so a wide subject can still be framed (the camera never
+// zooms out past the whole figure). The callouts' column (LX) sits further left than a machine's.
+const BOX = { x: 3300, y: 350, w: 7000, h: 4200 };
+// The clear area stops above the cards that open at the stage's lower right (the prediction, the
+// concept): a framed word, its working and its bits never sit under them, at 1280 x 800 either.
+const CLEAR = { x0: LX + 150, y0: 150, x1: RX - 150, y1: 4650 };
 const VOICE = existsSync(join(HERE, "voice.json")) ? JSON.parse(readFileSync(join(HERE, "voice.json"), "utf8")) : null;
 
 // Callouts, on the concept step only (the overview); later steps are framed close and name their bits
 // in the heading. Text in the columns, a leader drawn live to the part's anchor (figure.mjs `at`).
 const label = (id, text, x, y, to, beats, anchor) => ({ id, text, at: [x, y], to, beats, anchor });
 const LABELS = [
-  label("rail", "Bit array", LX, 2500, "rail", [0], "end"),
+  label("rail", "Bit array", LX, 1900, "rail", [0], "end"),
   label("index", "Bit index", LX, 4300, "index", [0], "end"),
 ];
 const labelSvg = (l) => `<g class="label" data-label="${l.id}" data-beats="${l.beats.join(" ")}" data-at="${l.to}" data-to="${l.at[0]},${l.at[1]}"><path class="leader"/><circle class="ldot" r="26"/><text x="${l.at[0]}" y="${l.at[1]}" text-anchor="${l.anchor}">${esc(l.text)}</text></g>`;
@@ -87,10 +92,11 @@ function machine(DATA) {
     $("r-words").textContent = String(state.members ?? 0);
     $("r-fp").textContent = (100 * fpFromFill(on / model.m, model.k)).toFixed(1) + "%";
   }
-  // "hashed" lights the bits this word's hashes pick, whichever they are this step.
+  // "hashed" lights the bits this word's hashes pick, whichever they are this step; the card lights its
+  // arrows with it (they are framed apart, so the card's bounds stay the card and its working)
   const expand = (names) => names.flatMap((n) => (n === "hashed" ? (cur?.picked ?? []).map((b) => `bit${b}`) : [n]));
   function focusParts() {
-    const { focus } = lastFocus, lit = expand(lastFocus.lit), lab = root.hasAttribute("data-lab");
+    const { focus } = lastFocus, lit = expand(lastFocus.lit).flatMap((n) => (n === "card" ? ["card", "arrows"] : [n])), lab = root.hasAttribute("data-lab");
     stage?.focus((part) => ({ recede: lit.length ? !lit.includes(part) : !lab && focus ? !focus.includes(part) : false, named: lit.includes(part) }));
   }
   const focus = (f) => ((lastFocus = f), focusParts());
@@ -146,7 +152,7 @@ function machine(DATA) {
 }
 
 // ---------------------------------------------------------------- page
-const bundle = buildSync({ entryPoints: [join(HERE, "figure.mjs")], bundle: true, format: "iife", globalName: "FIG", write: false, minify: true, legalComments: "none" }).outputFiles[0].text;
+const bundle = buildSync({ entryPoints: [join(HERE, "figure.mjs")], bundle: true, format: "iife", globalName: "FIG", write: false, minify: true, legalComments: "none", define: { "process.env.VIZ_PLANT": JSON.stringify(process.env.VIZ_PLANT ?? "") } }).outputFiles[0].text;
 if (/<\/script/i.test(bundle)) throw new Error("the figure bundle contains </script");
 const modelSrc = readFileSync(join(HERE, "model.mjs"), "utf8").replace(/^export /gm, "") + "\nconst MODELS_IN_PAGE = MODELS;\n";
 const M0 = MODELS[BASE], std = VARIANT_DATA[BASE];
@@ -198,7 +204,7 @@ const HTML = drawingPage({
   steps: STEPS,
   stageLabel: "A Bloom filter's sixteen bits, drawn as solid cells. Left and right arrows step through the explanation; space plays and pauses.",
   viewBox: `0 0 ${VBW} ${VBH}`,
-  figLabel: "Two rows of eight bit cells on a board, a word card in front of them, and one arrow for each hash function to the bit it picks",
+  figLabel: "Two rows of eight bit cells on a board, a word card in front of them, and one arrow for each hash function to the bit it picks, with each function's working (hash, mod 16, bit) beside the card",
   concept: std.voice ? std.voice[0].text : std.captions[0],
   setup: `A Bloom filter keeps ${M0.m} bits and ${M0.k} hash functions. It adds three words, answers four questions and attempts one delete.`,
   whatIf: { label: "Hash functions", variants: Object.entries(VARIANTS).map(([k, v]) => [k, v.label]) },
