@@ -19,7 +19,7 @@ for (const [name, M] of Object.entries(MODELS)) {
 }
 
 test("every core topic is placed on a step, the lab or What if", () => {
-  const places = new Set([...STEPS.map((_, k) => `step:${k}`).slice(1), "whatif", "lab", "practice"]);
+  const places = new Set([...STEPS.map((_, k) => `step:${k}`), "whatif", "lab", "practice"]);
   for (const t of COVERAGE.topics) assert.ok(places.has(t.where) || t.where === "deferred", `${t.topic}: ${t.where}`);
   assert.ok(COVERAGE.topics.filter((t) => t.core !== false).length >= 4);
 });

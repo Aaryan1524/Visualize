@@ -13,7 +13,7 @@
   --rig-slate-lit:#a9b6c5;--rig-slate-dark:#26303d;
   --rig-frame-lit:#f3f0e8;--rig-frame-dark:#cbc5b8;
   --rig-cell-lit:#fbf9f3;--rig-cell-dark:#b7b0a3;--rig-card-lit:#ffffff;--rig-card-dark:#a9a397;
-  --rig-set-lit:#8e8a82;--rig-set-dark:#2b2925;--rig-good-lit:#bfe3da;--rig-good-dark:#2f7d6d;
+  --rig-set-lit:#8e8a82;--rig-set-dark:#2b2925;--rig-set-ink:#ffffff;--rig-good-lit:#bfe3da;--rig-good-dark:#2f7d6d;
   --recede:0%;
 }
 @media (prefers-color-scheme:dark){.vz:not([data-theme="light"]){
@@ -25,7 +25,7 @@
   --rig-slate-lit:#b2c0d0;--rig-slate-dark:#2b3644;
   --rig-frame-lit:#46433d;--rig-frame-dark:#26241f;
   --rig-cell-lit:#5a5750;--rig-cell-dark:#2a2824;--rig-card-lit:#e9e7e1;--rig-card-dark:#6d6a63;
-  --rig-set-lit:#d6d3cc;--rig-set-dark:#77736b;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
+  --rig-set-lit:#d6d3cc;--rig-set-dark:#77736b;--rig-set-ink:#1d1b18;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
 }}
 .vz[data-theme="dark"]{
   --rig-shine:#ffffff;--rig-contact:#000000;
@@ -36,7 +36,7 @@
   --rig-slate-lit:#b2c0d0;--rig-slate-dark:#2b3644;
   --rig-frame-lit:#46433d;--rig-frame-dark:#26241f;
   --rig-cell-lit:#5a5750;--rig-cell-dark:#2a2824;--rig-card-lit:#e9e7e1;--rig-card-dark:#6d6a63;
-  --rig-set-lit:#d6d3cc;--rig-set-dark:#77736b;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
+  --rig-set-lit:#d6d3cc;--rig-set-dark:#77736b;--rig-set-ink:#1d1b18;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
 }
 /* No ancestor in these selectors: they must also match inside <use> copies. */
 .rig-m-steel{--rig-a:var(--rig-steel-lit);--rig-b:var(--rig-steel-dark)}
@@ -54,7 +54,12 @@
 .rig-part[data-t-bad]{--rig-cell-lit:color-mix(in oklab,var(--t-bad) 45%,#ffffff);--rig-cell-dark:var(--t-bad)}
 .rig-part[data-t-hot]{--rig-cell-lit:var(--rig-subject-lit);--rig-cell-dark:var(--rig-subject-dark)}
 .rig-value{font-family:var(--mono,ui-monospace,monospace);font-weight:700;fill:color-mix(in oklab,var(--ink) calc(100% - var(--recede)),var(--stage))}
-.rig-part[data-t-set] .rig-value,.rig-part[data-t-hot] .rig-value,.rig-part[data-t-good] .rig-value,.rig-part[data-t-bad] .rig-value{fill:#ffffff}
+/* a value printed on a toned cell takes the tone's dark shade, which reads on its lit top in both themes;
+   a set cell is dark in the light theme and light in the dark one, so its value has its own ink */
+.rig-part[data-t-hot] .rig-value,.rig-part[data-t-good] .rig-value,.rig-part[data-t-bad] .rig-value{fill:color-mix(in oklab,color-mix(in oklab,var(--rig-cell-dark) 70%,#000000) calc(100% - var(--recede)),var(--stage))}
+.rig-part[data-t-set] .rig-value{fill:color-mix(in oklab,var(--rig-set-ink) calc(100% - var(--recede)),var(--stage))}
+/* a value printed on a card: the card is light in both themes, so its ink is dark in both */
+.rig-value.rig-on-card{fill:color-mix(in oklab,#1d1b18 calc(100% - var(--recede)),var(--stage))}
 .rig-index{font-family:var(--mono,ui-monospace,monospace);font-weight:500;fill:var(--ink-2,#625f58)}
 .rig-arrow-halo{fill:none;stroke:var(--stage);stroke-width:7px;stroke-linecap:round;vector-effect:non-scaling-stroke}
 .rig-arrow-line{fill:none;stroke:var(--rig-arrow,var(--ink));stroke-width:2.4px;stroke-linecap:round;vector-effect:non-scaling-stroke}

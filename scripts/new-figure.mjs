@@ -1,10 +1,15 @@
 #!/usr/bin/env node
-// Start a machine page from a small, complete one that already builds and passes check-drawing (all
-// but the independent review, which only a fresh reviewer can give): a model with a tested contact
-// pair, a rig figure of a few parts drawn once and moved, a camera shot per step, a narration recorded
-// with the local voice, the audit's claims and topics, a claims test, a lab and Now you try.
+// Start a Drawing page from a small, complete one that already builds and passes check-drawing (all but
+// the independent review, which only a fresh reviewer can give). Machines and concepts are built the
+// same way, on the rig: a model with a reference test, a rig figure of parts drawn once and moved, a
+// camera shot per step, a narration recorded with the local voice, the audit's claims and topics, a
+// claims test, a lab and Now you try.
 //
-//   node scripts/new-machine.mjs <name> [--dir <folder>] [--title "Gear Pair"] [--no-voice] [--force]
+//   node scripts/new-figure.mjs <name> --kind machine|concept [--dir <folder>] [--title "Gear Pair"] [--no-voice] [--force]
+//
+// --kind machine: a gear pair (a tested contact pair; turned and plate parts).
+// --kind concept: a hash table with linear probing (slots on a rail with printed values, a key card, an
+//                 arrow to the slot looked at, a marker): the concept parts in src/rig/parts.ts.
 //
 // <folder> defaults to examples/<name>. Then replace the model first (model.mjs), then the figure and
 // the story; references/figures.md is the recipe.
@@ -15,18 +20,19 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const TEMPLATES = join(ROOT, "scripts", "templates", "machine");
 const args = process.argv.slice(2);
 const name = args.find((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--") && !["--no-voice", "--force"].includes(args[i - 1])));
 const opt = (k, d) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : d);
-if (!name || !/^[a-z][a-z0-9-]*$/.test(name)) {
-  console.error('usage: node scripts/new-machine.mjs <name: lowercase, dashes> [--dir <folder>] [--title "Title"] [--no-voice] [--force]');
+const kind = opt("kind", null);
+if (!name || !/^[a-z][a-z0-9-]*$/.test(name) || !["machine", "concept"].includes(kind)) {
+  console.error('usage: node scripts/new-figure.mjs <name: lowercase, dashes> --kind machine|concept [--dir <folder>] [--title "Title"] [--no-voice] [--force]');
   process.exit(2);
 }
+const TEMPLATES = join(ROOT, "scripts", "templates", kind);
 const dir = resolve(opt("dir", join(ROOT, "examples", name)));
 const title = opt("title", name.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "));
 if (existsSync(dir) && readdirSync(dir).length && !args.includes("--force")) {
-  console.error(`new-machine: ${dir} is not empty (--force to write over it)`);
+  console.error(`new-figure: ${dir} is not empty (--force to write over it)`);
   process.exit(1);
 }
 mkdirSync(dir, { recursive: true });

@@ -1,0 +1,63 @@
+// __TITLE__: the model. REPLACE THIS FIRST. The scaffold's concept is a hash table with linear probing,
+// so that everything around it builds and passes its checks; your concept goes here, and every number
+// the page prints comes from it (src/claims/audit.mjs fails a number the model does not have).
+//
+// The page inlines this file (its `export` keywords removed), so it must not import anything.
+
+export const VARIANTS = {
+  eight: { label: "8 slots", m: 8 },
+  eleven: { label: "11 slots", m: 11 },
+};
+// The story's keys, chosen so every case happens in the 8-slot table: a key that lands at once, a
+// collision that probes on, a run of full slots, and a lookup that probes along it to an empty slot.
+export const KEYS = [11, 19, 12];
+export const ASK = 27;
+
+/** Where a key starts looking: its remainder after dividing by the table's size. */
+export const home = (key, m) => key % m;
+
+/** Insert a key: look at its home slot, then the next ones round the table, until one is free. */
+export function insert(table, key) {
+  const m = table.length, probes = [];
+  for (let i = 0; i < m; i++) {
+    const s = (home(key, m) + i) % m;
+    probes.push(s);
+    if (table[s] === null) {
+      const next = [...table];
+      next[s] = key;
+      return { table: next, slot: s, probes };
+    }
+  }
+  return { table, slot: -1, probes }; // full
+}
+
+/** Look a key up the same way: found in a slot, or stopped by an empty one (absent). */
+export function lookup(table, key) {
+  const m = table.length, probes = [];
+  for (let i = 0; i < m; i++) {
+    const s = (home(key, m) + i) % m;
+    probes.push(s);
+    if (table[s] === key) return { found: true, slot: s, probes };
+    if (table[s] === null) return { found: false, slot: s, probes };
+  }
+  return { found: false, slot: -1, probes };
+}
+
+export function makeModel(v) {
+  const m = v.m, empty = Array(m).fill(null);
+  // the story: each key inserted in turn, then the lookup
+  const steps = [];
+  let table = empty;
+  for (const key of KEYS) {
+    const r = insert(table, key);
+    steps.push({ op: "insert", key, home: home(key, m), ...r, before: table });
+    table = r.table;
+  }
+  const ask = lookup(table, ASK);
+  steps.push({ op: "lookup", key: ASK, home: home(ASK, m), ...ask, table, before: table });
+  const filled = table.filter((x) => x !== null).length;
+  const N = { m, keys: KEYS.length, filled, load: filled / m, ask: ASK, askHome: home(ASK, m), askProbes: ask.probes.length };
+  return { v, m, steps, table, N, home: (k) => home(k, m), insert, lookup };
+}
+
+export const MODELS = Object.fromEntries(Object.entries(VARIANTS).map(([k, v]) => [k, makeModel(v)]));
