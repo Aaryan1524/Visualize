@@ -20,7 +20,9 @@
 //   boundsOf(names)     optional: the bounds of the named parts, in the figure's own units (the camera's
 //                       transform excluded), or null. With it, a step's `shot` (a list of part names in
 //                       DATA.steps: the step's subject, centred and lit) moves the camera, and
-//                       DATA.camera.around[k] (parts the subject attaches to) stays in view;
+//                       DATA.camera.around[k] (parts the subject attaches to) stays in view, and
+//                       DATA.camera.subject[k] lists the parts the step's heading names, which
+//                       check-drawing requires in frame;
 //                       DATA.camera.alias adds names the camera may light: see "The camera" below
 //                       and camera.mjs
 //   clearArea()         optional: { x0, y0, x1, y1 } in the figure's units, where framed parts may go
@@ -38,7 +40,7 @@ export function player(DATA, machine, kit) {
   const STEPS = DATA.steps, LAST = STEPS.length - 1, PRED = DATA.predict.step;
   // The camera's own data (DATA.camera: names it may light, and each step's parts to keep in view) is
   // not reader text, so it stays out of the audit's stamp.
-  const ALIAS = { ...(DATA.alias || {}), ...(DATA.camera?.alias || {}) }, AROUND = DATA.camera?.around || {};
+  const ALIAS = { ...(DATA.alias || {}), ...(DATA.camera?.alias || {}) }, AROUND = DATA.camera?.around || {}, SUBJECT = DATA.camera?.subject || {};
   const S = { variant: null, step: -1, T: 0, pinPose: true, state: null, running: false, touring: false, voiceOn: true, armed: false, answer: null, last: 0, lit: [], heard: -1 };
   let V = null, E = null;
 
@@ -765,7 +767,7 @@ export function player(DATA, machine, kit) {
       C.instant = false;
     },
     // The camera: where it is, where it is going, the clear area, and each step's track (camera.mjs).
-    camera: () => ({ active: !!C.el, m: C.cur, target: C.target, blending: !!C.blend, cont: C.cont, clear: C.clear, T: S.T, step: S.step, pinned: S.pinPose, running: S.running, starts: SEG.s, lead: SEG.lead, shots: STEPS.map((s) => s.shot ?? null), around: STEPS.map((s, k) => AROUND[k] ?? null), tracks: C.tracks.map((t) => ({ shot: t.shot, enter: t.enter, start: t.start, end: t.end, moves: t.moves.map((m) => ({ t0: m.t0, d: m.d, from: m.from, to: m.to, ids: m.ids, enter: !!m.enter })) })), links: V.voice ? V.voice.map((tr) => tr.links.map((l) => ({ start: l.start, end: l.end, ids: l.ids }))) : [] }),
+    camera: () => ({ active: !!C.el, m: C.cur, target: C.target, blending: !!C.blend, cont: C.cont, clear: C.clear, T: S.T, step: S.step, pinned: S.pinPose, running: S.running, starts: SEG.s, lead: SEG.lead, shots: STEPS.map((s) => s.shot ?? null), around: STEPS.map((s, k) => AROUND[k] ?? null), subject: STEPS.map((s, k) => SUBJECT[k] ?? null), tracks: C.tracks.map((t) => ({ shot: t.shot, enter: t.enter, start: t.start, end: t.end, moves: t.moves.map((m) => ({ t0: m.t0, d: m.d, from: m.from, to: m.to, ids: m.ids, enter: !!m.enter })) })), links: V.voice ? V.voice.map((tr) => tr.links.map((l) => ({ start: l.start, end: l.end, ids: l.ids }))) : [] }),
     // The named parts' bounds and the callout anchors, in the figure's own units (no camera).
     boundsOf: (names) => (C.el ? boundsOfIds(names) : null),
     anchors: () => machine.anchors?.() ?? {},

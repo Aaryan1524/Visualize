@@ -437,7 +437,7 @@ try {
         }
         return { out, seen };
       };
-      let shots = 0, spoken = 0, led = 0;
+      let shots = 0, spoken = 0, led = 0, subjects2 = 0;
       const subjects = [], boundsSeen = new Map();
       for (const [w, h] of [[1440, 900], [1280, 800]]) {
         await p.setViewport({ width: w, height: h });
@@ -461,6 +461,18 @@ try {
               if (w === 1440) subjects.push(`${v} ${k} centre ${(sj.fx * 100).toFixed(0)}%,${(sj.fy * 100).toFixed(0)}% span ${(sj.span * 100).toFixed(0)}% lit ${(sj.share * 100).toFixed(0)}%`);
             }
             shots++;
+            // every part the step's heading names (DATA.camera.subject[k]) is in frame at its still
+            // frame and all through the step, not only the shot's own subject
+            const named = cam.subject?.[k];
+            if (named?.length) {
+              for (const f of await p.evaluate(framing, named, k, false)) fail(`${at}, still frame: the heading names it, but ${f}`);
+              for (const frac of [0.1, 0.35, 0.6, 0.85]) {
+                const T = cam.starts[k] + frac * (cam.starts[k + 1] - cam.starts[k]);
+                await p.evaluate((ms) => window.__viz.seek(ms), T * 1000);
+                for (const f of await p.evaluate(framing, named, k, false)) fail(`${at}, at ${T.toFixed(2)} s: the heading names it, but ${f}`);
+              }
+              subjects2++;
+            }
             // each spoken link, at the moment its words begin
             for (const l of cam.links[k] ?? []) {
               const T = cam.starts[k] + cam.lead + l.start;
@@ -480,7 +492,7 @@ try {
           }
         }
       }
-      console.log(`camera framing: ${shots} step shots, ${spoken} spoken names and ${led} voice-led shots, at 1440×900 and 1280×800, every What if`);
+      console.log(`camera framing: ${shots} step shots, ${spoken} spoken names, ${led} voice-led shots and ${subjects2} steps whose heading's parts stay in frame through the step, at 1440×900 and 1280×800, every What if`);
       console.log(`camera subjects (1440×900; centre across, down the clear area; span of its shorter side; lit share of the parts in focus): ${subjects.join(" | ")}`);
       console.log(`camera bounds (figure units, ${variants[0] ?? ""}): ${[...boundsSeen.values()].join(", ")}`);
       await p.setViewport({ width: 1440, height: 900 });
