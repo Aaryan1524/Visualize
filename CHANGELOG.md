@@ -55,6 +55,11 @@ What a machine needs. The escalator built in Clay came out as about forty identi
     - the camera to 180° and 0;
     - each cog's bar to the model's lateral position, within a pixel;
     - the drawn offset to the model's, across the lab's whole range.
+- **View A is removed; the main figure carries the explanation.** The builder: "remove the side view, we can add that later. I just want the main figure to be robust."
+  - The derailleur draws no inset. The callout column on the right moves out, and the figure fits a wider box.
+  - The camera's clear area widens with it. Every shot still passes centring, subject and framing; step 7 now frames the barrel adjuster with its cable.
+  - The lab teaches alignment in the main figure: the off-line readout, the lab's rows, and the guide pulley's teeth turning red when it is off line.
+  - In the docs an inset view is optional and off by default. If one is added later, it must be a true elevation, never a near angle.
 - **What the derailleur taught is now the kit, not one page's memory.**
   - `references/figures.md` is the recipe for a machine figure on the rig: when to use one, the look, draw once and move, the camera, insets, and every failure with the check that now catches it.
   - `node scripts/new-machine.mjs <name>` writes a gear pair. As generated, it builds and passes `check-drawing`, all but the independent review. It has:

@@ -56,21 +56,25 @@ A whole-machine figure at every step leaves the reader hunting for a 4 mm screw 
 - **The 2× cap** (`CAP` in `src/drawing/camera.mjs`): at 3× the context is gone.
 - **Voice-led shots** follow `[phrase|part]` links in the narration. Two names spoken close together share one shot.
   - A step that names two parts in one breath should frame both. The scaffold's speed step does.
-- **Keep clear of cards and insets:** `clearArea()` is the space between the callout columns, and anything framed parts must stay out from under carries `data-camera-avoid`.
+- **Keep clear of the cards:** `clearArea()` is the space between the callout columns, and anything framed parts must stay out from under (the title block, an inset if you add one) carries `data-camera-avoid`.
 - **Nothing clips** the figure but the stage.
 
-## Insets
+## Insets: optional, and off by default
 
-An inset earns its place by showing what the main view cannot.
+**The main figure carries the explanation on its own.** Build no inset by default. A second view splits the reader's eye and the stage, and the builder chose a robust main figure over one.
 
-When **alignment is the point**, as with a chain on its cog or a pulley under it, make the inset a **true orthographic elevation**, as the derailleur's View A is (`examples/derailleur/rear.mjs`):
-- the camera is straight from behind and level (azimuth 180°, elevation 0);
-- each cog is a bar at its lateral position;
-- dashed centrelines mark what should line up, and the gap between them is written in mm from the model.
+When the main view truly cannot show something, such as an alignment, show it there first:
+- a readout from the model;
+- the lab's rows;
+- a tint on the part that is out of line. The derailleur's guide pulley turns red when off line.
 
-From straight behind everything only slides, so each part is drawn once and moved by a translate.
+If an inset is added later, it must earn its place:
+- **Make it a true orthographic elevation, never a near-angle view.** When alignment is the point, as with a chain on its cog, look straight along the line that matters: from behind and level, azimuth 180°, elevation 0.
+- Draw each part where the model puts it, mark what should line up, and write the gap in mm from the model.
+- From straight on, parts only slide, so each is drawn once and moved by a translate.
+- Test that the camera is exactly that elevation and that each part's position matches the model.
 
-An inset at an angle shows slanted faces, and the reader cannot judge alignment by eye. The derailleur's first View A was drawn that way.
+An inset at a near angle shows slanted faces, and the reader cannot judge alignment by eye. The derailleur's first inset was drawn that way, and a later true elevation was removed in favour of the main figure.
 
 ## Failures, each with its check
 

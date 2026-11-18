@@ -166,7 +166,7 @@ An isometric figure keeps everything else on this page: the model and its tests,
 
 ### Build one with `src/rig/`
 
-- **Camera** (`camera.ts`): `fitCamera(points, box, azimuth, elevation)` fits an orthographic view to the figure's bounds; fit it to every pose the story reaches, so nothing leaves the stage. `insetCamera` makes a second, magnified view. When alignment is the point, an inset is a true elevation instead: the derailleur's View A is drawn straight from behind (`examples/derailleur/rear.mjs`), where every part only slides. See `references/figures.md`, "Insets".
+- **Camera** (`camera.ts`): `fitCamera(points, box, azimuth, elevation)` fits an orthographic view to the figure's bounds; fit it to every pose the story reaches, so nothing leaves the stage. `insetCamera` makes a second, magnified view. Insets are optional and off by default: the main figure carries the explanation. If you add one, make it a true elevation (`references/figures.md`, "Insets").
 - **Shapes** (`shapes.ts`): every part is a closed mesh whose faces carry their outward normals.
   - `plate(plane, { outer, holes }, t0, t1)` extrudes any outline: teeth, windows and slots included.
   - `turned(origin, axis, profile)` makes pulleys, bolts and barrels.
@@ -222,13 +222,13 @@ A figure that shows the whole machine at every step leaves the reader hunting fo
   - A seek and a play to the same time give the same camera.
 - **Only the stage clips it.** Give the drawing `overflow: visible`, and put no clip-path or mask on the camera's group: a zoomed figure runs to the stage's rounded edge.
   - The heading stays readable on a soft wash of the stage colour behind it, never a hard edge through the drawing.
-  - Callout text has a halo, and View A is an opaque disc.
-- **What does not zoom:** callout text, View A, the title block and the cards. Leaders follow the camera to their parts; a callout whose point leaves the picture hides.
+  - Callout text has a halo.
+- **What does not zoom:** callout text, the title block and the cards. Leaders follow the camera to their parts; a callout whose point leaves the picture hides.
 - **The machine supplies two hooks:**
   - `boundsOf(names)`: the named parts' bounds in the figure's own units, without the camera, or null for a name it does not have;
   - `clearArea()`: `{ x0, y0, x1, y1 }`, where the camera centres its shots: clear of the heading, the callout columns, any inset and the cards.
 
-  Put `data-camera` on the group the camera moves, and `data-camera-avoid` on anything framed parts must stay out from under (the derailleur marks View A's disc and title, and the title block). Keep insets and labels outside the camera's group. `DATA.camera.alias` adds names only the camera uses, with the parts they light. All of `DATA.camera` stays out of the audit's stamp.
+  Put `data-camera` on the group the camera moves, and `data-camera-avoid` on anything framed parts must stay out from under (the derailleur marks its title block). Keep insets and labels outside the camera's group. `DATA.camera.alias` adds names only the camera uses, with the parts they light. All of `DATA.camera` stays out of the audit's stamp.
 - **Every name must be framable.** The derailleur's build stops on a shot or a voice link naming a part the figure does not draw.
 - **A part too small to read alone** is framed with what it acts on. The derailleur's B screw, a 5 mm head, is framed with the mounting bolt it turns the derailleur about.
 
