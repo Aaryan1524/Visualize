@@ -1,7 +1,7 @@
 {
-  "stamp": "84a7ae3c95dd4acd",
+  "stamp": "b9b3c2e1eb4e0710",
   "reviewer": "independent",
-  "summary": "Both round-4 findings are fixed. Step 4 now frames the guide pulley ahead of the chain, and the fixed-length off-line arrow with an exact number is honest, since the legend says so. Two new problems are in the arrow's label. Past half a cog it measures from the wrong cog and reverses direction ('1.64 mm outboard' for a tight cable), which contradicts the lab rows. And the label printed at the arrow's head names the opposite of the way the arrow points.",
+  "summary": "Every finding from rounds 1 to 5 is fixed or accepted. The off-line arrow, its label, the readout and the lab rows now agree in every case I tried (tight 0.5, 1.5 and 3; slack 1, 2 and 3 on the 17; and both limit-screw cases), each measured from the cog asked for. I found nothing new.",
   "findings": [
     {
       "where": "setup, concept, variants.*.captions.0, variants.*.voice.0",
@@ -172,7 +172,7 @@
       "finding": "Once the cable error passes half a cog, the arrow, its label and the readout switch to the nearest cog and reverse direction, while the lab rows still measure from the wanted cog. Take cog 6 (the 17) with the cable 1.5 mm tight. The pulley is 2.10 mm inboard of the 17, which the rows say. But the figure and the readout say '1.64 mm outboard', measured from the 19, and the arrow points to the 19's line. With the cable 1.5 mm slack they say '1.64 mm inboard', and at 2 mm slack '0.94 mm inboard'. That contradicts the caption's rule that a slack cable puts the pulley outboard, and it contradicts the rows on the same screen. The barrel direction a reader would take from the arrow is also the wrong one. Measure the arrow and the readout from the cog asked for (2.10 mm inboard of the 17). Or, at the least, name the cog in the label ('1.64 mm outboard of the 19').",
       "resolved": false,
       "fixed": true,
-      "response": "Fixed: the arrow, its label and the readout now measure from the cog asked for (the lab's cog, step 7's), as the rows do, and all three name it. Cog 6 with the cable 1.5 mm tight now reads 'pulley 2.10 mm inboard of the 17' on the arrow, '2.10 mm inboard of the 17' in the readout, and '1.5 × 1.4 = 2.10 mm inboard of the 17.' in the rows; 2 mm slack reads 2.80 mm outboard of the 17. One function in the model (offLine) produces the words for all three. A test across the whole lab range holds the arrow, the readout's words and the rows to the same number, side and cog, and checks that a slack cable puts the pulley outboard and a tight one inboard on every cog a limit screw does not hold."
+      "response": "Fixed. Checked in the lab on cog 6 (the 17). With the cable 1.5 mm tight, the label, the readout and the rows all say 2.10 mm inboard of the 17, and the verdict says the chain sits on the 19. With it 1 mm slack they say 1.40 mm outboard of the 17; 2 mm slack, 2.80 mm outboard (the chain is on the 15); 3 mm slack, 4.20 mm outboard; 3 mm tight, 4.20 mm inboard. Each figure is the cable error times 1.4, and each verdict's cog matches the nearest cog line (14.50 mm is nearer the 15 at 14.96; 22.90 mm is nearer the 19 at 22.44). At the limits (cog 1 slack, cog 11 tight) no arrow is drawn, and the rows name the H or the L screw."
     },
     {
       "where": "lab and step 7 (figure: off-line arrow label)",
@@ -181,7 +181,7 @@
       "finding": "The arrow runs from the pulley's plane toward the cog's line, so for a slack cable it points inboard. The label sits at its head and says 'outboard'. At a glance, an arrow with a word at its tip reads as 'this way, this far', so the picture says 'outboard' while pointing inboard. A tight cable shows the mirror image ('inboard' at the head of an outboard arrow). The legend explains it, but the figure should read without the legend. Put the number at the tick (the pulley's end) as '1.40 mm outboard of its cog'. Or make the label say what the arrow shows ('to the cog: 1.40 mm inboard'), which is also the way the barrel adjuster has to move the pulley.",
       "resolved": false,
       "fixed": true,
-      "response": "Fixed: the label now sits at the pulley's end of the arrow and says where the pulley is ('pulley 1.40 mm outboard of the 17'); the arrow runs from the pulley back to the 17's line. The legend says the same: the arrow runs from the pulley back to the line of the cog it should be on, with where the pulley sits written at the pulley's end. The test checks the words are at the pulley's end and the head at the cog's line."
+      "response": "Fixed. The label now sits at the pulley's end and reads as the pulley's position ('pulley 1.40 mm outboard of the 17'), and the arrow runs from the pulley back to the 17's line. Slack and tight point opposite ways, which is right. The details legend says the same. Step 7 shows the same mark at a readable size, with the pulley lit."
     }
   ]
 }
