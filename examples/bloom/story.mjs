@@ -4,14 +4,15 @@
 // Every number is written from the model; each cause-and-effect sentence in CLAIMS appears on the page
 // word for word, with a test against the model.
 
-import { MODELS, BASE, OPS, M as BITS, bestK, bitsPerItem, expectedFill, fpFromFill, fpRate, fpRateExact, setBits, test, workingFor } from "./model.mjs";
+import { MODELS, BASE, M as BITS, bestK, bestKTrue, bitsPerItem, expectedFill, fpFromFill, fpRate, fpRateClassic, fpRateTrue, setBits, test, workingFor } from "./model.mjs";
 
 // Steps: step 0 is the concept (no tab); each later step is one operation. `shot` names what the camera
 // centres on (lit); `subject` every part the heading names, which must stay in frame. Names: "card" (the
 // word and its hash arrows), "hashed" (the bits this word's hashes pick), "bitN" (one bit).
-// Step 3 has no shot: with six hash functions owl's bits reach across the whole array, and once three
-// words are in, the whole filter is the thing to look at.
-const TABS = ["Add cat", "Add fox", "Add owl", "Ask fox", "Ask elk", "Ask jay", "Delete cat", "Ask again"];
+// Step 3 has no shot: with six hash functions its word's bits reach across the whole array, and once
+// three words are in, the whole filter is the thing to look at. The tabs name each step's lesson, not its
+// word: every What if variant tells the same story with words its own hashes make each case happen for.
+const TABS = ["Add", "Shared bit", "Add again", "Maybe", "Definitely not", "False positive", "Delete", "False negative"];
 const shot = (k) => (k === 3 ? { subject: ["card"] } : { shot: ["card", "hashed"], subject: ["card", "hashed"] });
 export const STEPS = [{ tab: null, focus: null }, ...TABS.map((tab, i) => ({ tab, focus: null, ...shot(i + 1) }))];
 /** The step that asks the prediction, about the next one: the false positive. */
@@ -76,21 +77,23 @@ function caption(Mo, prev, s, e) {
   }
   if (e.answer === "maybe") {
     if (e.member) return `Asking for ${e.word}: ${work}. ${bits.length > 1 ? `All ${bits.length} of its bits are` : "Its bit is"} 1, so the filter answers maybe in the set. ${cap(e.word)} was added, so here the maybe is right.`;
-    const from = [...new Set(bits.flatMap((b) => setters(STEPS_, e.index, b)))].sort((a, b) => OPS.findIndex((o) => o.word === a) - OPS.findIndex((o) => o.word === b));
-    const on = setBits(prev.bits), n = prev.members.length, m = prev.m;
-    const avg = m * expectedFill(m, k, n);
-    const vsAverage = on > avg ? " This run set more bits than average." : on < avg ? " This run set fewer bits than average." : "";
+    const from = [...new Set(bits.flatMap((b) => setters(STEPS_, e.index, b)))].sort((a, b) => Mo.ops.findIndex((o) => o.word === a) - Mo.ops.findIndex((o) => o.word === b));
+    const on = setBits(prev.bits), n = prev.members.length, m = prev.m, best = bestKTrue(m, n);
+    const classic = k === 1
+      ? `Bloom's classic estimate, (1 − (1 − 1/m)^(kn))^k, is exact for one hash function`
+      : `Bloom's classic estimate, (1 − (1 − 1/m)^(kn))^k = ${pct(fpRateClassic(m, k, n))}, treats the ${k} bits as independent and runs a little low at this size`;
     return `Asking for ${e.word}: ${work}. ${cap(e.word)} was never added, but ${list(from)} set ${bits.length > 1 ? "all of its bits" : "its bit"}, so the filter answers maybe: a false positive. ` +
-      `With ${on} of ${m} bits set, a word that was never added passes with chance about (${on}/${m})^${k} = ${pct(fpFromFill(on / m, k))}. ` +
-      `On average ${n} words set about ${avg.toFixed(1)} of ${m} bits, for an expected rate of (1 − (1 − 1/m)^(kn))^k = ${pct(fpRateExact(m, k, n))}; the textbook formula (1 − e^(−kn/m))^k, an approximation for large m, gives ${pct(fpRate(m, k, n))}.${vsAverage} ` +
-      `The best number of hash functions here is (m/n) ln 2 ≈ ${bestK(m, n).toFixed(1)}: each extra hash checks one more bit, which helps, but also sets more bits, which hurts. ` +
-      `Real filters are sized from the target: about ${bitsPerItem(0.01).toFixed(1)} bits per item give a 1% rate, with ${Math.round(bestK(bitsPerItem(0.01), 1))} hash functions.`;
+      `With ${on} of ${m} bits set, a word that was never added passes with chance (${on}/${m})^${k} = ${pct(fpFromFill(on / m, k))}: that is this run's chance, and it depends on where these ${n} words happened to land. ` +
+      `Averaged over every way ${n} words can land, the expected rate with ${hashes(k).toLowerCase()} is ${pct(fpRateTrue(m, k, n))}. ${classic}; the textbook formula (1 − e^(−kn/m))^k, for large m, gives ${pct(fpRate(m, k, n))}. ` +
+      `Expected rates for ${n} words in ${m} bits, by number of hash functions: ${[1, 2, 3, 4, 5, 6].map((j) => `${j}: ${pct(fpRateTrue(m, j, n))}`).join(", ")}. ` +
+      `Each extra hash checks one more bit, which helps, but also sets more bits, which hurts, so the expected rate falls and then rises again, lowest here at ${best}; the rule for large filters, (m/n) ln 2, gives ${bestK(m, n).toFixed(1)}. ` +
+      `Real filters are sized from the target rate p: m/n = −ln p / (ln 2)² ≈ 1.44 log₂(1/p) bits per item, with k = log₂(1/p) hash functions. For p = 1% that is about ${bitsPerItem(0.01).toFixed(1)} bits per item and ${Math.round(bestK(bitsPerItem(0.01), 1))} hash functions (log₂ 100 ≈ ${Math.log2(100).toFixed(1)}), and each tenfold cut in p costs about ${(bitsPerItem(0.001) - bitsPerItem(0.01)).toFixed(1)} more bits per item.`;
   }
   const zero = e.zeros[0];
   if (e.member)
     return `Asking for ${e.word} again: ${work}. Bit ${zero} is 0, so the filter answers definitely not, yet ${e.word} was added: a false negative, which a Bloom filter must never give. ` +
       `A counting Bloom filter fixes this by keeping a small counter in each position instead of a bit: adding increments the counters and deleting decrements them, so a shared position stays above 0 until every word that set it is gone. ` +
-      `It is safe only for deleting words that were really added: deleting a false positive would decrement other words' counters and could cause false negatives too. The counters, often 4 bits each, can also overflow, and they cost about four times the space of plain bits.`;
+      `It is safe only for deleting words that were really added: deleting a false positive would decrement other words' counters and could cause false negatives too. The counters, often 4 bits each, cost about four times the space of plain bits; with 4 bits an overflow is astronomically rare, and a counter that does fill up is left stuck at its maximum.`;
   return `Asking for ${e.word}: ${work}. Bit ${zero} is 0, and adding ${e.word} would have set it, so ${e.word} was never added: the answer is definitely not. One 0 is enough, and while no bit is ever cleared, this answer is always right. ` +
     `It is the answer that saves work: a database that keeps a Bloom filter in memory skips a disk read whenever the filter says definitely not.`;
 }
@@ -124,7 +127,23 @@ function voice(Mo, s, e, index) {
   }
   const zero = named(e.zeros[0]);
   if (e.member) return `Now ask for ${word} again. ${zero} is zero, so the filter says definitely not, and that's wrong. A Bloom filter must never say no to something it holds. That's why it has no delete. A counting Bloom filter keeps a small counter instead of each bit, so deleting takes away only its own share, as long as you only delete what you really added.`;
-  return `Is ${word} in the set? ${zero} is zero. If ${e.word} had been added, that bit would be one. So the answer is definitely not. As long as no bit is ever cleared, that answer is always right.`;
+  return `Is ${e.word} in the set? ${zero} is zero. If ${e.word} had been added, that bit would be one. So the answer is definitely not. As long as no bit is ever cleared, that answer is always right.`;
+}
+
+/**
+ * The prediction, asked on PRED_STEP about the operation the next step shows, for one variant: its word,
+ * its bits and its answer all come from that variant's model.
+ */
+export function prediction(Mo) {
+  const e = Mo.steps[PRED_STEP].event, b = e.picked;
+  return {
+    question: `${cap(e.word)} was never added. ${b.length === 1 ? `Its bit: ${b[0]}` : `Its bits: ${list(b)}`}. The answer?`,
+    choices: ["Definitely not", "Maybe in the set"],
+    answer: e.answer === "maybe" ? 1 : 0,
+    explanation: e.answer === "maybe"
+      ? `Maybe in the set: ${b.length === 1 ? `bit ${b[0]} is 1, set by another word` : `bits ${list(b)} are all 1, set by other words`}.`
+      : `Definitely not: bit ${e.zeros[0]} is 0.`,
+  };
 }
 
 // ---------------------------------------------------------------- the claims, against the story's filter
@@ -155,8 +174,8 @@ export const CLAIMS = [
   {
     text: "each extra hash checks one more bit, which helps, but also sets more bits, which hurts",
     test: () => {
-      // over k = 1…6 for these sizes the rate falls and then rises again, lowest next to (m/n) ln 2
-      const r = [1, 2, 3, 4, 5, 6].map((k) => fpRateExact(BITS, k, 3));
+      // over k = 1…6 for these sizes the true expected rate falls and then rises again, lowest next to (m/n) ln 2
+      const r = [1, 2, 3, 4, 5, 6].map((k) => fpRateTrue(BITS, k, 3));
       const best = r.indexOf(Math.min(...r)) + 1;
       return r[0] > r[best - 1] && r[5] > r[best - 1] && Math.abs(best - bestK(BITS, 3)) < 1 && expectedFill(BITS, 6, 3) > expectedFill(BITS, 3, 3);
     },
@@ -214,6 +233,7 @@ export function practice(seed, rand, k = K) {
     const its = [...new Set(workingFor(bits, k, ask).map((w) => w.bit))].sort((a, b) => a - b);
     const zero = its.find((b) => bits[b] === 0);
     return {
+      bits, ask, its, working: workingFor(bits, k, ask),
       q: `A ${BITS}-bit filter with ${k} hash function${k > 1 ? "s" : ""} holds ${list(words)}. Bits set: ${list(on)}. Asking for "${ask}" checks ${bitN(its.length)} ${list(its)}. What does it answer?`,
       answer: answer === "maybe" ? "Maybe in the set" : "Definitely not",
       explain: answer === "maybe" ? `Maybe in the set: ${bitN(its.length)} ${list(its)} ${its.length === 1 ? "is" : "are all"} 1${words.includes(ask) ? `, because ${ask} was added` : `, though ${ask} was never added: a false positive`}.` : `Definitely not: bit ${zero} is 0, and adding "${ask}" would have set it.`,

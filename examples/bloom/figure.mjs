@@ -114,17 +114,18 @@ export function figure(M, cam) {
       const a = arrow(cam, from, to, { lift: back ? 14 : 5 + lane * 6, head: 4.6, via });
       items.push({ id: `arrow${j}`, key: 30 + j, part: "arrows", transform: null, svg: a.svg });
     }
-    // the working, beside the card where the reader is looking: one row a hash function, added as its
-    // arrow lands (h1  2,668,802,083 mod 16 = 3), upright so the long numbers read
-    const rows = st.word ? (st.shown ?? []).map((w) => `h${w.fn}  ${w.hash.toLocaleString("en-US")} mod ${M.m} = ${w.bit}`) : [];
+    // the working, beside the card where the reader is looking: one row a hash function, all of them from
+    // the step's start (h1  2,668,802,083 mod 16 = 3), upright so the long numbers read; the arrows land one by one
+    const rows = st.word ? (st.working ?? st.shown ?? []).map((w) => `h${w.fn}  ${w.hash.toLocaleString("en-US")} mod ${M.m} = ${w.bit}`) : [];
     if (rows.length) {
       // Clear of every cell: below the card and reaching left, low enough to pass under the front row,
       // which falls away to the left; centred under the card when it is at the left end, so the frame
       // stays on the board
-      const size = workingStrip(rows, [0, 0], WORKING), end = card[0] < L.width * 0.15;
+      const fs = st.lab || st.practice ? WORKING * 1.35 : WORKING; // the camera shows the whole filter smaller there
+      const size = workingStrip(rows, [0, 0], fs), end = card[0] < L.width * 0.15;
       const c = screenOf(cam, [card[0] + (end ? 0 : CARD.w / 4), card[1] - CARD.d / 2, 0]);
       const corner = end ? [c[0] - size.w / 2, c[1] + 110] : [c[0] - size.w, c[1] + 110];
-      items.push({ id: "working", key: 22, part: "card", transform: null, svg: workingStrip(rows, corner, WORKING).svg });
+      items.push({ id: "working", key: 22, part: "card", transform: null, svg: workingStrip(rows, corner, fs).svg });
     } else items.push({ id: "working", key: 22, hidden: true });
     at.card = screenOf(cam, [card[0] - CARD.w / 2, card[1], CARD.h]);
     at.rail = screenOf(cam, [L.bits[0][0] - CELL.w / 2, L.bits[0][1], CELL.h / 2]);
