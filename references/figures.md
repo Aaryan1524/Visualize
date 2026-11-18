@@ -67,7 +67,9 @@ A whole-machine figure at every step leaves the reader hunting for a 4 mm screw 
 When the main view truly cannot show something, such as an alignment, show it there first:
 - a readout from the model;
 - the lab's rows;
-- a tint on the part that is out of line, and a mark that shows which way and how far. When the derailleur's guide pulley is off line, its teeth turn red, and an arrow under it points to its cog's line, labelled with the model's offset.
+- a tint on the part that is out of line, and a mark that shows which way and how far. When the derailleur's guide pulley is off line, its teeth turn red, and an arrow under it runs from the pulley back to the line of the cog it should be on. Where the pulley sits ("pulley 1.40 mm outboard of the 17") is written at the pulley's end.
+  - Measure from the part the reader asked about, not the nearest one. Past half a cog off, the nearest cog is the wrong one and the side flips. One function says it for the arrow, the readout and the lab's rows.
+  - Word the label as the position of the thing at its end. A word at an arrow's head reads as "this way".
   - A 1–4 mm offset is a pixel or two in the figure, so the arrow is drawn a fixed 30 mm long.
   - The legend says the arrow is drawn longer than the offset, and the label's number is exact.
   - A test checks the label and the direction across the lab's whole range.

@@ -55,6 +55,11 @@ What a machine needs. The escalator built in Clay came out as about forty identi
     - the camera to 180° and 0;
     - each cog's bar to the model's lateral position, within a pixel;
     - the drawn offset to the model's, across the lab's whole range.
+- **Round 5: the off-line label tells one story.**
+  - Past half a cog off, the arrow and the readout measured from the nearest cog. Cog 6 with the cable 1.5 mm tight said "1.64 mm outboard" (of the 19), while the lab's rows said 2.10 mm inboard of the 17.
+  - The arrow, the readout and the rows now all measure from the cog asked for and name it: "2.10 mm inboard of the 17".
+  - The words sit at the pulley's end, as the pulley's position ("pulley 1.40 mm outboard of the 17"), and the arrow runs back to that cog's line.
+  - A test across the lab holds all three to the same number, side and cog, and holds the rule that a slack cable puts the pulley outboard and a tight one inboard on every cog no limit screw holds.
 - **Round 4 of the review: the picture shows the cause again.**
   - Step 4's heading, "The pulley moves at once; the chain waits for a ramp to come round", now has all three in frame through the step: the shift gate, the run of chain at an angle, and the guide pulley under the next cog. Its first framing after View A's removal showed only the cassette.
   - The "Ramp and pin" callout moved off the chain's upper run, so it names the gate on the cog.
