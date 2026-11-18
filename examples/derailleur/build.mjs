@@ -15,7 +15,6 @@ import { fileURLToPath } from "node:url";
 import { buildSync } from "esbuild";
 import { MODELS, VARIANTS, DR, makeModel, clickPull, indexing, BANDS, shares } from "./model.mjs";
 import { cameraFor, figure, XCUT } from "./figure.mjs";
-import { VIEW_A } from "./rear.mjs";
 import { screenOf } from "../../src/rig/index.ts";
 import { drawingPage, esc } from "../../src/drawing/page.mjs";
 
@@ -27,11 +26,9 @@ const ROOT = join(HERE, "../..");
 // offsets and type sizes carry over: about 10 units to a screen pixel at 1440 x 900.
 const VBW = 14200, VBH = 6550, FS = 150, UNIT = 10;
 const f1 = (v) => (Math.round(v * 10) / 10).toString();
-// The main view: each cassette's camera is fitted to its own gears, so the figure fills the stage.
-const BOX = { x: 4300, y: 260, w: 5100, h: 6080 };
-// The inset: View A, a true rear elevation (straight from behind), following the guide pulley.
-const INSET = { c: [12180, 2260], r: 2000, azimuth: VIEW_A.azimuth, elevation: VIEW_A.elevation };
-INSET.scale = INSET.r / 50; // 50 mm either side of its centre: the whole cassette's width and the guide pulley
+// The main view: each cassette's camera is fitted to its own gears, so the figure fills the stage
+// between the two columns of callouts (LX, RX below).
+const BOX = { x: 4500, y: 230, w: 5900, h: 6120 };
 
 // ---------------------------------------------------------------- the story
 const PRED_STEP = 4;
@@ -44,7 +41,7 @@ const STEPS = [
   { tab: "Pedal to shift", heading: "The pulley moves at once; the chain waits for a ramp to come round.", shot: ["ramp"], focus: ["guide", "tension", "cage", "pknuckle", "chain", "cassette"] },
   { tab: "Slack", heading: null, shot: ["cage", "guide", "tension", "forces"], focus: ["cage", "guide", "tension", "chain", "cassette", "forces", "pknuckle"] },
   { tab: "Limit screws", heading: "Two screws stop the swing at the end cogs; a third sets the gap.", shot: ["hscrew", "lscrew", "bscrew"], focus: ["bknuckle", "links", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "hanger"] },
-  { tab: "Barrel adjuster", heading: "A slack cable puts every cog but the smallest off line; the barrel adjuster takes it up.", shot: ["barrel"], around: ["links"], focus: ["cable", "barrel", "bknuckle", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "links"] },
+  { tab: "Barrel adjuster", heading: "A slack cable puts every cog but the smallest off line; the barrel adjuster takes it up.", shot: ["barrel", "wire"], around: ["links"], focus: ["cable", "barrel", "bknuckle", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "links"] },
 ];
 const STRETCH = -1.0; // mm of cable slack in the barrel adjuster step
 const OVER = 2.0; // mm of extra cable pull against the L screw in the limit screw step
@@ -107,8 +104,7 @@ function skeleton(M, name) {
   // the housing and the chain fade out toward the cut; the frame's stays fade away from the dropout
   const xa = screenOf(cam, [XCUT - 60, -20, 0])[0], xb = screenOf(cam, [XCUT - 4, -20, 0])[0];
   const dz = screenOf(cam, [4, -12, 0]);
-  const defs = `<defs><linearGradient id="fadeXg" gradientUnits="userSpaceOnUse" x1="${f1(xa)}" x2="${f1(xb)}" y1="0" y2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><mask id="fadeX" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeXg)"/></mask><radialGradient id="fadeStaysG" gradientUnits="userSpaceOnUse" cx="${f1(dz[0])}" cy="${f1(dz[1])}" r="${f1(cam.scale * 95)}"><stop offset=".45" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient><mask id="fadeStays" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeStaysG)"/></mask><clipPath id="insetClip"><circle cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/></clipPath></defs>`;
-  const inset = `<g id="insetG" class="inset"><circle class="inset-bg" cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/><g clip-path="url(#insetClip)"><defs id="rigDefsA"></defs><g id="insetScene"></g></g><circle class="inset-ring" data-camera-avoid="" cx="${INSET.c[0]}" cy="${INSET.c[1]}" r="${INSET.r}"/><text class="inset-title" data-camera-avoid="" x="${INSET.c[0]}" y="${INSET.c[1] - INSET.r - 110}" text-anchor="middle">VIEW A · FROM BEHIND · FOLLOWS THE GUIDE PULLEY</text></g>`;
+  const defs = `<defs><linearGradient id="fadeXg" gradientUnits="userSpaceOnUse" x1="${f1(xa)}" x2="${f1(xb)}" y1="0" y2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><mask id="fadeX" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeXg)"/></mask><radialGradient id="fadeStaysG" gradientUnits="userSpaceOnUse" cx="${f1(dz[0])}" cy="${f1(dz[1])}" r="${f1(cam.scale * 95)}"><stop offset=".45" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient><mask id="fadeStays" maskUnits="userSpaceOnUse" x="0" y="0" width="${VBW}" height="${VBH}"><rect width="${VBW}" height="${VBH}" fill="url(#fadeStaysG)"/></mask></defs>`;
   // the title block
   const x0 = 10200, x1 = VBW - 80, y0 = 4950, y1 = VBH - 80;
   let tb = `<g class="tblock" data-camera-avoid=""><path class="tb-frame" d="M${x0},${y0}H${x1}V${y1}H${x0}Z"/><path class="tb-rule" d="M${x0},${y0 + 360}H${x1}M${x0},${y1 - 300}H${x1}"/>`;
@@ -122,13 +118,13 @@ function skeleton(M, name) {
   tb += `<g id="tbkey" data-x0="${x0 + 110}">`;
   for (const [cls, t] of [["k-blue", "Cable"], ["k-green", "Springs"], ["k-orange", "Followed part"], ["k-red", "Off line"]]) tb += `<g class="tbk"><path class="${cls}" d="M0,${y1 - 140}h240"/><text class="tb-text tb-key" x="0" y="${y1 - 100}">${t}</text></g>`;
   tb += "</g></g>";
-  return `${defs}<defs id="rigDefs"></defs><g id="scene" data-camera=""></g>${inset}<g id="labels">${LABELS.map(labelSvg).join("")}</g>${tb}`;
+  return `${defs}<defs id="rigDefs"></defs><g id="scene" data-camera=""></g><g id="labels">${LABELS.map(labelSvg).join("")}</g>${tb}`;
 }
 
-// Where the camera centres a shot: between the two columns of callouts, clear of the heading, View A,
-// the title block and the cards. Zoomed in, the figure runs on to the stage's edge, under the callouts
-// (their text has a halo), the heading (a soft wash of the stage behind it) and View A (an opaque disc).
-const LX = 3900, RX = 9420;
+// Where the camera centres a shot: between the two columns of callouts, clear of the heading, the
+// title block and the cards. Zoomed in, the figure runs on to the stage's edge, under the callouts
+// (their text has a halo) and the heading (a soft wash of the stage behind it).
+const LX = 3900, RX = 10560;
 const CLEAR = { x0: LX + 150, y0: 150, x1: RX - 150, y1: VBH - 150 };
 
 // Callouts: text placed in units; the leader is drawn live to the part's projected point (`to`,
@@ -186,7 +182,7 @@ function machine(DATA) {
   const STEPS = DATA.steps;
   const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
   const clamp = (u) => Math.max(0, Math.min(1, u));
-  const IN = DATA.inset, G3 = DATA.g3;
+  const G3 = DATA.g3;
   let V = null, model = null, cur = null;
   const SPEED = 60; // mm of chain a second while pedalling, about 70 rpm on the 50 ring at this cog
 
@@ -307,30 +303,23 @@ function machine(DATA) {
     model = m;
     turns = new Map();
     phases = new Map();
-    // Every part drawn once for this variant, in the main camera and in View A's; the stages then
-    // only place them each frame.
+    // Every part drawn once for this variant; the stage then only places them each frame.
     const cam = FIG.cameraFor(model, DATA.box);
     figM = FIG.figure(model, cam, { prefix: "m" });
-    figA = FIG.rearView(model, { scale: IN.scale, prefix: "a" });
     defsM = $("rigDefs");
-    defsA = $("rigDefsA");
     defsM.replaceChildren();
-    defsA.replaceChildren();
     $("scene").replaceChildren();
-    $("insetScene").replaceChildren();
     stageM = new FIG.RigStage($("scene"));
-    stageA = new FIG.RigStage($("insetScene"));
     for (const pt of figM.parts) stageM.add(pt.id, pt.part, pt.svg);
-    for (const pt of figA.parts) stageA.add(pt.id, pt.part, pt.svg);
   }
 
   // ------------------------------------------------ drawing one moment
-  let figM = null, figA = null, stageM = null, stageA = null, defsM = null, defsA = null;
+  let figM = null, stageM = null, defsM = null;
   const addDefs = (host, list) => list.length && host.insertAdjacentHTML("beforeend", list.join(""));
   function poseOf(s) {
     return model.pose(s.pull, s.chainK, s.lOut ?? 0);
   }
-  let lastAt = null, lastA = null, lastFocus = { focus: null, lit: [] };
+  let lastAt = null, lastFocus = { focus: null, lit: [] };
   function render(state, S) {
     cur = state;
     const pose = poseOf(state);
@@ -340,11 +329,6 @@ function machine(DATA) {
     addDefs(defsM, out.defs);
     stageM.apply(out.items);
     lastAt = out.at;
-    // View A, straight from behind: drawn once, slid to follow the guide pulley
-    const ina = figA.pose(st);
-    $("insetScene").setAttribute("transform", `translate(${(IN.c[0] - ina.focus[0]).toFixed(1)} ${(IN.c[1] - ina.focus[1]).toFixed(1)})`);
-    stageA.apply(ina.items);
-    lastA = ina.at;
     focusParts();
     readouts(state, pose);
   }
@@ -352,9 +336,8 @@ function machine(DATA) {
   function focusParts() {
     const { focus, lit } = lastFocus;
     const lab = root.hasAttribute("data-lab");
-    const test = (part) => (part === "overlay" ? { recede: false, named: false } : { recede: lit.length ? !lit.includes(part) : !lab && focus ? !focus.includes(part) : false, named: lit.includes(part) });
+    const test = (part) => ({ recede: lit.length ? !lit.includes(part) : !lab && focus ? !focus.includes(part) : false, named: lit.includes(part) });
     stageM?.focus(test);
-    stageA?.focus(test);
   }
   const focus = (f) => {
     lastFocus = f;
@@ -503,11 +486,11 @@ function cameraNames() {
 cameraNames();
 
 const DATA = {
-  box: BOX, inset: INSET, g3: G3, plain: 8, stretch: STRETCH, over: OVER, bands: BANDS,
+  box: BOX, g3: G3, plain: 8, stretch: STRETCH, over: OVER, bands: BANDS,
   base: "road",
   steps: STEPS.map(({ heading, focus, shot }) => ({ heading, focus, ...(shot ? { shot } : {}) })),
   // the camera: where framed parts may go (between the two columns of callouts, clear of the heading,
-  // View A, the title block and the cards), the drawn items a camera name can mean, the names only it
+  // the title block and the cards), the drawn items a camera name can mean, the names only it
   // lights, and the parts each step keeps in view around its subject
   camera: { clear: PLANT_CLEAR ?? CLEAR, items: CAM_ITEMS, alias: CAM_LIGHT, around: Object.fromEntries(STEPS.flatMap((s, k) => (s.around ? [[k, s.around]] : []))) },
   alias: CAM_ALIAS,
@@ -543,6 +526,7 @@ ${readFileSync(join(ROOT, "src/rig/rig.css"), "utf8")}
 path,circle{vector-effect:non-scaling-stroke}
 text{font-family:var(--sans);fill:var(--ink)}
 /* the cog the chain is on takes the followed part's colour, faintly */
+.rig-part[data-off]{--rig-subject-lit:color-mix(in oklab,var(--t-bad) 80%,#ffffff);--rig-subject-dark:color-mix(in oklab,var(--t-bad) 70%,#000000)}
 .rig-part[data-on]{--rig-steel-lit:color-mix(in oklab,var(--rig-subject-lit) 45%,#ffffff);--rig-steel-dark:color-mix(in oklab,var(--rig-subject-dark) 55%,#3a3631)}
 .rig-part[data-touch]{--rig-alloy-lit:color-mix(in oklab,var(--orange) 35%,#fff);--rig-ink:var(--orange)}
 .spoke{fill:none;stroke:color-mix(in oklab,var(--ink-2) calc(55% - var(--recede) * .4),var(--stage));stroke-width:.9px}
@@ -561,26 +545,7 @@ text{font-family:var(--sans);fill:var(--ink)}
 .spring.back{stroke-width:1.1px;stroke-opacity:.55}
 .offline-end{fill:var(--t-bad)}
 .engrave{font:600 64px var(--mono);fill:var(--ink-2)}
-.inset-bg{fill:color-mix(in oklab,var(--stage) 94%,var(--ink))}
-.inset-ring{fill:none;stroke:var(--ink);stroke-width:1.2}
-.rv-frame{fill:color-mix(in oklab,var(--rig-frame-lit) calc(100% - var(--recede)),var(--stage));stroke:color-mix(in oklab,var(--rig-frame-dark) calc(100% - var(--recede)),var(--stage));stroke-width:1px;vector-effect:non-scaling-stroke}
-.rv-spokes path{fill:none;stroke:var(--rig-frame-dark);stroke-width:1.2px;stroke-dasharray:6 5;vector-effect:non-scaling-stroke}
-.rv-note{font-size:${FS * 0.8}px;fill:var(--ink-2);paint-order:stroke;stroke:var(--stage);stroke-width:40px}
-.rv-freehub{fill:color-mix(in oklab,var(--rig-steel-dark) calc(70% - var(--recede) * .5),var(--stage));stroke:var(--rig-ink);stroke-width:.8px;vector-effect:non-scaling-stroke}
-.rv-hanger{fill:color-mix(in oklab,var(--rig-slate-dark) calc(100% - var(--recede)),var(--stage));stroke:var(--rig-ink);stroke-width:1.2px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.rv-arm{fill:color-mix(in oklab,var(--rig-slate-lit) calc(100% - var(--recede)),var(--stage));stroke:var(--rig-ink);stroke-width:1.1px;vector-effect:non-scaling-stroke}
-.rv-link path{fill:none;stroke-linecap:round;vector-effect:non-scaling-stroke}
-.rv-link-edge{stroke:color-mix(in oklab,var(--rig-ink) calc(100% - var(--recede)),var(--stage));stroke-width:13px}
-.rv-link-face{stroke:color-mix(in oklab,var(--rig-slate-lit) calc(100% - var(--recede)),var(--stage));stroke-width:10px}
-.rv-chain .rv-roller{fill:var(--rig-lit);stroke:var(--rig-line);stroke-width:.8px;vector-effect:non-scaling-stroke}
-.rv-chain .rv-plate{fill:var(--rig-dark);stroke:var(--rig-line);stroke-width:.6px;vector-effect:non-scaling-stroke}
-.rv-line{fill:none;stroke-width:1.4px;stroke-dasharray:10 7;vector-effect:non-scaling-stroke}
-.rv-line-cog{stroke:var(--ink)}
-.rv-line-pulley{stroke:var(--orange)}
-.rv-gap{fill:none;stroke:var(--t-bad);stroke-width:2px;vector-effect:non-scaling-stroke}
-.rv-gap-text{font-size:${FS * 0.86}px;font-weight:600;fill:var(--t-bad);paint-order:stroke;stroke:var(--stage);stroke-width:44px;stroke-linejoin:round}
-.inset-title{font-size:${FS * 0.82}px;letter-spacing:.08em;font-weight:600;paint-order:stroke;stroke:var(--stage);stroke-width:48px;stroke-linejoin:round}
-.vz[data-practice] #fig .inset,.vz[data-practice] #fig .label{visibility:hidden}
+.vz[data-practice] #fig .label{visibility:hidden}
 .leader{fill:none;stroke:var(--ink);stroke-width:.5}
 .ldot{fill:var(--ink)}
 .label text{font-size:${FS}px;font-weight:500}
@@ -680,7 +645,7 @@ const HTML = drawingPage({
   steps: STEPS,
   stageLabel: "Rear derailleur, drawn in isometric. Left and right arrows step through the explanation; space plays and pauses.",
   viewBox: `0 0 ${VBW} ${VBH}`,
-  figLabel: "Isometric drawing of a bicycle rear derailleur under an eleven-cog cassette, with the chain, the parallelogram, the cage and its two pulleys, the cable and the adjusting screws, and a magnified view from behind",
+  figLabel: "Isometric drawing of a bicycle rear derailleur under an eleven-cog cassette, with the chain, the parallelogram, the cage and its two pulleys, the cable and the adjusting screws",
   concept: std.voice ? std.voice[0].text : std.captions[0],
   setup: std.captions[0],
   whatIf: { label: "Cassette", variants: Object.entries(VARIANTS).map(([k, v]) => [k, v.label]) },

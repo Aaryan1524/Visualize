@@ -97,8 +97,7 @@ for (const [name, M] of Object.entries(MODELS)) {
 
 // The chain drives every wheel it touches: where it meets a cog or a pulley, the tooth there must move
 // on screen with the chain, the same way and at the same speed (src/rig/contacts.ts). A sign slip
-// anywhere (a pulley turned the wrong way, a cassette angle that runs backward) shows up here. View A
-// is a rear elevation, where nothing turns, so only the main view has contacts to check.
+// anywhere (a pulley turned the wrong way, a cassette angle that runs backward) shows up here.
 function contactsOf(M, cam, { reverse = null } = {}) {
   const F = figure(M, cam, { prefix: "v" });
   const dr = 0.4; // mm of chain between the two frames

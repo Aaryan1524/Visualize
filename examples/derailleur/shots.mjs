@@ -49,7 +49,6 @@ const MOMENTS = [
   // 4x close-ups of the figure
   { name: "close-parts", step: 1, clip: [430, 180, 420, 560], scale: 4 },
   { name: "close-slack", step: 5, clip: [430, 180, 420, 560], scale: 4, answer: 0 },
-  { name: "close-viewA", step: 7, clip: [1010, 160, 330, 340], scale: 4 },
 ];
 
 let list = MOMENTS;
