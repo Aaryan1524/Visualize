@@ -15,6 +15,7 @@
 const NUM = String.raw`\d+(?:\.\d+)?`;
 const UNIT = String.raw`(?:\s?(?:mm|cm|m|km|g|kg|N|N·mm|s|ms|°|%|teeth|links|bits|bytes|ms|V|A|W))?`;
 const OP = "[+−×÷]|-(?=\\s)"; // a hyphen counts as minus only with a space after it ("29 - 5"), not in "11-speed"
+const MOD = /(?<![\d,.])(\d{1,3}(?:,\d{3})+|\d+) mod (\d+) = (\d+)\b/g;
 const EQ = new RegExp(`(${NUM}${UNIT}(?:\\s*(?:${OP})\\s*${NUM}${UNIT})+)\\s*=\\s*(${NUM})${UNIT}`, "g");
 
 const decimals = (s) => (s.split(".")[1] ?? "").length;
@@ -75,6 +76,12 @@ export function checkArithmetic(texts) {
         const mid = (lo + hi) / 2;
         problems.push(`${where}: "${m[0]}" — the left side comes to ${+mid.toFixed(Math.max(decimals(m[2]), 2))} (${+lo.toFixed(4)} to ${+hi.toFixed(4)} from the printed digits), not ${m[2]}`);
       }
+    }
+    // a remainder, as concept pages print it ("29 mod 8 = 5"): whole numbers, exact
+    for (const m of t.matchAll(MOD)) {
+      checked++;
+      const [a, b, r] = [Number(m[1].replace(/,/g, "")), Number(m[2]), Number(m[3])];
+      if (b === 0 || a % b !== r) problems.push(`${where}: "${m[0]}" — ${a} mod ${b} is ${b === 0 ? "undefined" : a % b}, not ${r}`);
     }
   }
   return { checked, problems };

@@ -35,3 +35,12 @@ test("arithmetic: a hyphen inside a word is not a minus, and an en dash range is
   assert.equal(one("an 11-speed cassette, 11–28").checked, 0);
   assert.equal(one("29 - 5 = 24").checked, 1);
 });
+
+test("arithmetic: a remainder a concept page prints is checked exactly", () => {
+  assert.deepEqual(one("27 mod 8 = 3: slots 3, 4 and 5 are taken.").problems, []);
+  assert.equal(one("27 mod 8 = 3").checked, 1);
+  assert.match(one("29 mod 8 = 6").problems[0], /29 mod 8 is 5, not 6/);
+  // a hash written with thousands separators is read whole, not from its last group
+  assert.deepEqual(one("h1(cat) = 2,915,253,606, and 2,915,253,606 mod 16 = 6").problems, []);
+  assert.equal(one("2,915,253,606 mod 16 = 14").problems.length, 1);
+});
