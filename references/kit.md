@@ -1,5 +1,7 @@
 # Kit reference
 
+> **Legacy.** This page describes the scene.ts route (the Unfold stage, `verify.mjs`), kept so `examples/lru/`, `retries/`, `attention/` and `lru-3d/` still build. **Do not use it for a new page:** every new page, machine or concept, is a Drawing page on the rig (`references/figures.md`). Where this page and `figures.md` disagree (the camera, the checks, the parts), `figures.md` is right.
+
 The world: x and y on the floor, z up, in units of about one screen pixel at 1×. The camera is a fixed 30° isometric view from the (+x, +y, +z) side. On screen, +x runs down-right and +y down-left; the faces you see are the top, the +y face ("left") and the +x face ("right"). Everything here is in `src/`.
 
 ## Marks (`src/core/types.ts`)

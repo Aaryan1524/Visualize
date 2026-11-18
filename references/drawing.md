@@ -12,7 +12,7 @@ Build both (`node examples/escalator/build.mjs`, `node examples/lock/build.mjs`)
 | Subject | Look | Why |
 |---|---|---|
 | A real machine or physical system: escalator, engine, lock, gearbox, pump, disk drive, a lift | **Drawing**: a sharp 2D side elevation or section, drawn to scale; or, when it works in depth as well (a bicycle's rear derailleur), an isometric figure (see "Isometric machine figures") | In Clay, a machine's many parts became identical soft blobs. Forty wheels hid the two tracks that are the whole point, and the builder called it unprofessional |
-| An abstract concept with no physical figure: binary search, LRU, heaps, retries, attention | **A scene in the drawing look** (`look: "drawing"`): the kit's 3D parts in the same ink, hatching, palette and title block | There is no real geometry to draw to scale, but the page should still look like a plate from the same book |
+| An abstract concept with no physical figure: binary search, LRU, heaps, retries, attention, a Bloom filter | **A rig figure of concept parts** (`references/figures.md`, `examples/bloom/`): cells, cards, markers and arrows as shaded solids, on this same page and player | There is no real geometry to draw to scale, but the page is a plate from the same book, with the same camera and checks. (The older `look: "drawing"` scene is legacy.) |
 
 Aim for sharp and precise, not photo-real: an engineering drawing a reader trusts, not a render.
 
@@ -41,7 +41,7 @@ These are all in the escalator. A page missing one of them is not done.
 
 A plain agent beat the skill on depth in both blind evals of round 4, each time by doing these three things. Every Drawing page does them:
 
-- **The problem first.** Step 0 says what the machine must achieve and the number that makes it hard: "A lock has one job: turn for one key, and refuse more than ninety thousand others." Fold it into the concept, not an extra step. The lock is the model for this; the escalator's opening predates the rule and still starts with the mechanism.
+- **The problem first.** Step 0, the concept (no tab), says what the machine must achieve and the number that makes it hard: "A lock has one job: turn for one key, and refuse more than ninety thousand others." Fold it into the concept, not an extra step. The lock is the model for this; the escalator's opening predates the rule and still starts with the mechanism.
 - **The second idea.** One step for what the field teaches right after the core: picking for a lock, the handrail drive for an escalator. Ask "what does someone who just understood this ask next?"
 - **A lab.** The reader sets their own values and the model answers, with the drawing following where it can: cut a key and see each pin land, or move the orange step anywhere and set a track error. Inputs are bounded, and the model's tests sweep the lab's whole range (the lock tests 3,000 random keys for each tolerance).
 
@@ -104,7 +104,7 @@ audit: {
   facts: [/* numbers derived in the build, not stored in the model */],
   allow: [{ value: 5, why: "the tests' sweep step" }],
   claims: [{ text: "the sentence exactly as the page says it", test: (M) => /* true by the model */ true }],
-  coverage: { source: "where the topic list came from", topics: [{ topic, where: "step:3" | "lab" | "whatif" | "practice" | "deferred", why }] },
+  coverage: { source: "where the topic list came from", topics: [{ topic, where: "step:0" (the concept) | "step:3" | "lab" | "whatif" | "practice" | "deferred", why }] },
   reviewFile: join(HERE, "review.json"),
   report: join(ROOT, "dist", "<name>.audit.json"),   // for scripts/review-brief.mjs
 }
@@ -153,7 +153,7 @@ It cannot judge beauty. Shoot every step with `node scripts/shoot.mjs <page> --s
 
 ## Isometric machine figures
 
-`references/figures.md` is the recipe: start there, from `node scripts/new-machine.mjs <name>`. This section is the rig's reference.
+`references/figures.md` is the recipe: start there, from `node <skill>/scripts/new-figure.mjs <name> --kind machine|concept`. This section is the rig's reference.
 
 Two drawings serve a machine. Pick by what the reader must see.
 
@@ -265,7 +265,7 @@ Then look. `node examples/derailleur/shots.mjs --only step` shoots every step in
 ## Known gaps
 
 - **The drawing itself is still per machine.** The page and the player are shared; hatching, dimension lines, arrowheads, detail circles and the title block are still small functions in each `build.mjs` (the two examples draw them differently: the escalator in world mm with y up, the lock in page units). Copy them from `examples/lock/build.mjs`.
-- **`voice.mjs` is per example**, a copy of the same recorder with the machine's own script. `scripts/voice.mjs` records concept scenes only.
+- **`voice.mjs` is per page**, a copy of the same recorder reading the page's own `script` (`story.mjs`). `scripts/voice.mjs` records legacy scene.ts pages only.
 - **`scripts/verify.mjs` does not read Drawing pages.** The model tests and `check-drawing` stand in for it.
 - **Desktop only,** like the rest of the kit for now.
 - **The rig sorts by fixed slots, not by a general solver.** Parts that are not slabs between parallel planes need keys chosen by hand; two parts that interpenetrate on screen in both orders need splitting.

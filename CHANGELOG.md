@@ -4,6 +4,21 @@ One version covers the kit and the skill (`package.json` `version` and `SKILL.md
 
 ## Unreleased
 
+### One route for machines and concepts
+
+A fresh agent asked to explain a Bloom filter followed `SKILL.md` down the old concept route (scene.ts, the Unfold stage, `look: "drawing"`) and shipped a flat, pale plan view: two small rows of bits on an empty stage, with none of the rig's look, the lit subject or the camera. Its words were good (three review rounds to no open findings); its figure did not belong beside the derailleur, and two of the Drawing checks crashed on its page. The builder wants every subject to come out consistent and beautiful, so there is now one route.
+
+- **Concept parts on the rig** (`src/rig/parts.ts`): a cell with a printed value and a tone set by flag, a rail with indices, a key card, a ring of slots, a marker, an arrow drawn in the figure's projection, a board. Each is drawn once and moved; a value or tone changes by attribute.
+- **`scripts/new-figure.mjs <name> --kind machine|concept`.** The concept scaffold is a hash table with linear probing (slots, a key card walking to the slot it looks at, an arrow, a marker, a lab where the reader inserts a key). Both kinds build and pass `check-drawing` as generated, all but the review. `new-machine.mjs` remains as `--kind machine`.
+- **`examples/bloom/`: the Bloom filter on the rig**, from the concept scaffold, reusing the eval's model, words, claims and topics: two rows of shaded bit cells, a word card, one arrow a hash function, the camera on each word's bits, What if for 1, 3, 4 and 6 hash functions, and a lab where the reader types any word.
+- **The Drawing checks run on concept pages, and refuse old ones clearly.** `check-drawing`, `shoot-steps` and `check-arithmetic` say a scene.ts page is not a Drawing page and point to `verify.mjs`, instead of crashing.
+- **`check-arithmetic` redoes remainders** ("27 mod 8 = 3"), thousands separators included.
+- **A lab input can be typed** (`{ type: "text", samples }`): the checks and the shots try each sample and an empty entry.
+- **Coverage may place a topic at `"step:0"`**, the concept, where "the problem first" puts it.
+- **The review brief** shoots with `shoot-steps.mjs` by its absolute path, so a reviewer started elsewhere can run it.
+- **Values read in both themes.** A toned cell prints its value in the tone's dark ink; a set cell and a card have their own ink in each theme. White figures on a lit orange top, and light ones on a light card in the dark theme, had been unreadable.
+- **`SKILL.md` and the references describe one route.** `figures.md` covers machines and concepts. The scene.ts route is marked legacy in `SKILL.md`, `authoring.md`, `kit.md` and `verify.md`. Fixed the points the test agent found unclear: the camera ("one camera" now means one angle that zooms and pans), checks listed for every page that only Drawing pages run, a delivery report promising checks the stage did not run, the hands-on rule naming only Drawing and Clay pages, step 0 and coverage, and the review brief's shoot path.
+
 What a machine needs. The escalator built in Clay came out as about forty identical soft wheels in front of two thin track lines, with a floor shadow that meant nothing. The builder called it unprofessional. Drawn as a to-scale side cutaway, the same mechanism read at a glance.
 
 - **Two looks, chosen by subject.** Real machines and physical systems are drawn as technical cutaways (`references/drawing.md`). Abstract concepts stay in Clay.

@@ -1,30 +1,67 @@
-# Figures: the recipe for a machine that reads as 3D
+# Figures: the recipe for every page, machine or concept
 
-This is how the rear derailleur page (`examples/derailleur/`) was built, written so the next machine starts where it ended. Its first versions failed in the ways listed at the end. Each failure now has a check, and each check is in the scaffold.
+Every new page is a Drawing page on the rig: a tested model, a figure of shaded solids drawn once and moved, a camera shot per step, a recorded voice, the audit's claims and topics, a lab and Now you try, put together by `drawingPage()` (`src/drawing/page.mjs`) and checked by `check-drawing`, `check-arithmetic` and `shoot-steps`. Machines and concepts take the same route; only the parts differ.
+
+Two pages show the bar: the rear derailleur (`examples/derailleur/`), a machine, and the Bloom filter (`examples/bloom/`), a concept. Their first versions failed in the ways listed at the end. Each failure now has a check, and each check is in the scaffold.
 
 Start with the scaffold, then replace its parts in order:
 
 ```sh
-node scripts/new-machine.mjs <name> --dir <folder>    # a gear pair that builds and passes check-drawing (all but the review)
+node <skill>/scripts/new-figure.mjs <name> --kind machine --dir <folder>   # a gear pair
+node <skill>/scripts/new-figure.mjs <name> --kind concept --dir <folder>   # a hash table: slots, a key card, an arrow, a marker
 ```
 
-It writes a model with a tested contact pair, a rig figure of a few parts, a camera shot per step, a recorded narration, the audit's claims and topics, a claims test, a lab and Now you try. **Replace the model first** (`model.mjs`), then the figure (`figure.mjs`), then the story (`story.mjs`). Keep every test passing as you go.
+Each builds and passes `check-drawing` as generated, all but the review (which only a fresh reviewer can give). Each writes:
+- `model.mjs` and `model.test.mjs`: the model, tested against a separately written reference (the machine's also checks its contact pair);
+- `figure.mjs`: the rig figure;
+- `story.mjs`: the steps with their shots, the headings, captions and narration, the claims and the topics;
+- `build.mjs`: the machine hooks (motion, camera bounds, lab, Now you try) handed to `drawingPage`;
+- `voice.mjs`, which records `voice.json`, and `claims.test.mjs`.
 
-## When a subject gets a rig figure
+**Replace the model first** (`model.mjs`), then the figure (`figure.mjs`), then the story (`story.mjs`). Keep every test passing as you go. (`new-machine.mjs <name>` still works: it is `--kind machine`.)
 
-| Subject | Figure | Why |
+## What figure a subject gets
+
+| Subject | Figure | Example |
 |---|---|---|
-| A machine whose parts move in depth (sideways and in the side plane at once, or in layers) | **The rig** (`src/rig/`): shaded solids, drawn once and moved | The default for machines. The derailleur's cage swings in one plane while the parallelogram carries it across eleven cogs, and only solids show both. |
-| A machine that works in one plane, where a section shows the cause | **The flat cutaway** (`references/drawing.md`) | Tracks and steps, pins and a shear line: `examples/escalator/`, `examples/lock/` |
-| A concept with no physical figure | Clay or the drawing look (`SKILL.md`, "Stage") | A concept still has parts. Where it is drawn as a mechanism, build its parts as rig solids. |
+| A machine whose parts move in depth (sideways and in the side plane at once, or in layers) | **Rig solids** from `src/rig/` meshes (`plate`, `turned`, `rod`, `sprocket`) | `examples/derailleur/`: the cage swings in one plane while the parallelogram carries it across eleven cogs, and only solids show both |
+| An abstract concept: a data structure, an algorithm, a protocol, a mechanism in a paper | **Rig solids** from the concept parts (below), in the shape the field already draws | `examples/bloom/`: two rows of bit cells, a word card and one arrow a hash function |
+| A machine that works in one plane, where a section shows the cause | **The flat cutaway** (`references/drawing.md`): a Drawing page too, with the same page, player and checks | `examples/escalator/`, `examples/lock/` |
 
-**A concept's parts become rig solids by what they are, not by decoration:**
-- a slot is a recessed `plate` with a floor;
-- a token or bit is a short `turned` disc that slides between slots by one transform;
-- a ring is a `plate` with a hole and its positions as `turned` pins round it;
-- a pointer is a small `plate` arrow standing at its slot.
+The scene.ts route (the Unfold stage, `look: "drawing"` or `"clay"`, `verify.mjs`) is **legacy**: it is kept so `examples/lru/`, `retries/`, `attention/` and `lru-3d/` still build, and it is not chosen for a new page. The Drawing checks refuse its pages with a message saying so.
 
-The rest of this page applies unchanged: one followed part, a camera shot per step, contact tests where one part drives another.
+## Concept parts
+
+`src/rig/parts.ts` builds what concepts are made of, each drawn once at the origin and placed by a transform. Values and tones change by attribute, never by rebuilding the solid.
+
+| Part | Call | Notes |
+|---|---|---|
+| A cell or slot | `cellDrawing(cam, { w, d, h })` | A block with a shallow panel on top. Its tone is a flag on the item: `t-set` (holds a value: dark in the light theme), `t-hot` (the followed one, orange), `t-good`, `t-bad` |
+| A printed value | `decalAt(cam, [x, y, z])` and `valueText(text, size)` | A live item lying on the cell's top; swap the string to change it. On a toned cell it takes the tone's own ink, so it reads in both themes |
+| A rail of cells, with indices | `railCentres(n, pitch, origin)`, an index decal per cell (`valueText(i, 6, "rig-index")`) on the board in front | Indices are drawn once, in place |
+| A token or key card | `cardDrawing(cam, { w, d })`, its word by `valueText(word, size, "rig-value rig-on-card")` | Light in both themes, so its ink is dark in both |
+| A ring of slots | `ringSlots(n, r, centre)` and `turnAt(cam, theta, at)` | The first slot at the front |
+| A pointer or marker | `markerDrawing(cam, { h })` | A pin with a ball, in the followed colour |
+| An arrow or link | `arrow(cam, from, to, { lift })` | Drawn in the figure's projection, lifted into an arc; rebuilt when its ends move (a short path, not a solid) |
+| A floor | `boardDrawing(cam, { w, d })` | Quiet context, in `frame` |
+
+Put the camera at `CONCEPT_VIEW` (azimuth 247°, elevation 32°), a three-quarter view from the front left, so tops, fronts and printed values all read.
+
+**How the concept parts are used well** (each learned on the Bloom filter):
+- **An arrow ends on the front face of its cell**, not on its top: a head on the top covers the value printed there. An arrow to a back row arcs over the front row.
+- **The card goes where its arrows are short**: in front of the cells it points at, or walking with the key along the rail (the scaffold's card stays in front of the slot it is looking at).
+- **Don't label every arrow.** h1, h2, h3 at arrow heads sat on the cells and read as noise; the caption and the lab's rows print each function's working.
+- **A group the story is about gets a camera name**: the scaffold's `"run"` (the slots a key has looked at), the Bloom filter's `"hashed"` (the bits a word's hashes pick). `boundsOf` and the lighting expand it to the parts it is this step. A name may not be as big as the whole figure (half its area): frame the run, not the rail, and give a step whose subject spans everything no shot.
+- **Show the working.** The working is on screen as printed values and in the caption and the lab's rows: word → hash → mod m → bit, not an arrow from word to bit alone.
+
+The rest of this page applies to both kinds: one followed part, a camera shot per step, contact tests where one part drives another.
+
+## The page
+
+- **Step 0 is the concept**, with no tab: the problem the idea solves, before anything moves (`headings(M)[0]` is the question). A topic it teaches is placed at `"step:0"`.
+- **The prediction** is asked on `PRED_STEP` about what the next step shows, and revealed there. Ask it the step before the causal moment.
+- **The lab** (`DATA.lab.inputs`) is the reader's own values: a number on a slider (`min`, `max`, `step`), or a typed entry, `{ type: "text", samples: [...] }`, for a word or a key. The checks try each slider's two ends, or each sample and an empty entry.
+- **Now you try** is `question(n, r)` from the model, with three choices or more.
 
 ## The look
 
@@ -57,6 +94,7 @@ A whole-machine figure at every step leaves the reader hunting for a 4 mm screw 
 - **The 2× cap** (`CAP` in `src/drawing/camera.mjs`): at 3× the context is gone.
 - **Voice-led shots** follow `[phrase|part]` links in the narration. Two names spoken close together share one shot.
   - A step that names two parts in one breath should frame both. The scaffold's speed step does.
+- **The camera only zooms and pans**, from the one angle the figure is drawn at; it never turns. That is the "one camera" of the concept pages: the reader keeps their bearings while each step is framed.
 - **Keep clear of the cards:** `clearArea()` is the space between the callout columns, and anything framed parts must stay out from under (the title block, an inset if you add one) carries `data-camera-avoid`.
 - **Nothing clips** the figure but the stage.
 
@@ -95,5 +133,9 @@ An inset at a near angle shows slanted faces, and the reader cannot judge alignm
 | **A black figure:** the scaffold's first build left out `rig.css`, and every check passed | `check-drawing` fails solids with no material colours |
 | **A step that lost its subject:** with the inset gone, step 4 framed only the cassette, and the pulley moving ahead of the chain was never seen | `DATA.camera.subject[k]`: every part the heading names stays in frame through the step. The planted fault `missing-subject` fails it. |
 | **An alignment cue too small to see:** the off-line mark was about 1 px long and hidden behind the parallelogram | A red arrow, drawn long, with the exact offset beside it. A test checks its label, direction and on-screen length across the lab. |
+| **The old route for a concept:** a fresh agent built a Bloom filter as a scene.ts page, a flat pale plan view with none of the rig, the lit subject or the camera, and two of these checks crashed on it | One route in `SKILL.md`; the Drawing checks refuse an old page with a clear message; the concept scaffold |
+| **A value nobody could read:** white figures on a cell's lit top, and dark ones on a light card in the dark theme | Toned cells print their value in the tone's dark shade; a set cell and a card have their own ink in each theme. Look at both themes |
+| **A remainder printed wrong:** concept pages print "27 mod 8 = 3" | `check-arithmetic` re-does every `a mod m = r`, thousands separators included |
+| **A heading that gave the answer away:** the prediction was set on the step it asks about, so the heading above it said "A false positive" | The prediction sits on the step before (`PRED_STEP`); `check-drawing` checks it is revealed on the next step |
 
 The rule under every row is the same: **look at the page as built**. Checks pass frames that read wrong, so open every fresh shot.
