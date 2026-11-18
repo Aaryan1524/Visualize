@@ -34,7 +34,12 @@ export const icon = {
 // The lab: the reader's own values in, the model's verdict out. It sits where Now you try sits.
 function labPanel(lab) {
   if (!lab) return "";
-  const row = (i) => `<label class="vz-lab-input"><span>${esc(i.label)}</span><input type="range" data-id="${i.id}" min="${i.min}" max="${i.max}" step="${i.step ?? 1}" value="${i.value}" aria-label="${esc(i.label)}"><b id="lab-v-${i.id}">${i.value}</b></label>`;
+  // a number on a slider (min, max, step), or `type: "text"`: a word or key the reader types (maxlength;
+  // `samples`, the entries the checks try in place of a slider's two ends)
+  const row = (i) =>
+    i.type === "text"
+      ? `<label class="vz-lab-input vz-lab-text"><span>${esc(i.label)}</span><input type="text" data-id="${i.id}" maxlength="${i.maxlength ?? 16}" value="${esc(i.value)}" spellcheck="false" autocomplete="off" aria-label="${esc(i.label)}"><b id="lab-v-${i.id}"></b></label>`
+      : `<label class="vz-lab-input"><span>${esc(i.label)}</span><input type="range" data-id="${i.id}" min="${i.min}" max="${i.max}" step="${i.step ?? 1}" value="${i.value}" aria-label="${esc(i.label)}"><b id="lab-v-${i.id}">${i.value}</b></label>`;
   return `
         <section class="vz-predict vz-practice vz-lab" id="lab" aria-label="${esc(lab.title)}" hidden><span class="vz-predict-kicker">${esc(lab.title)}</span><p>${esc(lab.intro)}</p><div class="vz-lab-inputs">${lab.inputs.map(row).join("")}</div><p class="vz-lab-verdict" id="lab-verdict" aria-live="polite"></p><ul class="vz-lab-rows" id="lab-rows"></ul></section>`;
 }
@@ -77,7 +82,8 @@ export function auditPage(o) {
     // the drawing's own words: callouts, the title block, detail titles
     ...Object.entries(o.data.variants ?? {}).flatMap(([name, v]) => [...String(v.svg ?? "").matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map((m, i) => ({ where: `drawing.${name}.${i}`, text: m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<") }))),
   ];
-  const places = [...o.steps.map((_, k) => `step:${k}`).slice(1), "whatif", "practice", ...(o.data.lab ? ["lab"] : [])];
+  // step 0 is the concept (the problem, before the first tab): a topic it teaches is placed there too
+  const places = [...o.steps.map((_, k) => `step:${k}`), "whatif", "practice", ...(o.data.lab ? ["lab"] : [])];
   const captions = Object.values(o.data.variants ?? {}).flatMap((v) => v.captions ?? []);
   const details = [o.setup, ...o.facts.map(strip), ...captions].join("\n");
   if (!o.audit) return { ok: false, problems: ["audit: this page declares no audit (claims, coverage, review)"], review: "missing", stamp: "", counts: {} };

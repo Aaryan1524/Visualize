@@ -650,7 +650,7 @@ export function player(DATA, machine, kit) {
     $("lab-verdict").textContent = out.verdict;
     $("lab-verdict").dataset.ok = String(!!out.ok);
     $("lab-rows").replaceChildren(...out.rows.map((r) => Object.assign(document.createElement("li"), { textContent: r })));
-    for (const inp of DATA.lab.inputs) $("lab-v-" + inp.id).textContent = inp.format ? inp.format.replace("{}", labValues[inp.id]) : String(labValues[inp.id]);
+    for (const inp of DATA.lab.inputs) if (inp.type !== "text") $("lab-v-" + inp.id).textContent = inp.format ? inp.format.replace("{}", labValues[inp.id]) : String(labValues[inp.id]);
   }
   function openLab() {
     if (practiceOpen) tryBtn.click();
@@ -684,6 +684,13 @@ export function player(DATA, machine, kit) {
     for (const inp of lab.querySelectorAll("input[type=range]")) {
       inp.addEventListener("input", () => {
         labValues[inp.dataset.id] = Number(inp.value);
+        renderLab();
+      });
+    }
+    // a typed entry (a word, a key): the model reads it as typed
+    for (const inp of lab.querySelectorAll("input[type=text]")) {
+      inp.addEventListener("input", () => {
+        labValues[inp.dataset.id] = inp.value;
         renderLab();
       });
     }

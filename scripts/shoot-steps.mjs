@@ -65,8 +65,8 @@ try {
         await p.evaluate(() => window.__viz.lab({}));
         await shot(`${tag}lab`);
         for (const inp of info.inputs)
-          for (const end of ["min", "max"]) {
-            await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, inp[end]);
+          for (const [end, val] of inp.type === "text" ? (inp.samples ?? []).map((s, i) => [`sample${i + 1}`, s]) : [["min", inp.min], ["max", inp.max]]) {
+            await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, val);
             await shot(`${tag}lab-${inp.id}-${end}`);
             await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, inp.value);
           }

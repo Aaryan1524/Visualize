@@ -220,15 +220,16 @@ try {
       judge(`${at} ${v} answered prediction`, r);
       await p.evaluate(() => window.__viz.answer(null));
 
-      // The lab, every input at its minimum and at its maximum.
+      // The lab, every input at its minimum and at its maximum (a typed input: each of its samples, and
+      // an empty entry, which must still get a verdict).
       const inputs = await p.evaluate(() => window.__viz.labInputs());
       if (!inputs.length) fail(`${at}: the page has no lab (DATA.lab), so the reader cannot try values of their own`);
       for (const inp of inputs) {
-        for (const end of ["min", "max"]) {
-          const out = await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, inp[end]);
+        for (const val of inp.type === "text" ? [...(inp.samples ?? []), ""] : [inp.min, inp.max]) {
+          const out = await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, val);
           await wait(80);
           const r = await p.evaluate(measure);
-          const s = `${at} ${v} lab ${inp.id}=${inp[end]}`;
+          const s = `${at} ${v} lab ${inp.id}=${JSON.stringify(val)}`;
           if (!out || !out.verdict || !Array.isArray(out.rows)) fail(`${s}: the lab gave no verdict`);
           judge(s, r);
           await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, inp.value);
