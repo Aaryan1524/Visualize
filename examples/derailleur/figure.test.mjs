@@ -7,12 +7,12 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MODELS } from "./model.mjs";
+import { MODELS, indexing } from "./model.mjs";
 import { figure, cameraFor, W, BINS } from "./figure.mjs";
 import { pathAt } from "./model.mjs";
 import { angleBin, applyAffine, carry, checkContacts, moveInPlane, planeOf, screenOf } from "../../src/rig/index.ts";
 
-const BOX = { x: 4300, y: 260, w: 5100, h: 6080 };
+const BOX = { x: 4500, y: 230, w: 5900, h: 6120 }; // as the page
 const PX = 10; // svg units per screen pixel at 1440 x 900
 const SIDE = planeOf([0, 0, 0], [0, -1, 0], [1, 0, 0]);
 const AX = { origin: [0, 0, 0], u: SIDE.u, v: SIDE.v, n: SIDE.n };
@@ -144,3 +144,36 @@ test("a planted fault: a guide pulley turned the wrong way fails the contact tes
   assert.ok(r.faults.some((f) => f.startsWith("guide: the wheel moves against the chain")), r.faults.join("; "));
   assert.ok(!r.faults.some((f) => f.startsWith("cog") || f.startsWith("tension")));
 });
+
+// Off line, the main figure shows which way and how far: under the guide pulley, an arrow from the
+// pulley's plane toward its cog's line, long enough to read at 1x, labelled with the model's offset.
+for (const [name, M] of Object.entries(MODELS)) {
+  test(`${name}: across the lab, the off-line arrow reads the model's offset, points to the cog's line and is long enough to see`, () => {
+    const cam = cameraFor(M, BOX), F = figure(M, cam, { prefix: "o" });
+    let shown = 0, checked = 0;
+    for (let gear = 1; gear <= M.n; gear++)
+      for (let e10 = -30; e10 <= 30; e10 += 2)
+        for (let l2 = 0; l2 <= 12; l2 += 3) {
+          const x = indexing(M, gear, e10 / 10, l2 / 2), pose = M.pose(x.pull, x.on, l2 / 2);
+          const items = F.pose({ pose, roll: 0, show: { offline: true } }).items;
+          const mark = items.find((i) => i.id === "o-offline"), teeth = items.find((i) => i.id === "o-guideTeeth");
+          checked++;
+          if (Math.abs(x.off) <= 0.05) {
+            assert.ok(!mark, `gear ${gear}, error ${e10 / 10}: on line, no arrow`);
+            assert.ok(!teeth.flags.off);
+            continue;
+          }
+          shown++;
+          assert.ok(mark, `gear ${gear}, error ${e10 / 10}: off by ${x.off}, but no arrow`);
+          assert.ok(teeth.flags.off, "the guide pulley's teeth turn red");
+          assert.ok(mark.svg.includes(`>${Math.abs(x.off).toFixed(2)} mm ${x.off > 0 ? "inboard" : "outboard"}<`), `label for ${x.off}: ${mark.svg.match(/>([^<]*mm[^<]*)</)?.[1]}`);
+          assert.ok(Number(mark.svg.match(/data-len="([\d.]+)"/)[1]) >= 15 * PX, "the arrow is at least 15 px long");
+          // it points from the pulley's plane toward the cog's line
+          const y = pose.G[1] - M.r - M.D.tipAdd - 7, a = screenOf(cam, W(pose.G[0], y, pose.e)), c = screenOf(cam, W(pose.G[0], y, -M.cogZ(pose.cog)));
+          const head = mark.svg.match(/class="offline-head" d="M([-\d.]+) ([-\d.]+)/);
+          const b = [Number(head[1]), Number(head[2])];
+          assert.ok((b[0] - a[0]) * (c[0] - a[0]) + (b[1] - a[1]) * (c[1] - a[1]) > 0, `gear ${gear}, error ${e10 / 10}: the arrow points away from the cog's line`);
+        }
+    assert.ok(shown > 300 && checked > 1000, `${shown} of ${checked} off line`);
+  });
+}

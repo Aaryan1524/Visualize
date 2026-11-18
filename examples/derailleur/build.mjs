@@ -38,10 +38,10 @@ const STEPS = [
   { tab: "The parts", heading: "A sprung parallelogram hangs a cage of two pulleys under the cassette.", focus: null },
   { tab: "One click", heading: null, shot: ["barrel", "wire"], around: ["links"], focus: ["cable", "links", "pknuckle", "bknuckle", "guide", "tension", "cage", "chain", "cassette", "barrel"] },
   { tab: "Return spring", heading: "Let cable out, and the return spring pulls the derailleur back out.", shot: ["links", "rspring"], focus: ["rspring", "links", "pknuckle", "bknuckle", "guide", "tension", "cage", "chain", "cassette", "cable"] },
-  { tab: "Pedal to shift", heading: "The pulley moves at once; the chain waits for a ramp to come round.", shot: ["ramp"], focus: ["guide", "tension", "cage", "pknuckle", "chain", "cassette"] },
+  { tab: "Pedal to shift", heading: "The pulley moves at once; the chain waits for a ramp to come round.", shot: ["ramp", "chainrun", "guide"], subject: ["guide", "chainrun", "ramp"], focus: ["guide", "tension", "cage", "pknuckle", "chain", "cassette"] },
   { tab: "Slack", heading: null, shot: ["cage", "guide", "tension", "forces"], focus: ["cage", "guide", "tension", "chain", "cassette", "forces", "pknuckle"] },
   { tab: "Limit screws", heading: "Two screws stop the swing at the end cogs; a third sets the gap.", shot: ["hscrew", "lscrew", "bscrew"], focus: ["bknuckle", "links", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "hanger"] },
-  { tab: "Barrel adjuster", heading: "A slack cable puts every cog but the smallest off line; the barrel adjuster takes it up.", shot: ["barrel", "wire"], around: ["links"], focus: ["cable", "barrel", "bknuckle", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "links"] },
+  { tab: "Barrel adjuster", heading: "A slack cable puts every cog but the smallest off line; the barrel adjuster takes it up.", shot: ["barrel", "wire", "guide"], subject: ["barrel", "guide"], focus: ["cable", "barrel", "bknuckle", "pknuckle", "guide", "tension", "cage", "chain", "cassette", "links"] },
 ];
 const STRETCH = -1.0; // mm of cable slack in the barrel adjuster step
 const OVER = 2.0; // mm of extra cable pull against the L screw in the limit screw step
@@ -81,6 +81,8 @@ const VOICE = existsSync(join(HERE, "voice.json")) ? JSON.parse(readFileSync(joi
 // (with --strict it stops, as it does on any unplanted build).
 const PLANTS = {
   // a step's shot names a part the figure does not have
+  // a step whose shot leaves out a part its heading names (the pulley, in step 4)
+  "missing-subject": () => (STEPS[4].shot = ["ramp"]),
   "missing-shot": () => (STEPS[3].shot = ["links", "sprocket"]),
   // the voice names a part the figure does not have
   "unknown-link": () => VOICE.variants.road[2].links[0].ids.splice(0, 1, "sprocket"),
@@ -143,7 +145,7 @@ const LABELS = [
   label("cage", "Cage", LX, 4950, "cage", [1], "end"),
   label("tension", "Tension pulley", LX, 5700, "tension", [1, 5], "end"),
   label("rspring", "Return spring", LX, 3350, "rspring", [3], "end"),
-  label("gates", "Ramp and pin", RX, 1050, "gate", [4], "start"),
+  label("gates", "Ramp and pin", RX, 1950, "gate", [4], "start"),
   label("springF", "Cage spring: turns it back", LX, 4300, "springForce", [5], "end"),
   label("chainF", "Chain: pulls it forward", LX, 4950, "chainForce", [5], "end"),
   label("hscrew", "H screw", LX, 2700, "hscrew", [6], "end"),
@@ -278,6 +280,13 @@ function machine(DATA) {
         const g = lastAt?.gate;
         if (!g) continue;
         add(g[0] - 650, g[1] - 650, g[0] + 650, g[1] + 650);
+        continue;
+      }
+      if (n === "chainrun") {
+        // the run of chain from its cog down to the guide pulley
+        const a = lastAt?.run1a, c = lastAt?.run1b;
+        if (!a || !c) continue;
+        add(Math.min(a[0], c[0]) - 120, Math.min(a[1], c[1]) - 120, Math.max(a[0], c[0]) + 120, Math.max(a[1], c[1]) + 120);
         continue;
       }
       const sel = ITEMS[n] ? ITEMS[n].map((id) => `[data-item="${id}"]`).join(",") : `[data-part="${n}"]`;
@@ -456,10 +465,10 @@ const std = VARIANT_DATA.road, M0 = MODELS.road;
 // meets the next cog. An unknown name stops the build; scripts/check-drawing.mjs then checks, in the
 // page, that every name has bounds and sits clear of the cards where it is framed.
 const CAM_ITEMS = { hscrew: ["m-screwH"], lscrew: ["m-screwL"], bscrew: ["m-bscrew"], barrel: ["m-barrel"], wire: ["m-wire"], cable: ["m-barrel", "m-wire"], housing: ["m-housing"] };
-const CAM_LIGHT = { wire: ["cable"], ramp: ["cassette", "chain"] }; // names only the camera uses, and the parts they light
+const CAM_LIGHT = { wire: ["cable"], ramp: ["cassette", "chain"], chainrun: ["chain"] }; // names only the camera uses, and the parts they light
 const CAM_ALIAS = { forces: ["forces", "cage", "tension"], gates: ["cassette", "chain"], lscrew: ["bknuckle"], hscrew: ["bknuckle"], bscrew: ["bknuckle", "hanger"], barrel: ["cable"], housing: ["cable"] };
 function framable() {
-  const names = new Set(["ramp", "gates", ...Object.keys(CAM_ITEMS)]);
+  const names = new Set(["ramp", "gates", "chainrun", ...Object.keys(CAM_ITEMS)]);
   for (const M of Object.values(MODELS)) {
     const F = figure(M, cameraFor(M, BOX), { prefix: "m" });
     const ids = new Set(F.parts.map((p) => p.id));
@@ -475,7 +484,7 @@ function framable() {
 }
 function cameraNames() {
   const can = framable(), bad = [];
-  STEPS.forEach((st, k) => [...(st.shot ?? []), ...(st.around ?? [])].forEach((n) => can.has(n) || bad.push(`step ${k}'s shot names "${n}"`)));
+  STEPS.forEach((st, k) => [...(st.shot ?? []), ...(st.around ?? []), ...(st.subject ?? [])].forEach((n) => can.has(n) || bad.push(`step ${k}'s shot names "${n}"`)));
   for (const [v, tracks] of Object.entries(VOICE?.variants ?? {}))
     tracks.forEach((tr, k) => tr.links.forEach((l) => l.ids.forEach((n) => can.has(n) || bad.push(`the voice (${v}, step ${k}, at ${l.start.toFixed(2)} s) names "${n}"`))));
   if (!bad.length) return;
@@ -492,7 +501,7 @@ const DATA = {
   // the camera: where framed parts may go (between the two columns of callouts, clear of the heading,
   // the title block and the cards), the drawn items a camera name can mean, the names only it
   // lights, and the parts each step keeps in view around its subject
-  camera: { clear: PLANT_CLEAR ?? CLEAR, items: CAM_ITEMS, alias: CAM_LIGHT, around: Object.fromEntries(STEPS.flatMap((s, k) => (s.around ? [[k, s.around]] : []))) },
+  camera: { clear: PLANT_CLEAR ?? CLEAR, items: CAM_ITEMS, alias: CAM_LIGHT, around: Object.fromEntries(STEPS.flatMap((s, k) => (s.around ? [[k, s.around]] : []))), subject: Object.fromEntries(STEPS.flatMap((s, k) => (s.subject ? [[k, s.subject]] : []))) },
   alias: CAM_ALIAS,
   predict: {
     step: PRED_STEP,
@@ -538,12 +547,14 @@ text{font-family:var(--sans);fill:var(--ink)}
 .force-head{stroke:none}
 .spring-f{stroke:var(--green)}.force-head.spring-f{fill:var(--green)}
 .chain-f{stroke:var(--orange)}.force-head.chain-f{fill:var(--orange)}
-.offline{fill:none;stroke:var(--t-bad);stroke-width:3px}
+.offline{fill:none;stroke:var(--t-bad);stroke-width:4px;stroke-linecap:round}
+.offline-head{fill:var(--t-bad);stroke:var(--stage);stroke-width:1.5px;paint-order:stroke}
+.offline-halo{fill:none;stroke:var(--stage);stroke-width:9px;stroke-linecap:round}
+.offline-text{font-size:${FS * 0.82}px;font-weight:600;fill:var(--t-bad);paint-order:stroke;stroke:var(--stage);stroke-width:44px;stroke-linejoin:round}
 .gate{fill:none;stroke:var(--orange);stroke-width:2.6px;stroke-linecap:round}
 .gate-pin{fill:var(--orange);stroke:var(--stage);stroke-width:.8px}
 .spring{fill:none;stroke-width:1.6px;stroke:color-mix(in oklab,var(--green) calc(100% - var(--recede)),var(--stage));stroke-linecap:round}
 .spring.back{stroke-width:1.1px;stroke-opacity:.55}
-.offline-end{fill:var(--t-bad)}
 .engrave{font:600 64px var(--mono);fill:var(--ink-2)}
 .vz[data-practice] #fig .label{visibility:hidden}
 .leader{fill:none;stroke:var(--ink);stroke-width:.5}
@@ -660,7 +671,7 @@ const HTML = drawingPage({
     ["var(--blue)", "The cable and its pull"],
     ["var(--green)", "The springs, and the cage spring's pull: always back"],
     ["var(--orange)", "The part to follow: the cage and pulleys, the chain's pull on them, the shift gates"],
-    ["var(--t-bad)", "The chain out of line with its cog"],
+    ["var(--t-bad)", "The guide pulley out of line with its cog: its teeth turn red, and an arrow under it points to the cog's line (drawn longer than the offset; the number beside it is exact)"],
   ],
   facts: [
     `The chain's path is solved, not drawn: ring, cog, guide pulley and tension pulley joined by tangent runs, with the cage angle found so the path is exactly ${M0.links} links of ${DR.p} mm. Tests re-measure every path point by point.`,

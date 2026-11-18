@@ -35,6 +35,8 @@ const LAT = [0, -1, 0]; // outboard
 
 // The chain is drawn forward to here, fading over the last FADE mm: the chainring is 404 mm ahead.
 export const XCUT = 128;
+// The off-line arrow's drawn length, mm sideways: far longer than any real offset, so it reads at 1x.
+export const OFF_ARROW = 30;
 const FADE = 46;
 
 // How many drawings each turning part gets, and the plane each chain piece is placed by. A thick part
@@ -345,6 +347,9 @@ export function figure(M, cam, o = {}) {
       at.chain = w(pins.find((x) => x.q.on === "cog" && x.q.f > 0.35 && x.q.f < 0.65) ?? pins[0]);
       at.chainUpper = w(pins.find((x) => x.q.on === "run0" && x.x > 30 && x.x < 80) ?? pins[0]);
       at.chainLower = w(pins.find((x) => x.q.on === "run3" && x.x > 30 && x.x < 90) ?? pins[0]);
+      // the run from the cog the chain is on down to the guide pulley: at an angle while they differ
+      at.run1a = S(path.runs[1].p0[0], path.runs[1].p0[1], p.chainE);
+      at.run1b = S(path.runs[1].p1[0], path.runs[1].p1[1], eG);
     }
     at.cassette = S(0, M.Rk[M.last] + 3, -M.zMax * 0.55);
     at.cog = S(M.Rk[eng] * Math.cos(2.2), M.Rk[eng] * Math.sin(2.2), cogE[eng]);
@@ -445,11 +450,18 @@ export function figure(M, cam, o = {}) {
       at.springForce = arc[12];
       at.chainForce = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
     }
-    // ---- off line: a red mark from the cog's line to the guide pulley's, in the gap between them
+    // ---- off line: under the guide pulley, a red tick on the pulley's plane and an arrow from it toward
+    // its cog's line, labelled with the model's offset. A real offset (1 to 4 mm) would be a pixel or
+    // two here, so the arrow is drawn OFF_ARROW mm long whatever the offset: it shows which way; the
+    // number, exact, says how far.
     if (st.show?.offline && Math.abs(p.off) > 0.05) {
-      const y = gy + M.r + 3.4, ea = -M.cogZ(p.cog);
-      const a = S(gx, y, ea), b = S(gx, y, eG);
-      live("offline", "chain", out(eG + 9), `<path class="offline" d="${pathThrough([a, b], false)}"/><circle class="offline-end" cx="${a[0].toFixed(1)}" cy="${a[1].toFixed(1)}" r="18"/><circle class="offline-end" cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="18"/>`);
+      const ea = -M.cogZ(p.cog), dir = Math.sign(ea - eG), y = gy - M.r - D.tipAdd - 7;
+      const t0 = S(gx, y + 3.2, eG), t1 = S(gx, y - 3.2, eG), a = S(gx, y, eG), b = S(gx, y, eG + dir * OFF_ARROW);
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, u = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+      const text = `${Math.abs(p.off).toFixed(2)} mm ${p.off > 0 ? "inboard" : "outboard"}`;
+      const tx2 = b[0] + u[0] * 60, anchor = u[0] >= 0 ? "start" : "end";
+      live("offline", "guide", 1e6, `<g class="offline-mark" data-off="${p.off.toFixed(4)}" data-len="${len.toFixed(1)}"><path class="offline-halo" d="${pathThrough([t0, t1], false)}M${a[0].toFixed(1)},${a[1].toFixed(1)}L${b[0].toFixed(1)},${b[1].toFixed(1)}"/><path class="offline" d="${pathThrough([t0, t1], false)}"/><path class="offline" d="${pathThrough([a, [b[0] - u[0] * 70, b[1] - u[1] * 70]], false)}"/><path class="offline-head" d="${arrowHead(b, u, 110)}"/><text class="offline-text" x="${tx2.toFixed(1)}" y="${(b[1] + 50).toFixed(1)}" text-anchor="${anchor}">${text}</text></g>`);
+      at.offline = a;
     }
     // drawings needed for the first time this frame
     const fresh = [];

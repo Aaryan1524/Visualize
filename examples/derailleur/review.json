@@ -1,7 +1,7 @@
 {
-  "stamp": "b8ee221583eecd3d",
+  "stamp": "ff423de1d0c20dae",
   "reviewer": "independent",
-  "summary": "Every finding from rounds 1 and 2 is fixed or accepted, and I recomputed all the new sums from the model (73 = 46.94 + 26.02; 29.41 + 11.99 - 5.19 - 10.18 = 26.02; 102.50 = 54.96 + 47.54; 51.49 + 15.66 - 6.33 - 13.28 = 47.54; tight cable leaves the largest cog on its line). I found nothing new that is wrong, misleading or missing.",
+  "summary": "Every earlier finding stays fixed. The words no longer refer to View A ('behind' now appears only in 'below and behind the axle' and in the frame-stays note, both about physical position). Two lessons that View A carried now rest on words alone: step 4's 'pulley moves at once, chain waits' has no guide pulley in frame, and the lab's off-line cue is only a red tint, with its legend mark hidden behind the links.",
   "findings": [
     {
       "where": "setup, concept, variants.*.captions.0, variants.*.voice.0",
@@ -146,6 +146,24 @@
       "resolved": false,
       "fixed": true,
       "response": "Fixed: captions 2 and 6 and Details now say 'the linkage is refitted for each cassette'."
+    },
+    {
+      "where": "step:4 (picture), steps.4.heading, variants.*.captions.4, variants.*.voice.4",
+      "text": "The pulley moves at once; the chain waits for a ramp to come round. ... With the pedals still, the pulley moves at once and the chain just runs at an angle.",
+      "severity": "missing",
+      "finding": "With View A gone, nothing on screen shows this step's subject. Through the whole step (I sampled it every second, from the click to the chain seated on the 15) the camera frames the cassette, with the parallelogram cut off at the bottom edge. The guide pulley is out of frame, so the reader never sees it move one cog ahead while the chain stays on the 14, or the chain running at an angle between them. Only the readout ('14 teeth · pulley under the 15') carries it. View A ('follows the guide pulley') was what showed this. Frame the guide pulley and the cog it has moved under together with the gates, or pull the camera back far enough to include them. Separately, the 'Ramp and pin' label sits on top of the chain's upper run, so it reads as naming the chain. Put it beside a gate on a cog.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: step 4 now frames the shift gate, the run of chain from the 14 down to the guide pulley, and the guide pulley under the 15, all through the step (shot [ramp, chainrun, guide]; a new camera check holds every part the heading names in frame at the still frame and at four moments through the step, and a planted step framing only the cassette fails it). The Ramp and pin callout moved down, below the chain's upper run, so its leader runs to the gate on the cog."
+    },
+    {
+      "where": "lab (picture), step:7 (picture), details.legend 'The chain out of line with its cog', drawing legend 'Off line'",
+      "text": "Off line / The chain out of line with its cog",
+      "severity": "misleading",
+      "finding": "The lab's alignment lesson still reads, but only through the words: the verdict ('Skips under load: 1.40 mm outboard of the 17'), the worked rows and the readout. In the figure, the only off-line cue is the guide pulley's teeth turning dark red. That shows that something is wrong, but not which way or by how much. The red off-line mark the legend's swatch stands for (a line from the cog's line to the pulley's) is drawn about 1 px long, and the parallelogram links cover it in this view (checked in the lab with a cable 1 mm slack). In step 7's close frame the guide pulley is mostly behind the P-knuckle, in the receded tone, so '1.4 mm outboard of its cog' is not visible there either. The legend also says 'the chain out of line', while what turns red is the pulley. Either draw the off-line mark where it can be seen (below the pulley, or as an outboard arrow on the pulley's teeth) and point the legend at it, or change the legend to 'Guide pulley out of line with its cog' and say in the lab that the red teeth mean off line, with the direction given in the verdict.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: off line, an arrow under the guide pulley now points from the pulley's plane to its cog's line, with the model's offset beside it ('1.40 mm outboard'); it is drawn 30 mm long so it reads at 1x, and the legend says the arrow is drawn longer than the offset and the number is exact. The guide pulley's teeth turn red as before. Step 7's shot now frames and lights the guide pulley with the barrel adjuster. The legend reads 'The guide pulley out of line with its cog: its teeth turn red, and an arrow under it points to the cog's line'. A test checks the label, the direction and the arrow's on-screen length across the lab's whole range."
     }
   ]
 }
