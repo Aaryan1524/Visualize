@@ -43,7 +43,7 @@
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { launch } from "./lib/browser.mjs";
+import { drawingPageProblem, launch } from "./lib/browser.mjs";
 
 const page = process.argv[2];
 if (!page) {
@@ -130,6 +130,14 @@ const fakeAudio = () => {
 };
 
 const browser = await launch();
+{
+  const problem = await drawingPageProblem(browser, page);
+  if (problem) {
+    console.log(`drawing: ${problem}`);
+    await browser.close();
+    process.exit(2);
+  }
+}
 try {
   for (const [w, h] of ONLY_PLAYBACK || ONLY_CAMERA ? [] : [[1440, 900], [1280, 800]]) {
     const p = await browser.newPage();

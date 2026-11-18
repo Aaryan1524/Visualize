@@ -26,8 +26,14 @@ if (!existsSync(auditFile)) {
 const texts = JSON.parse(readFileSync(auditFile, "utf8")).texts ?? [];
 
 if (arg.endsWith(".html")) {
-  const { launch, openPage } = await import("./lib/browser.mjs");
+  const { drawingPageProblem, launch, openPage } = await import("./lib/browser.mjs");
   const browser = await launch();
+  const problem = await drawingPageProblem(browser, arg);
+  if (problem) {
+    console.log(`arithmetic: ${problem}`);
+    await browser.close();
+    process.exit(2);
+  }
   try {
     const { page } = await openPage(browser, resolve(arg), { width: 1440, height: 900, scale: 1 });
     const more = await page.evaluate(() => {

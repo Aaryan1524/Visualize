@@ -12,7 +12,7 @@
 
 import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { launch, openPage, settle } from "./lib/browser.mjs";
+import { drawingPageProblem, launch, openPage, settle } from "./lib/browser.mjs";
 import { reportFreshness, stamp } from "./lib/fresh.mjs";
 
 const args = process.argv.slice(2);
@@ -30,6 +30,14 @@ const scale = Number(opt("scale", 1)), themes = opt("themes", "light,dark").spli
 mkdirSync(out, { recursive: true });
 for (const f of readdirSync(out)) if (f.endsWith(".png")) rmSync(join(out, f)); // no old shots left to mislead
 const browser = await launch();
+{
+  const problem = await drawingPageProblem(browser, page);
+  if (problem) {
+    console.log(`shoot-steps: ${problem}`);
+    await browser.close();
+    process.exit(2);
+  }
+}
 let n = 0, first = null, last = null, failed = 0;
 try {
   for (const theme of themes) {
