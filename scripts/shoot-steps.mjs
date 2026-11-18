@@ -45,6 +45,8 @@ try {
     const shot = async (label) => {
       await settle(p);
       await new Promise((r) => setTimeout(r, 120));
+      // a camera still easing (to the lab's framing) would shoot a frame nobody stops on
+      await p.waitForFunction(() => !window.__viz.camera?.().blending, { timeout: 4000 }).catch(() => {});
       const file = join(out, `${label}-${theme}.png`);
       await p.screenshot({ path: file });
       const t = stamp(file);

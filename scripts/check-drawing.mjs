@@ -90,6 +90,37 @@ const arrowsOverValues = () => {
   return [...out];
 };
 
+// Every part lit right now (data-named: what the step's shot, the voice or the current operation lights)
+// is wholly on the stage and under no open card. The camera's subject is only what a step names; a
+// Bloom filter's word lit bits the frame cut off, and the lab card hid the bit that decided the answer.
+// A part more than a third of the stage across (a chain round a cassette, a cable running off to the
+// frame) is structure the figure runs through, not a subject that can be framed whole, and is skipped.
+const litOutOfView = () => {
+  const stage = document.getElementById("stage")?.getBoundingClientRect();
+  if (!stage) return [];
+  const open = (e) => e && !e.hidden && getComputedStyle(e).display !== "none" && getComputedStyle(e).visibility !== "hidden";
+  const cards = ["lab", "predict", "concept", "practice"].map((id) => document.getElementById(id)).filter(open).map((e) => ({ id: e.id, r: e.getBoundingClientRect() }));
+  const shown = (el) => {
+    for (let e = el; e && e.id !== "fig"; e = e.parentElement) if (getComputedStyle(e).display === "none") return false;
+    return true;
+  };
+  const parts = new Map();
+  for (const el of document.querySelectorAll("#fig [data-named]")) {
+    if (!shown(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) continue;
+    const p = el.dataset.part ?? "a part", b = parts.get(p);
+    parts.set(p, b ? { l: Math.min(b.l, r.left), t: Math.min(b.t, r.top), r: Math.max(b.r, r.right), b: Math.max(b.b, r.bottom) } : { l: r.left, t: r.top, r: r.right, b: r.bottom });
+  }
+  const out = [];
+  for (const [p, r] of parts) {
+    if (r.r - r.l > stage.width / 3 || r.b - r.t > stage.height / 3) continue;
+    if (r.l < stage.left - 1 || r.r > stage.right + 1 || r.t < stage.top - 1 || r.b > stage.bottom + 1) out.push(`"${p}" is lit but runs off the stage`);
+    for (const c of cards) if (Math.min(r.r, c.r.right) - Math.max(r.l, c.r.left) > 1 && Math.min(r.b, c.r.bottom) - Math.max(r.t, c.r.top) > 1) out.push(`"${p}" is lit but under the #${c.id} card`);
+  }
+  return out;
+};
+
 // Measure what a reader sees right now: scroll, callouts, open cards, and any broken number.
 const measure = () => {
   const doc = document.documentElement;
@@ -228,6 +259,7 @@ try {
         lastT = r.T;
         judge(s, r);
         for (const name of await p.evaluate(arrowsOverValues)) fail(`${s}: an arrow runs across the value ${name}; route it over a gap between parts (arrow's via) or end it on a face`);
+        for (const f of await p.evaluate(litOutOfView)) fail(`${s}: ${f}; frame it (the step's shot or subject), or light less`);
       }
       if (!has("answer") || !has("labInputs") || !has("lab")) continue;
       // The prediction, answered, on the step that reveals it.
@@ -254,8 +286,11 @@ try {
         for (const val of inp.type === "text" ? [...(inp.samples ?? []), ""] : [inp.min, inp.max]) {
           const out = await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, val);
           await wait(80);
+          // the camera may move to frame the lab's state (cardShot): measure it at rest
+          await p.waitForFunction(() => !window.__viz.camera?.().blending, { timeout: 4000 }).catch(() => {});
           const r = await p.evaluate(measure);
           const s = `${at} ${v} lab ${inp.id}=${JSON.stringify(val)}`;
+          for (const f of await p.evaluate(litOutOfView)) fail(`${s}: ${f}; frame the lab's state clear of its card (the machine's cardShot)`);
           if (!out || !out.verdict || !Array.isArray(out.rows)) fail(`${s}: the lab gave no verdict`);
           judge(s, r);
           await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, inp.value);
