@@ -1,79 +1,120 @@
 {
-  "stamp": "b497841c90a487d8",
+  "stamp": "afccb3ab4e834884",
   "reviewer": "independent",
-  "summary": "Every hash value, bit position, bit count and conditional rate I recomputed (32-bit FNV-1a on \"i:word\", mod 16, all four variants, lab samples) matches the page and the picture, and the base k = 3 walk-through is correct. The main faults are calling Bloom's classic formula the 'exact expected rate' (it is a lower bound, and at m = 16 it is off by 0.5 to 2 points), a Predict question frozen to the k = 3 bits in every variant, variants that lose the false negative and counting filter (k = 1) or the 'definitely not' answer (k = 6), a What if that compares one run's luck instead of the expected trade-off, and a sizing topic given only as one number.",
+  "summary": "Round 2. I recomputed every new number: the expected rate E[(X/m)^k] for 3 words in 16 bits, by both a fill-distribution recursion and the Stirling-number formula, is 17.60, 10.53, 9.06, 9.35, 10.63 and 12.71% for k = 1 to 6. I also checked the readout's expected values (0.58% for 1 word at k = 3, 3.52% for 2 words at k = 3, 12.11% for 2 words at k = 1), the sizing rule (1/ln 2 = 1.443; ln 10/(ln 2)² = 4.79 bits per tenfold), and the new words' hashes (eel, ant, and ram, cod and ewe in Now you try). All are right, and all four What if variants now carry every lesson. Seven of the nine round-1 findings are fixed. The bit-framing finding is only partly fixed, and Now you try's drawing is fixed but the stage heading above it is not, so both stay open. I add four small new ones: the readouts after the naive delete, a 'becomes 1' for a bit that was already 1, the What if quietly changing which words are in the set at k = 1, and '1 bits set' / '1 words added'.",
   "findings": [
     {
-      "where": "details.facts[3]; every false-positive caption (variants.*.captions, the 'Ask for jay' step, and 'Ask for elk' in six)",
-      "text": "at 16 bits the exact expected rate, (1 − (1 − 1/m)^(kn))^k, is a little higher / for an expected rate of (1 − (1 − 1/m)^(kn))^k = 8.6%",
+      "where": "details.facts[3]; every false-positive caption",
+      "text": "at 16 bits the exact expected rate, (1 − (1 − 1/m)^(kn))^k, is a little higher",
       "severity": "wrong",
-      "finding": "(1 − (1 − 1/m)^(kn))^k is Bloom's classic estimate, not the exact expected false-positive rate. It raises the expected fill to the k-th power, which treats the k probed bits as independent. They are not: they are negatively correlated through the fixed number of set bits. The true expectation is E[(X/m)^k], where X is the number of distinct positions hit by kn uniform draws. By Jensen's inequality it is at least (E[X]/m)^k, and strictly greater for k ≥ 2 (Bose et al., 'On the false-positive rate of Bloom filters', IPL 2008; Christensen, Roginsky & Jimeno 2010). Computing it exactly for m = 16, n = 3 gives: k = 1: 17.60% (the formula is exact only here); k = 3: 9.06% (page says 8.6%); k = 4: 9.35% (page says 8.4%); k = 6: 12.71% (page says 10.5%). This changes the conclusion too: under the true expectation k = 3 beats k = 4 at this size, while the page's figures put k = 4 ahead. Fix: call it 'Bloom's classic estimate (a slight underestimate at small m)', or replace it with E[(X/m)^k] and its values.",
+      "finding": "Bloom's classic estimate was called the exact expected rate; the true expectation is E[(X/m)^k]: 17.60, 10.53, 9.06, 9.35, 10.63, 12.71% for k = 1..6 at m = 16, n = 3.",
+      "resolved": false,
       "fixed": true,
-      "response": "Fixed. The model now computes the true expected rate, E[(X/m)^k] over the occupancy distribution of kn uniform hashes (fpRateTrue), tested against an exact Stirling-number reference and a 200,000-trial seeded simulation; it reproduces 17.60%, 9.06%, 9.35% and 12.71%. The false-positive step shows this run's chance, the true expected rate, Bloom's classic estimate named as an estimate that runs a little low for two or more hashes (exact for one), and the large-m formula. The k ranking now comes from the true rate: lowest at 3 here, with the large-filter rule (m/n) ln 2 = 3.7 named as such. Details no longer calls the classic formula exact. The claim about extra hashes is tested against the true rate."
+      "response": "Fixed. The page now gives the expected rate as the average of (X/m)^k over the fill X, computed exactly. It shows 17.6, 10.5, 9.1, 9.3, 10.6 and 12.7%, which match my two independent computations. It correctly calls the classic estimate exact only for k = 1 and a little low for k ≥ 2, and correctly says the minimum is at 3, against 3.7 from the large-m rule."
     },
     {
-      "where": "predict.question (shown unchanged in the one, four and six variants); predict.explanation.one",
-      "text": "Jay was never added. Its bits: 4, 6, 15. The answer?  /  Maybe in the set: bits 6 are all 1, set by other words.",
+      "where": "predict.question; predict.explanation.one",
+      "text": "Jay was never added. Its bits: 4, 6, 15. The answer? (in every variant) / bits 6 are all 1",
       "severity": "wrong",
-      "finding": "build.mjs builds the question once from the base model (k = 3), so the same bits appear in every variant. The screenshots confirm 'Its bits: 4, 6, 15' at k = 1, where jay's only bit is 6, and at k = 6, where jay's bits are 3, 4, 6, 10, 13 and 15. The per-variant explanation then lists different bits ('4, 6, 13, 15' for k = 4; '3, 4, 6, 10, 13, 15' for k = 6), so the question and its answer contradict each other. The k = 1 explanation also reads 'bits 6 are all 1'; it should say 'bit 6 is 1'. Build the question per variant from that variant's step-6 event, and make the explanation's number agree with the bit count.",
+      "finding": "The question was built from the base variant only, so it contradicted the per-variant explanations; the k = 1 explanation was ungrammatical.",
+      "resolved": false,
       "fixed": true,
-      "response": "Fixed. The prediction is built per variant from that variant's model (story.mjs `prediction`): its word, its bits and its answer; the player now takes a question per variant. A single bit reads 'Its bit: 6' and 'bit 6 is 1, set by another word'. A test checks, for every variant, that the question names the word and every bit the model picks, that the answer is the model's, and that one bit is never called 'bits'."
+      "response": "Fixed. The question is per variant ('Eel … Its bit: 4' at k = 1; jay's 3, 4 or 6 bits otherwise). The screenshots match each variant's step-6 event, and the k = 1 explanation now reads 'bit 4 is 1, set by another word'."
     },
     {
-      "where": "variants.one, steps 7–8 (headings, captions, voice)",
-      "text": "Delete cat by clearing bit 6. … [step 8] Ask for fox: its bit is 1. Maybe in the set. / None of the other words used this bit, so this time nothing else is damaged",
+      "where": "variants.one, steps 7–8",
+      "text": "None of the other words used this bit, so this time nothing else is damaged",
       "severity": "missing",
-      "finding": "At k = 1 the delete happens to break nothing, so the 'Ask again' step repeats step 4 word for word (same heading without 'again', same caption, same voice: 'And it's right: fox was added'). As a result, this variant never shows a false negative, never explains why a Bloom filter has no delete, and never mentions counting Bloom filters or their caveats. Those topics exist only in the step-8 false-negative caption. A reader who picks '1' in What if loses two core topics. Fix: keep the counting-filter paragraph on step 8 in every variant, or say plainly at step 8 that this run got lucky and why deletion still fails in general (with one example of a shared bit).",
+      "finding": "At k = 1 the delete broke nothing, so the variant never showed a false negative or mentioned counting filters.",
+      "resolved": false,
       "fixed": true,
-      "response": "Fixed. Each variant now tells the story with words its own hashes make every case happen for (model.mjs `opsFor`, preferring the three-hash story's words). With one hash function the second word shares the first's bit, so deleting the first breaks it: step 8 is a false negative with the counting-filter paragraph. The tabs name the lessons (Shared bit, Definitely not, False positive, False negative...) instead of the words. Tests check every variant's results are added, added, added, maybe, no, false-positive, cleared, false-negative, and that no step repeats the previous step's heading, narration or any long sentence of its caption."
+      "response": "Fixed. The k = 1 run now adds cat, jay and owl. Cat and jay share bit 6 (both hash to 6 under h1, which I verified), so clearing cat makes jay a false negative, and the counting-filter paragraph follows."
     },
     {
       "where": "variants.six, steps 5–6",
-      "text": "Ask for elk: every bit is 1. A false positive. (caption repeats the whole rate paragraph from step 6)",
+      "text": "Ask for elk: every bit is 1. A false positive.",
       "severity": "missing",
-      "finding": "At k = 6 elk is a false positive too, so this variant never shows a 'definitely not' answer. The no-false-negatives guarantee ('One 0 is enough…') and the use case it supports ('a database … skips a disk read whenever the filter says definitely not') disappear, yet these are the topics the coverage list assigns to step 5. Steps 5 and 6 also repeat the same long rate-and-sizing paragraph verbatim. Fix: at k = 6, ask about a word that still hits a 0 (emu does: bits 7, 14, 1, 0, 3, 10 include 1 and 8, which are 0), or add the definitely-not explanation to this variant's text.",
+      "finding": "At k = 6 no query hit a 0, so 'definitely not' and the database use were never shown; steps 5 and 6 repeated the same paragraph.",
+      "resolved": false,
       "fixed": true,
-      "response": "Fixed. With six hash functions the 'definitely not' question is now asked with a word that hits a 0 (ant), chosen by the model, so this variant keeps 'One 0 is enough' and the disk-read use; the rate-and-sizing paragraph appears on step 6 only. A test checks every core lesson is said at its step in every variant."
+      "response": "Fixed. Step 5 now asks for ant. Its bits are 3, 14, 1, 12, 7 and 2 (verified), and bit 1 is 0, so the answer is definitely not. The picture lights bit 1 red and the other five green, and the duplicated paragraph is gone."
     },
     {
-      "where": "What if (1 / 3 / 4 / 6) and the 'chance of a false positive' readout",
-      "text": "18.8% / 12.5% / 15.3% / 44.9% chance of a false positive (readout at the jay step for k = 1, 3, 4, 6); 'The best number of hash functions here is (m/n) ln 2 ≈ 3.7'",
+      "where": "What if and the readout",
+      "text": "18.8% / 12.5% / 15.3% / 44.9% chance of a false positive",
       "severity": "misleading",
-      "finding": "The coverage list puts the k trade-off on the What if, but the number a reader compares when switching k is the conditional rate for this one run, (bits set/16)^k. That number is dominated by hash luck: every variant 'set more bits than average', k = 4 reads worse than k = 3 (15.3% vs 12.5%) even though the page's own expected figures rank them the other way, and k = 6 reads 44.9% against an expectation of about 10.5–12.7%. The U-shaped curve with its minimum near (m/n) ln 2 is never shown side by side, so the What if teaches the variance of one run rather than the trade-off. Fix: show the expected rate for each k next to the run's rate in the readout (or a small rate-versus-k strip), and say that the optimum is over the expected rate.",
+      "finding": "Switching k showed only one run's conditional rate, so the What if taught hash luck instead of the expected trade-off.",
+      "resolved": false,
       "fixed": true,
-      "response": "Fixed. The readouts show this run's chance of a false positive beside the expected rate for this many hash functions, each labelled as such, and the false-positive step lists the expected rate for 1 to 6 hash functions (17.6%, 10.5%, 9.1%, 9.4%, 10.6%, 12.7% for three words), says it falls and rises again with its lowest point at 3, and says the run's chance depends on where the words happened to land."
+      "response": "Fixed. The readout now shows 'this run's chance' next to 'expected with this many hash functions' (for example 12.5% vs 9.1% at k = 3, and 15.3% vs 9.3% at k = 4), and every false-positive caption lists the full expected curve for k = 1 to 6."
     },
     {
-      "where": "step 6 captions (sizing); concept/voice",
-      "text": "Real filters are sized from the target: about 9.6 bits per item give a 1% rate, with 7 hash functions.  /  about ten bits per item for a one percent error rate",
+      "where": "step 6 captions (sizing)",
+      "text": "about 9.6 bits per item give a 1% rate, with 7 hash functions",
       "severity": "missing",
-      "finding": "The numbers are right: −ln(0.01)/(ln 2)² = 9.585 bits per item, and k = log₂(100) = 6.64, rounded to 7. But sizing is a coverage topic and the page gives only this single data point. A reader cannot size a filter for 0.1% or 5% from it. Add the rule: m/n = −ln p / (ln 2)² ≈ 1.44·log₂(1/p) bits per item, with k = (m/n) ln 2 = log₂(1/p). As a rule of thumb, each extra ~4.8 bits per item cuts the rate tenfold (0.1% needs about 14.4 bits per item and k = 10). Also note that the 1.44 factor is the overhead over the information-theoretic minimum, log₂(1/p).",
+      "finding": "Sizing was a single data point with no rule.",
+      "resolved": false,
       "fixed": true,
-      "response": "Fixed. Step 6 now gives the rule: m/n = −ln p / (ln 2)² ≈ 1.44 log₂(1/p) bits per item with k = log₂(1/p) hash functions, the 1% example from it (9.6 bits per item, 7 hash functions, log₂ 100 ≈ 6.6), and that each tenfold cut in p costs about 4.8 more bits per item."
+      "response": "Fixed. The page now gives m/n = −ln p/(ln 2)² ≈ 1.44 log₂(1/p) and k = log₂(1/p), the 1% example (9.6 bits per item, 7 hash functions, log₂ 100 ≈ 6.6), and about 4.8 more bits per item for each tenfold cut in p. All of these are correct."
     },
     {
       "where": "step 8 captions (counting filter caveats)",
-      "text": "The counters, often 4 bits each, can also overflow, and they cost about four times the space of plain bits.",
+      "text": "The counters, often 4 bits each, can also overflow",
       "severity": "misleading",
-      "finding": "This is true, but stated without context it suggests overflow is a practical risk. Fan et al. (Summary Cache) chose 4-bit counters because overflow is then vanishingly rare: the probability that any counter reaches 16 is at most about 1.37 × 10⁻¹⁵ × m at the optimal k. They also note the standard handling: a counter that overflows sticks at its maximum, which can later cause a false negative only if it is decremented. One clause would keep the caveat honest: 'with 4-bit counters overflow is astronomically rare; a full counter is left saturated'.",
+      "finding": "Overflow was presented as a practical risk without context.",
+      "resolved": false,
       "fixed": true,
-      "response": "Fixed. The caveat now reads: 'The counters, often 4 bits each, cost about four times the space of plain bits; with 4 bits an overflow is astronomically rare, and a counter that does fill up is left stuck at its maximum.'"
+      "response": "Fixed. The text now reads 'with 4 bits an overflow is astronomically rare, and a counter that does fill up is left stuck at its maximum', which matches Fan et al."
     },
     {
-      "where": "figure framing: variants.one steps 5–8; variants.three steps 1, 6, 7; lab in every variant",
-      "text": "(picture) the bit array cropped by the camera, or covered by the lab card",
+      "where": "figure framing: variants.one steps 2–8; variants.three steps 1 and 6",
+      "text": "(picture) parts of the 16-bit array off frame while the readout counts them",
       "severity": "misleading",
-      "finding": "In the k = 1 'Ask for elk' shot, bits 6, 7 and 15 are off the top or right edge and bit 4 is cut. In the k = 1 jay, delete and ask-again shots, bits 0 and 8 are off the left edge. In k = 3 steps 1, 6 and 7, bits 0 and 8 are clipped at the left edge. The 'N bits set' readout then counts bits the reader cannot see. In the lab, the word card sits over the left end of the array and hides a bit being checked: emu's bit 1 (k = 3), the deciding 0, is half covered, and hippopotamuses' bit 0 (k = 4) is hidden, with its arrow running under the card. With m = 16 the point is that every bit can be drawn (details.facts[0]), so keep all 16 in frame and move the lab card off the array.",
+      "finding": "Partly fixed. The lab card no longer covers the array, and every bit an operation touches is now lit and in frame. But the k = 1 camera still pushes untouched bits out of view. In 'Ask for elk' (step 5), bit 4 (a 1) is cut at the top, and bits 5, 6, 7 and 15 are off the frame, while the readout says '2 bits set', so one of the two set bits is invisible and the other half cut. In k = 1 steps 2, 6–8 and k = 3 steps 1 and 6, bits 0 and 8 are clipped at the left edge. Details says m = 16 was chosen 'so small that every bit can be drawn'. With only 16 bits the whole array should stay in frame, so the reader can check the 'bits set' count and see that the remaining bits are 0, which is the whole basis of the false-positive arithmetic.",
+      "resolved": false,
       "fixed": true,
-      "response": "Fixed. The current operation now lights its word and every bit it touches, and check-drawing fails any lit part that runs off the stage or sits under an open card, at every step of every variant and at every lab sample; a planted fault (VIZ_PLANT=card-only-shot, framing the card alone) must fail it. While the lab or Now you try is open the camera frames all 16 bits and the word to the right of the card (the player's new cardShot/cardClear), zooming out below 1 if it must, so no bit the word checks is hidden."
+      "response": "Fixed. The page now keeps the whole array in frame at every step: DATA.camera.keep = [\"array\"] (all 16 bits), a general option the player honours in every step's shot and every voice-led shot, zooming and panning only as far as the array stays whole. check-drawing measures the drawn bits (not the machine's bounds) at every step's still frame and at four moments through each step, in every variant at both sizes, and fails any that run off the stage; a planted fault (VIZ_PLANT=short-keep, reporting only four bits' bounds) must fail it. Where the kept array stops the camera centring a subject, the subject need only be in the clear area and large enough."
     },
     {
-      "where": "lab and practice opened from step 8; legend",
-      "text": "Type any word. The filter holds cat, fox and owl. (tab '08 Ask again' highlighted)  /  practice: 'A 16-bit filter with 1 hash function holds ram, cod and ewe. Bits set: 0, 9 and 10.'  /  legend: 'This word's bit, still 0'",
+      "where": "lab, Now you try, legend",
+      "text": "The filter holds cat, fox and owl (lab at step 8) / practice drawn over the step-8 filter / 'This word's bit, still 0'",
       "severity": "misleading",
-      "finding": "The lab silently restores the pre-delete filter (8 bits, 3 words, cat present) while the 'Ask again' tab, whose filter has cat cleared, stays highlighted. The practice card describes a different filter (bits 0, 9, 10) than the one drawn behind it (the page's own k = 1 array, with bits 3 and 4 set and fox's hash arrow), so picture and question disagree. In step 8 the legend calls the red key 'This word's bit, still 0', but bit 6 was 1 and has just been cleared, so 'still' is wrong there. Fix: label the lab's state ('the filter after adding cat, fox and owl'), dim or hide the figure during practice (or draw the practice filter), and change the legend to 'This word's bit, now 0'.",
+      "finding": "Mostly fixed. The lab now names its filter ('The filter of step 8, after adding cat, fox and owl and deleting cat: 5 of 16 bits set'), and its answers handle deleted words and false negatives. The legend now reads 'A bit this word checks, found 0'. Now you try draws its own filter: ram, cod and ewe at bits 10, 0 and 9, with cod hashing to 0, all verified, and the readout matches it (3 bits, 18.8%, 17.6%). One mismatch remains. The stage heading above that drawing still reads 'Ask for jay again: bit 6 is 0. A false negative.', and the tab still says '08 False negative'. Both describe the step-8 filter, not the ram, cod and ewe filter on screen, and bit 6 is plainly 0 and not being asked. While Now you try is open, replace the heading with something like 'Now you try' or the practice question's own subject.",
+      "resolved": false,
       "fixed": true,
-      "response": "Fixed. The lab asks the filter the highlighted step shows and its first row says which ('The filter of step 8, after adding cat, fox and owl and deleting cat: 5 of 16 bits set'), with verdicts for a member broken by a delete and for a deleted word. Now you try draws the question's own filter and word on the stage. The legend says 'A bit this word checks, found 0' (and 'found 1'), true for a bit cleared a step before."
+      "response": "Fixed. While Now you try draws its own filter, the stage heading describes it ('Practice: a 16-bit filter holding ram, cod and ewe'); the lab already sets its own heading. Closing Now you try restores the step's heading and frame."
+    },
+    {
+      "where": "readout after the naive delete (step 7 and 8, every variant)",
+      "text": "5 bits set · 2 words added · 3.1% this run's chance of a false positive · 3.5% expected with this many hash functions (k = 3); 1 bits set · 2 words added · 6.3% · 12.1% (k = 1)",
+      "severity": "misleading",
+      "finding": "After cat's bits are cleared, the readout scores the filter as if it were a valid Bloom filter that had only ever held two words. The 'expected' figure is the rate for a fresh 2-word filter (I get 3.52% at k = 3 and 12.11% at k = 1). Next to the 9.1% before the delete, it suggests the delete improved the filter. The filter is actually broken: fox (or jay at k = 1) now tests 'definitely not', which a Bloom filter should never say about a member. The run's false-positive chance is arithmetically right for non-members, but the expected rate no longer describes this filter. After a clear, drop or grey out the 'expected' figure, or add a note such as 'no longer a valid Bloom filter: members can now test absent'.",
+      "fixed": true,
+      "response": "Fixed. After the naive delete, both rate readouts show '–' and a note reads 'no rate: the delete broke the filter', in the story from the delete onward and in the lab whenever the filter shown has had a word deleted. No better-looking rate is shown."
+    },
+    {
+      "where": "add captions and voice where a bit is shared (variants.one step 2; variants.three/four/six steps 2–3)",
+      "text": "Adding jay: … Bit 6 becomes 1; … Bit 6 was already 1, set by cat, so jay shares it. / Its bit, bit six, becomes one. bit six was already one",
+      "severity": "misleading",
+      "finding": "Setting a bit that is already 1 changes nothing, so saying it 'becomes 1' and then 'was already 1' contradicts itself. This is starkest at k = 1, where the step changes no bit at all: the count stays at 1 of 16. The fact that adding is idempotent is exactly why the filter cannot tell how many words set a bit, and why deletion fails, so it deserves to be stated cleanly. Write: 'Bits 3 and 5 become 1; bit 6 is already 1, set by cat, so fox shares it', and at k = 1: 'Bit 6 is already 1, so nothing changes: the filter cannot tell that a second word set it.'",
+      "fixed": true,
+      "response": "Fixed. Add captions and narration are written from the model: only the bits that were 0 'become 1'; a bit already 1 reads 'Bit 6 was already 1, set by cat, so nothing changes there: fox shares it'. When no bit changes (one hash function, step 2) the caption says 'No bit changes' and makes the point: setting a bit that is already 1 leaves it 1, so the filter cannot tell how many words set a bit, which is why clearing a word's bits cannot delete it."
+    },
+    {
+      "where": "What if 1 vs 3/4/6: the set of words",
+      "text": "variants.one adds cat, jay, owl and asks about eel; the other variants add cat, fox, owl and use jay as the false positive",
+      "severity": "misleading",
+      "finding": "To make every lesson happen at k = 1, that variant swaps fox for jay as a member. So switching What if from 3 to 1 silently changes which words are in the set, and jay goes from 'never added: a false positive' to 'added: maybe, rightly'. A reader comparing variants can easily read this as an effect of k. The expected rate does not depend on the words, but the run's chance and the false-positive and false-negative examples do. Say it on the k = 1 variant, for example in its first caption: 'With one hash function this run adds cat, jay and owl instead of cat, fox and owl, so that a delete can break a shared bit'.",
+      "fixed": true,
+      "response": "Fixed. Where a variant uses another word, its caption and narration say so at that step: 'The three-hash story adds fox here, but with one hash function fox would not share a bit with cat, so deleting cat would break nothing; this version adds jay instead. Only the words differ: every word is hashed the same way.' Likewise for eel (one hash function: jay is one of the words added) and ant (six: elk would find every bit set)."
+    },
+    {
+      "where": "readout labels",
+      "text": "1 bits set · 1 words added",
+      "severity": "wrong",
+      "finding": "The plural is wrong when the count is 1 (k = 3 step 1; k = 1 steps 1, 2, 7 and 8). Use '1 bit set' and '1 word added'.",
+      "fixed": true,
+      "response": "Fixed. A shared mechanism in the player puts a readout's unit in the singular at 1 (data-one on the unit: '1 bit set', '1 word added'), used here and in the concept scaffold. check-arithmetic now also fails '1 <plural noun>' in the page's text, Now you try, the lab's rows and every step's readouts (a noun counts as plural when the page writes it after another count, or it is a common unit)."
     }
   ]
 }
