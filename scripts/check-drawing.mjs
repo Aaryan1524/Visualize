@@ -40,10 +40,24 @@
 //   A page that is clearly over its limit stops being timed once 800 frames of a variant have been,
 //   so a failing page fails in seconds. VIZ_ONLY_PLAYBACK=1 skips every other check, to time a page alone;
 //   VIZ_ONLY_CAMERA=1 runs only the camera's checks.
+// - the look (scripts/lib/look.mjs, thresholds in LOOK there; references/verify.md, "Look checks"), at
+//   1440×900. On a rig page (#fig .rig-part): through the whole story of every What if, sampled every
+//   0.1 s, no part turns a thick solid (one with .rig-wall faces, itself or in its <use>'s template) by a
+//   rotating, shearing or mirroring transform unless it is marked data-rig-turn, and every turn error
+//   RigStage records (globalThis.__rig.turns) is at most 1 px; at each step's still frame, in the light
+//   and the dark theme, every lit (not receded) part's top reads apart from its sides (OKLab lightness of
+//   its caps against its walls) and every part the step is about (lit, or named by a shown callout)
+//   stands off the stage; no more than 4 steps in a row share one framing (a camera that is off is one
+//   framing for the whole story); the parts a step is about span at least 12% of the stage's shorter side;
+//   and each is at least 5% on top of the parts in front of it (sampled with elementsFromPoint). On every
+//   page: no callout's leader is longer than 0.8 of the stage's shorter side or runs more than 0.25 of it
+//   across another part that matters at that step. VIZ_ONLY_LOOK=1 runs only these, in seconds;
+//   VIZ_PLANT=<fault> plants one fault first, and scripts/plant-look.mjs proves each check can fail.
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { drawingPageProblem, launch } from "./lib/browser.mjs";
+import { LOOK, inFaces, inLeaders, inTurnSweep, inVisible, longestSameRun, oklabL, partContrast, turns } from "./lib/look.mjs";
 
 const page = process.argv[2];
 if (!page) {
@@ -62,6 +76,9 @@ const MAX_SCALE = 3;
 const THROTTLE = Number(process.env.VIZ_CPU_THROTTLE || 1);
 const ONLY_PLAYBACK = !!process.env.VIZ_ONLY_PLAYBACK;
 const ONLY_CAMERA = !!process.env.VIZ_ONLY_CAMERA;
+const ONLY_LOOK = !!process.env.VIZ_ONLY_LOOK;
+// VIZ_PLANT=<fault> plants one fault in the page before the look checks measure it (scripts/plant-look.mjs)
+const PLANT = process.env.VIZ_PLANT ?? "";
 const throttle = async (page) => THROTTLE > 1 && (await (await page.createCDPSession()).send("Emulation.setCPUThrottlingRate", { rate: THROTTLE }));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -185,6 +202,248 @@ const fakeAudio = () => {
   };
 };
 
+// A planted fault for the look checks (VIZ_PLANT, run by scripts/plant-look.mjs): installed before the
+// page loads, it wraps seek and seekStep so the fault is laid on again after every frame.
+const plantFault = (name) => {
+  const wrap = () => {
+    const v = window.__viz;
+    if (!v || v.__planted) return !!v;
+    v.__planted = true;
+    const fig = () => document.getElementById("fig");
+    const css = (text) => {
+      const s = document.createElement("style");
+      s.textContent = text;
+      document.head.append(s);
+    };
+    if (name === "flat") css(".rig-face{fill:#9a9a9a!important}");
+    if (name === "pale") css(".rig-cap{fill:var(--stage)!important}");
+    if (name === "turn-error") ((globalThis.__rig ??= { turns: new Map() }).turns.set("planted", { maxErrPx: 3.5, n: 1 }));
+    if (name === "still") {
+      const cam = v.camera;
+      let first = null;
+      v.camera = () => {
+        const c = cam();
+        first ??= c.m;
+        return { ...c, m: first };
+      };
+    }
+    const after = () => {
+      const f = fig();
+      if (name === "turn") {
+        // the first thick part drawn in place, turned 20° by its transform and not marked
+        const g = [...f.querySelectorAll(".rig-part")].find((g) => g.style.display !== "none" && g.querySelector(".rig-wall") && !g.hasAttribute("data-rig-turn"));
+        if (g) g.setAttribute("transform", `${g._t ?? ""} rotate(20)`.trim());
+      }
+      // the first part the step lights that is a solid, as all its groups on screen, in `into`'s units
+      const litPart = () => {
+        const g = [...f.querySelectorAll(".rig-part[data-named]")].find((g) => g.style.display !== "none" && g.querySelector(".rig-solid"));
+        if (!g) return null;
+        let r = null;
+        for (const e of f.querySelectorAll(`.rig-part[data-part="${CSS.escape(g.dataset.part)}"]`)) {
+          const q = e.getBoundingClientRect();
+          if (e.style.display === "none" || !q.width) continue;
+          r = r ? { l: Math.min(r.l, q.left), t: Math.min(r.t, q.top), r: Math.max(r.r, q.right), b: Math.max(r.b, q.bottom) } : { l: q.left, t: q.top, r: q.right, b: q.bottom };
+        }
+        return r && { g, r };
+      };
+      const toUnits = (el, x, y) => new DOMPoint(x, y).matrixTransform(el.getScreenCTM().inverse());
+      if (name === "small") {
+        // every part the step frames or lights drawn at a twentieth of its size, about their common centre
+        const c = v.camera?.(), shot = (c?.active && (c.shots[c.step] ?? c.subject?.[c.step])) || [];
+        const gs = [...f.querySelectorAll(".rig-part")].filter((g) => g.hasAttribute("data-named") || shot.includes(g.dataset.part));
+        const rs = gs.map((g) => g.getBoundingClientRect()).filter((r) => r.width);
+        if (!rs.length) return;
+        const X = (Math.min(...rs.map((r) => r.left)) + Math.max(...rs.map((r) => r.right))) / 2, Y = (Math.min(...rs.map((r) => r.top)) + Math.max(...rs.map((r) => r.bottom))) / 2;
+        for (const g of gs) {
+          const q = toUnits(g.parentElement, X, Y);
+          g.setAttribute("transform", `translate(${q.x},${q.y}) scale(.05) translate(${-q.x},${-q.y}) ${g._t ?? ""}`.trim());
+        }
+      }
+      if (name === "leader-long") {
+        // the first shown callout's leader runs from the figure's top-left corner to its bottom-right
+        const vb = f.viewBox.baseVal;
+        const g = [...f.querySelectorAll("g.label")].find((g) => g.style.display !== "none" && g.getAttribute("visibility") !== "hidden" && g.querySelector(".leader"));
+        g?.querySelector(".leader").setAttribute("d", `M${vb.x + vb.width * 0.05},${vb.y + vb.height * 0.05}L${vb.x + vb.width * 0.95},${vb.y + vb.height * 0.95}`);
+      }
+      if (name === "leader-cross") {
+        // a callout shown on every step, its leader wandering back and forth over the first lit part
+        const lit = litPart(), g = f.querySelector("g.label"), path = g?.querySelector(".leader");
+        if (!lit || !path) return;
+        g.style.display = "";
+        g.setAttribute("visibility", "visible");
+        const { r } = lit, pts = [];
+        for (let i = 0; i <= 8; i++) pts.push(toUnits(path, i % 2 ? r.r - (r.r - r.l) * 0.2 : r.l + (r.r - r.l) * 0.2, r.t + ((r.b - r.t) * (0.3 + i * 0.05))));
+        const sb = document.querySelector(".vz-stage").getBoundingClientRect(), end = toUnits(path, sb.left + 4, sb.bottom - 4);
+        path.setAttribute("d", `M${pts.map((q) => `${q.x},${q.y}`).join("L")}L${end.x},${end.y}`);
+      }
+      if (name === "cover") {
+        // an opaque part laid over the whole of the first lit part
+        f.querySelector("#planted-cover")?.remove();
+        const lit = litPart();
+        if (!lit) return;
+        const host = lit.g.parentElement, a = toUnits(host, lit.r.l, lit.r.t), b = toUnits(host, lit.r.r, lit.r.b);
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        c.id = "planted-cover";
+        c.setAttribute("class", "rig-part");
+        c.dataset.part = "planted-cover";
+        c.innerHTML = `<rect x="${a.x}" y="${a.y}" width="${b.x - a.x}" height="${b.y - a.y}" fill="#777"/>`;
+        host.append(c);
+      }
+    };
+    for (const k of ["seek", "seekStep"]) {
+      const f = v[k];
+      v[k] = (...a) => {
+        const r = f(...a);
+        after();
+        return r;
+      };
+    }
+    return true;
+  };
+  const t = setInterval(() => wrap() && clearInterval(t), 5);
+};
+
+// The parts a step is about: those it lights (data-named) and those its shown callouts name.
+const focusParts = () => {
+  const shown = (g) => g.style.display !== "none" && g.getAttribute("visibility") !== "hidden";
+  const parts = new Set([...document.querySelectorAll("#fig .rig-part")].filter(shown).map((g) => g.dataset.part));
+  const out = new Set([...document.querySelectorAll("#fig .rig-part[data-named]")].filter(shown).map((g) => g.dataset.part));
+  for (const g of document.querySelectorAll("#fig g.label")) if (shown(g) && parts.has(g.dataset.at)) out.add(g.dataset.at);
+  return [...out];
+};
+
+// The look (scripts/lib/look.mjs): what a rig figure must show to read at first glance. At 1440×900;
+// the turn audit sweeps the whole story of every What if, the rest measure each step's still frame
+// of the first.
+async function lookChecks() {
+  const started = Date.now();
+  const p = await browser.newPage();
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.evaluateOnNewDocument(fakeAudio);
+  if (PLANT) await p.evaluateOnNewDocument(plantFault, PLANT);
+  await p.goto(url);
+  await p.evaluate(() => document.fonts.ready);
+  await wait(300);
+  if (PLANT) await p.waitForFunction(() => window.__viz?.__planted, { timeout: 4000 });
+  const info = await p.evaluate(() => ({ rig: !!document.querySelector("#fig .rig-part"), variants: window.__viz.variants ?? [], steps: window.__viz.steps, cam: window.__viz.camera?.() ?? null }));
+  const variants = info.variants.length ? info.variants : [null];
+  const report = [];
+
+  // 1. Turns: a thick solid turned by one 2D transform shows a wrong side; RigStage records the error
+  // a part placed with turnErrPx leaves.
+  if (info.rig) {
+    const bad = new Map();
+    let rec = [], samples = 0, turned = 0;
+    for (const v of variants) {
+      if (v) await p.evaluate((v) => window.__viz.variant(v), v);
+      const r = await p.evaluate(inTurnSweep, 100, turns.toString());
+      samples += r.samples;
+      turned += r.turned;
+      for (const b of r.bad) if (!bad.has(b.id)) bad.set(b.id, { ...b, v });
+      rec = r.record;
+    }
+    // one line a part, for the first dozen; the rest (a chain's links) on one line
+    const list = [...bad];
+    for (const [id, b] of list.slice(0, 12)) fail(`look ${b.v ?? ""} at ${b.t.toFixed(1)} s: part "${id}" turns a thick solid by one 2D transform without its error budget — use turningPart()`);
+    if (list.length > 12) fail(`look: ${list.length - 12} more parts turn thick solids by one 2D transform without their error budget — use turningPart(): ${list.slice(12).map(([id]) => id).join(", ")}`);
+    for (const t of rec) if (t.maxErrPx > LOOK.turnErrPx) fail(`look: part "${t.id}" is drawn with a turn error of ${t.maxErrPx.toFixed(2)} px, over ${LOOK.turnErrPx} px; draw it at more angles (turningPart's steps)`);
+    const worst = rec.reduce((m, t) => (t.maxErrPx > m.maxErrPx ? t : m), { id: "-", maxErrPx: 0 });
+    report.push(`turns: ${samples} frames, ${turned} turned placements, ${bad.size} unbudgeted thick part(s)${bad.size ? ` (${[...bad.keys()].join(", ")})` : ""}, ${rec.length} recorded, worst error ${worst.maxErrPx.toFixed(2)} px (${worst.id})`);
+  }
+  // Each step's still frame of every What if, in the light theme and then the dark.
+  const contrast = new Map(), pale = new Map(), leaders = [], hidden = [], spans = [], runs = [];
+  let capWallMin = { d: Infinity }, capStageMin = { d: Infinity }, leaderMax = { len: 0 }, crossMax = { px: 0 }, visMin = { share: Infinity }, spanMin = { span: Infinity };
+  for (const v of variants) {
+  if (v) await p.evaluate((v) => window.__viz.variant(v), v);
+  const ms = [], at = (k) => `${v ? `${v} ` : ""}step ${k}`;
+  for (const theme of info.rig ? ["light", "dark"] : ["light"]) {
+    await p.evaluate((th) => document.querySelector(".vz").dataset.theme !== th && document.getElementById("theme").click(), theme);
+    for (let k = 0; k < info.steps; k++) {
+      await p.evaluate((k) => window.__viz.seekStep(k), k);
+      const named = info.rig ? await p.evaluate(focusParts) : [];
+      if (info.rig) {
+        // 2. Solid contrast: a lit solid's caps and walls read as different faces; a lit subject's caps
+        // stand off the stage.
+        const fc = await p.evaluate(inFaces);
+        const stageL = oklabL(fc.stage);
+        for (const part of fc.parts) {
+          const best = partContrast(part.solids);
+          if (!best) continue;
+          const d = Math.abs(best.cap - best.wall), key = `${theme}|${part.part}`;
+          if (d < capWallMin.d) capWallMin = { d, part: part.part, theme, k: at(k) };
+          if (d < LOOK.capWall && !contrast.has(key)) contrast.set(key, { d, part: part.part, theme, k: at(k), ...best });
+          if (named.includes(part.part)) {
+            const ds = Math.abs(best.cap - stageL);
+            if (ds < capStageMin.d) capStageMin = { d: ds, part: part.part, theme, k: at(k) };
+            if (ds < LOOK.capStage && !pale.has(key)) pale.set(key, { d: ds, part: part.part, theme, k: at(k) });
+          }
+        }
+      }
+      if (theme !== "light") continue;
+      // 4. Leaders: short, and clear of the other named parts.
+      const ld = await p.evaluate(inLeaders);
+      for (const l of ld.leaders) {
+        const len = l.len / ld.short;
+        if (len > leaderMax.len) leaderMax = { len, label: l.label, k: at(k) };
+        if (len > LOOK.leaderLong) leaders.push(`look ${at(k)}: the leader of "${l.label}" is ${(len * 100).toFixed(0)}% of the stage's shorter side, over ${LOOK.leaderLong * 100}%; move the callout next to its part`);
+        for (const c of l.cross) {
+          const px = c.px / ld.short;
+          if (px > crossMax.px) crossMax = { px, label: l.label, part: c.part, k: at(k) };
+          if (px > LOOK.leaderCross) leaders.push(`look ${at(k)}: the leader of "${l.label}" crosses "${c.part}" for ${(px * 100).toFixed(0)}% of the stage's shorter side, over ${LOOK.leaderCross * 100}%; put the callout on its part's open side`);
+        }
+      }
+      if (!info.rig) continue;
+      // 5. Focus: the parts lit now are mostly on top, not under other parts.
+      for (const r of await p.evaluate(inVisible, named)) {
+        if (r.share < visMin.share) visMin = { ...r, k: at(k) };
+        if (r.share < LOOK.visible) hidden.push(`look ${at(k)}: "${r.part}" is lit but ${Math.round((1 - r.share) * 100)}% of it is covered${r.by ? ` (most by "${r.by}")` : ""}; turn the figure or cut the cover away (a cutaway)`);
+      }
+      // 3. Framing: the step's camera, and how much of the stage its subject spans.
+      const cam = await p.evaluate(() => window.__viz.camera?.() ?? null);
+      if (k > 0) ms.push(cam?.active ? cam.m : null);
+      const names = (cam?.active && (cam.shots[k] ?? cam.subject?.[k])) || named;
+      if (k > 0 && names.length) {
+        const sp = await p.evaluate((names) => {
+          const sb = document.querySelector(".vz-stage").getBoundingClientRect();
+          let b = null;
+          for (const g of document.querySelectorAll("#fig .rig-part")) {
+            if (!names.includes(g.dataset.part) || g.style.display === "none") continue;
+            const q = g.getBoundingClientRect();
+            if (q.width || q.height) b = b ? { x: Math.min(b.x, q.left), y: Math.min(b.y, q.top), r: Math.max(b.r, q.right), b: Math.max(b.b, q.bottom) } : { x: q.left, y: q.top, r: q.right, b: q.bottom };
+          }
+          b ??= window.__viz.partsOnScreen?.(names) ?? null;
+          return b && Math.max(Math.min(b.r, sb.right) - Math.max(b.x, sb.left), Math.min(b.b, sb.bottom) - Math.max(b.y, sb.top)) / Math.min(sb.width, sb.height);
+        }, names);
+        if (sp !== null) {
+          if (sp < spanMin.span) spanMin = { span: sp, k: at(k), names };
+          if (sp < LOOK.subjectSpan) spans.push(`look ${at(k)}: the step is about "${names.join(", ")}", which spans ${(sp * 100).toFixed(0)}% of the stage's shorter side, under ${LOOK.subjectSpan * 100}%; frame it closer (the step's shot)`);
+        }
+      }
+    }
+  }
+  await p.evaluate(() => document.querySelector(".vz").dataset.theme !== "light" && document.getElementById("theme").click());
+  if (info.rig && ms.length > 1) {
+    const clear = info.cam?.clear;
+    const run = ms.every(Boolean) && clear ? longestSameRun(ms, clear) : { len: ms.length, from: 1, to: ms.length };
+    if (run.len > LOOK.sameRun) fail(`look ${v ?? ""}: steps ${run.from} to ${run.to} (${run.len} in a row) show the same framing, over ${LOOK.sameRun}; give the steps shots of what each is about (DATA.camera)`);
+    runs.push(`${v ?? ""} ${run.len} (${run.from}-${run.to})${ms.every(Boolean) ? "" : ", the camera is off"}`.trim());
+  }
+  }
+  for (const c of contrast.values()) fail(`look ${c.theme} ${c.k}: "${c.part}" shows its top and sides ${c.d.toFixed(3)} apart in lightness (OKLab L ${c.cap.toFixed(2)} and ${c.wall.toFixed(2)}, ${c.material}), under ${LOOK.capWall}; give it a material whose lit and dark tones differ`);
+  for (const c of pale.values()) fail(`look ${c.theme} ${c.k}: "${c.part}" is lit but its top is ${c.d.toFixed(3)} in lightness from the stage, under ${LOOK.capStage}; it does not stand off the background`);
+  for (const f of [...new Set([...leaders, ...hidden, ...spans])]) fail(f);
+  if (info.rig) {
+    report.push(`framing: longest run in the same framing ${runs.join(", ")}; smallest subject ${Number.isFinite(spanMin.span) ? `${(spanMin.span * 100).toFixed(0)}% (${spanMin.k}, ${spanMin.names.join(", ")})` : "-"}`);
+  }
+  if (info.rig) {
+    report.push(`contrast: least top-to-sides ${Number.isFinite(capWallMin.d) ? `${capWallMin.d.toFixed(3)} (${capWallMin.part}, ${capWallMin.theme}, ${capWallMin.k})` : "-"}, least lit top to stage ${Number.isFinite(capStageMin.d) ? `${capStageMin.d.toFixed(3)} (${capStageMin.part}, ${capStageMin.theme}, ${capStageMin.k})` : "-"}`);
+    report.push(`focus: least share of a lit part on top ${Number.isFinite(visMin.share) ? `${(visMin.share * 100).toFixed(0)}% (${visMin.part}, ${visMin.k}${visMin.by ? `, under ${visMin.by}` : ""})` : "-"}`);
+  }
+  report.push(`leaders: longest ${(leaderMax.len * 100).toFixed(0)}% of the stage's shorter side${leaderMax.label ? ` ("${leaderMax.label}", ${leaderMax.k})` : ""}, deepest crossing ${(crossMax.px * 100).toFixed(0)}%${crossMax.label ? ` ("${crossMax.label}" over "${crossMax.part}", ${crossMax.k})` : ""}`);
+  console.log(`look${PLANT ? ` (planted: ${PLANT})` : ""}, ${((Date.now() - started) / 1000).toFixed(1)} s: ${report.join(" | ")}`);
+  await p.close();
+}
+
 const browser = await launch();
 {
   const problem = await drawingPageProblem(browser, page);
@@ -195,7 +454,7 @@ const browser = await launch();
   }
 }
 try {
-  for (const [w, h] of ONLY_PLAYBACK || ONLY_CAMERA ? [] : [[1440, 900], [1280, 800]]) {
+  for (const [w, h] of ONLY_PLAYBACK || ONLY_CAMERA || ONLY_LOOK ? [] : [[1440, 900], [1280, 800]]) {
     const p = await browser.newPage();
     await p.setViewport({ width: w, height: h });
     await p.evaluateOnNewDocument(fakeAudio);
@@ -371,7 +630,7 @@ try {
 
   // The camera (a page whose steps name shots, src/drawing/camera.mjs): framing, voice sync,
   // determinism and calm. Pages without one are not touched.
-  if (!ONLY_PLAYBACK) {
+  if (!ONLY_PLAYBACK && !ONLY_LOOK) {
     const p = await browser.newPage();
     await p.setViewport({ width: 1440, height: 900 });
     await p.evaluateOnNewDocument(fakeAudio);
@@ -682,8 +941,9 @@ try {
     }
     await p.close();
   }
+  if (!ONLY_PLAYBACK && !ONLY_CAMERA) await lookChecks();
   // Playback: every frame of the story, for every variant, at 1440 x 900.
-  if (!ONLY_CAMERA) {
+  if (!ONLY_CAMERA && !ONLY_LOOK) {
     // The machine: the same kind of work as a frame of the rig (set a transform on a few hundred <g>
     // holding a <use>, read the layout), timed here, in a blank page of the same browser and size.
     const cal = await browser.newPage();
