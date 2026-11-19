@@ -11,11 +11,27 @@ export interface Face {
   loops: number[][];
   normal: V3;
   role: Role;
+  /**
+   * A chamfer between a wall and the cap on one side: "high" next to the cap whose normal is the
+   * plate's +n, "low" next to the other. A bevel keeps role "wall"; drawing paints the bevel next to
+   * the cap the viewer sees after every wall and just before that cap.
+   */
+  bevel?: "high" | "low";
 }
+
+/**
+ * How drawing orders a mesh's side faces: "bucket" merges same-shade walls into one path (cheap,
+ * right for convex slabs and turned parts whose bands never overlap), "face" paints every face
+ * strictly far to near with its own edges (right for anything that hides parts of itself: coils,
+ * tubes, concave shells).
+ */
+export type FaceSort = "bucket" | "face";
 
 export interface Mesh {
   verts: V3[];
   faces: Face[];
+  /** the order this mesh needs; a Look's sort overrides it; unset means "bucket" */
+  sort?: FaceSort;
 }
 
 /** A plane: points are origin + a·u + b·v, and n = u × v is its normal. */
@@ -271,6 +287,23 @@ function insetLoop(loop: readonly P2[], d: number): P2[] {
   return out;
 }
 
+/** Whether a closed outline turns one way all round (straight runs allowed). */
+export function isConvex(loop: readonly P2[]): boolean {
+  const n = loop.length;
+  let span = 0;
+  for (const p of loop) span = Math.max(span, Math.abs(p[0]), Math.abs(p[1]));
+  const tol = 1e-9 * Math.max(1, span * span);
+  let sign = 0;
+  for (let i = 0; i < n; i++) {
+    const a = loop[i]!, b = loop[(i + 1) % n]!, c = loop[(i + 2) % n]!;
+    const t = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+    if (Math.abs(t) <= tol) continue;
+    if (sign === 0) sign = Math.sign(t);
+    else if (Math.sign(t) !== sign) return false;
+  }
+  return true;
+}
+
 /**
  * A closed plate extruded from t0 to t1 with true 45-degree beveled top and bottom rims.
  * The beveled rims catch directional specular light and give architectural chassis and horological
@@ -305,10 +338,15 @@ export function chamferPlate(pl: Plane, outer: readonly P2[], t0: number, t1: nu
       faces.push({ loops: [q], normal: quadNormal(q[0]!, q[1]!, q[2]!), role });
     }
   };
+  let at = faces.length;
   connect(r0, r1, "wall");
+  for (const f of faces.slice(at)) f.bevel = "low";
   connect(r1, r2, "wall");
+  at = faces.length;
   connect(r2, r3, "wall");
-  return { verts, faces };
+  for (const f of faces.slice(at)) f.bevel = "high";
+  // a concave outline hides parts of its own walls: those need a strict far-to-near order
+  return isConvex(loop) ? { verts, faces } : { verts, faces, sort: "face" };
 }
 
 /**
@@ -376,7 +414,8 @@ export function tube(points: readonly V3[], r: number, segments = 12): Mesh {
   }
   faces.push({ loops: [[...rings[0]!].reverse()], normal: scale(tangents[0]!, -1), role: "end" });
   faces.push({ loops: [[...rings[m - 1]!]], normal: tangents[m - 1]!, role: "end" });
-  return { verts, faces };
+  // a bent tube passes in front of itself (a coil, a loop): paint it face by face
+  return { verts, faces, sort: "face" };
 }
 
 /** A 3D Archimedean spiral polyline in plane `pl`, from radius r0 to r1 over `turns` turns. */
@@ -390,4 +429,67 @@ export function spiralPoints(pl: Plane, r0: number, r1: number, turns: number, s
     out.push(pointOn(pl, r * Math.cos(a), r * Math.sin(a), t));
   }
   return out;
+}
+
+export interface SpiralStrip {
+  /** radius at the start and at the end (Archimedean between) */
+  r0: number;
+  r1: number;
+  turns: number;
+  /** the strip's height along the plane's normal: from t0 to t1 */
+  t0: number;
+  t1: number;
+  /** the strip's thickness across its face */
+  thick: number;
+  /** facets along the whole spiral */
+  steps: number;
+  /** the start angle, radians from u toward v */
+  phase?: number;
+}
+
+/**
+ * A flat spring coiled in a plane (a mainspring, a hairspring, a clock spring): a thin strip of
+ * height t1 - t0 wound as an Archimedean spiral about the plane's origin. A closed mesh: an outer
+ * and an inner wall, a cap at each height and an end at each end. Its coils hide one another, so
+ * it is drawn face by face.
+ */
+export function spiralStrip(pl: Plane, o: SpiralStrip): Mesh {
+  const phase = o.phase ?? 0, steps = Math.max(2, Math.round(o.steps)), half = o.thick / 2;
+  if (!(o.thick > 0)) throw new RangeError("spiralStrip needs a thickness above zero");
+  const centre: P2[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const f = i / steps, a = phase + f * o.turns * 2 * Math.PI, r = o.r0 + (o.r1 - o.r0) * f;
+    centre.push([r * Math.cos(a), r * Math.sin(a)]);
+  }
+  const verts: V3[] = [];
+  // per station: inner-low, outer-low, outer-high, inner-high
+  const ring: number[][] = centre.map((p, i) => {
+    const a = centre[Math.max(0, i - 1)]!, b = centre[Math.min(steps, i + 1)]!;
+    const tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty) || 1;
+    let nx = ty / tl, ny = -tx / tl; // perpendicular to travel
+    if (nx * p[0] + ny * p[1] < 0) (nx = -nx), (ny = -ny); // outward
+    const at = (s: number, t: number) => verts.push(pointOn(pl, p[0] + nx * s, p[1] + ny * s, t)) - 1;
+    return [at(-half, o.t0), at(half, o.t0), at(half, o.t1), at(-half, o.t1)];
+  });
+  const faces: Face[] = [];
+  const face = (loop: number[], want: V3, role: Role) => {
+    const [a, b, c] = loop.map((k) => verts[k]!) as [V3, V3, V3];
+    let n = unit(cross(sub(b, a), sub(c, a)));
+    if (dot(n, want) < 0) (loop = [...loop].reverse()), (n = scale(n, -1));
+    faces.push({ loops: [loop], normal: n, role });
+  };
+  for (let i = 0; i < steps; i++) {
+    const A = ring[i]!, B = ring[i + 1]!;
+    const mid = (k: number) => scale(add(verts[A[k]!]!, verts[B[k]!]!), 0.5);
+    const out = sub(mid(1), mid(0));
+    face([A[1]!, B[1]!, B[2]!, A[2]!], out, "wall");
+    face([A[0]!, A[3]!, B[3]!, B[0]!], scale(out, -1), "wall");
+    face([A[3]!, A[2]!, B[2]!, B[3]!], pl.n, "cap");
+    face([A[0]!, B[0]!, B[1]!, A[1]!], scale(pl.n, -1), "cap");
+  }
+  const first = ring[0]!, last = ring[steps]!;
+  const along0 = sub(verts[ring[1]![0]!]!, verts[first[0]!]!), alongN = sub(verts[last[0]!]!, verts[ring[steps - 1]![0]!]!);
+  face([...first], scale(along0, -1), "end");
+  face([...last], alongN, "end");
+  return { verts, faces, sort: "face" };
 }

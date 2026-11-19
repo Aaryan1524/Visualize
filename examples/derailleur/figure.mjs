@@ -21,8 +21,8 @@
 // lateral e sits at t = e along it.
 
 import {
-  add, affineString, angleBin, axesOf, contactShadow, cross, dot, drawMesh, fitCamera, keyLight, linesOn, moveInPlane,
-  pathThrough, planeKey, planeOf, plate, circlePoints, rod, roundedHull, scale, screenOf, slotKey, sprocket, sub, turned, unit,
+  add, affineString, axesOf, contactShadow, cross, dot, drawMesh, fitCamera, keyLight, linesOn, moveInPlane,
+  pathThrough, planeKey, planeOf, plate, circlePoints, rod, roundedHull, scale, screenOf, slotKey, sprocket, sub, turned, turningPart, unit,
 } from "../../src/rig/index.ts";
 import { offLine, pathAt } from "./model.mjs";
 export { RigStage, screenOf } from "../../src/rig/index.ts";
@@ -39,17 +39,19 @@ export const XCUT = 128;
 export const OFF_ARROW = 30;
 const FADE = 46;
 
-// How many drawings each turning part gets, and the plane each chain piece is placed by. A thick part
-// turned by a transform is exact on that plane and off elsewhere by its distance from it times the
-// turn left over; figure.test.mjs holds every part under a pixel.
+// The fewest drawings each turning part gets, and the plane each near chain piece is placed by. A
+// thick part turned by a transform is exact on that plane and off elsewhere by its distance from it
+// times the turn left over. turningPart (src/rig/motion.ts) adds drawings past these until the worst
+// error is under half a pixel, and reports each placement's error to the page; figure.test.mjs holds
+// every part under a pixel.
 export const BINS = {
   cog: 1, // one drawing a cog: at most half a tooth left to the transform
   pulley: 2,
   link: 12, // at most 15 degrees left to a chain piece
-  cageStep: (4 * Math.PI) / 180, // a cage plate drawn every 4 degrees of its turn
-  // a chain piece is placed by the lateral plane in the middle of what it draws: the outer plates'
-  // mid-plane, and for an inner link, between its rollers and its near plate
-  placeBy: { outer: 2.35, inner: 0.76 },
+  cageStep: (4 * Math.PI) / 180, // a cage plate drawn every 4 degrees of its turn (or finer)
+  // a near chain piece is placed by the lateral plane in the middle of what it draws: an outer
+  // link's plate and rivet heads, an inner link's plate and rollers
+  placeBy: { outer: 2.6, inner: 0.375 },
 };
 
 export const VIEW = { azimuth: 244, elevation: 21 }; // from outboard and a little behind
@@ -120,6 +122,8 @@ export function figure(M, cam, o = {}) {
     return `#${full}`;
   };
   const place = (theta, to, fromN, toN) => affineString(moveInPlane(cam, SIDE_AXES, theta, to, fromN, toN));
+  // a thick part that turns: drawn per angle bin through tpl, placed by its mid-plane, its error reported
+  const turning = (id, period, n0, n1, minBins, draw) => turningPart(cam, SIDE_AXES, { id, period, n0, n1, minBins, draw, def: tpl });
 
   // painter's slots: the cogs' planes, far (inboard) to near
   const cogE = M.cogs.map((_, k) => M.cogE(k));
@@ -178,28 +182,23 @@ export function figure(M, cam, o = {}) {
   var barrel = { barrelA, dirB };
 
   // ---- cogs: drawn ahead at four angles across one tooth, in steel; the one the chain is on is lit
-  const COG_BINS = BINS.cog;
-  const cogDrawing = (k, bin) => tpl(`cog${k}-${bin}`, () => {
-    const R = M.Rk[k], N = M.cogs[k], rot = (bin * TAU) / N / COG_BINS;
+  const cogTurn = M.cogs.map((N, k) => turning(`cog${k}`, TAU / N, cogE[k] - 0.85, cogE[k] + 0.85, BINS.cog, (rot) => {
+    const R = M.Rk[k];
     const holes = [circlePoints(17.6, 40)];
     // windows only in a number that divides the teeth, so the cog keeps one tooth's symmetry and a
     // drawing turned a whole tooth back is the same picture
     const nW = [7, 6, 5, 4, 3].find((w) => N % w === 0);
     if (R > 34 && nW) holes.push(...windows(R, nW, 0.12 + rot));
     return drawMesh(slab(sprocket(N, R, D.tipAdd, rot), cogE[k] - 0.85, cogE[k] + 0.85, holes), cam, { material: "steel", shine: true });
-  });
+  }));
   // ---- pulleys: toothed plates in the subject's colour, on a turned alloy hub
-  const PUL_BINS = BINS.pulley;
-  const pulleyTeeth = (bin) => tpl(`pulley-${bin}`, () => {
-    const rot = (bin * TAU) / D.pulleyT / PUL_BINS;
-    return drawMesh(slab(sprocket(D.pulleyT, M.r, 2.4, rot), -1.4, 1.4, [circlePoints(6.4, 28)]), cam, { material: "subject", shine: true });
-  });
+  const pulleyTurn = turning("pulley", TAU / D.pulleyT, -1.4, 1.4, BINS.pulley, (rot) =>
+    drawMesh(slab(sprocket(D.pulleyT, M.r, 2.4, rot), -1.4, 1.4, [circlePoints(6.4, 28)]), cam, { material: "subject", shine: true }));
   const pulleyHub = tpl("pulleyHub", () => drawMesh(lateralTurned(0, 0, -3.6, 3.6, [[0, 6.2], [0.6, 7], [6.6, 7], [7.2, 6.2]], 28), cam, { material: "alloy", shine: true }) + drawMesh(lateralTurned(0, 0, 3.6, 5.2, [[0, 3.4], [1.6, 3.4]], 6), cam, { material: "alloy" }));
   // ---- cage plates, drawn ahead every 4° of the cage's turn
-  const CAGE_STEP = BINS.cageStep;
   const cage = M.v.cage;
-  const cageDrawing = (which, bin) => tpl(`cage${which}-${bin}`, () => {
-    const a = bin * CAGE_STEP, c = Math.cos(a), s = Math.sin(a);
+  const cageDraw = (which) => (a) => {
+    const c = Math.cos(a), s = Math.sin(a);
     const rot = (pts) => pts.map(([x, y]) => [x * c - y * s, x * s + y * c]);
     if (which === "In") return drawMesh(slab(rot(roundedHull([[0, 0, 10], [cage, 0, 11]])), -5.9, -4.5), cam, { material: "subject" });
     const outline = rot(roundedHull([[0, 0, 11], [cage, 0, 12], [cage / 2, -3.5, 9.5]]));
@@ -209,15 +208,17 @@ export function figure(M, cam, o = {}) {
     s2 += drawMesh(plateM, cam, { material: "subject", shine: true });
     for (const [bx, by] of rot([[0, 0], [cage, 0]])) s2 += drawMesh(lateralTurned(bx, by, 6.1, 7.8, [[0, 3.6], [1.2, 3.6], [1.7, 2.9]], 6), cam, { material: "alloy", shine: true });
     return s2;
-  });
+  };
+  const cageMin = Math.ceil(TAU / BINS.cageStep);
+  const cageTurn = { In: turning("cageIn", TAU, -5.9, -4.5, cageMin, cageDraw("In")), Out: turning("cageOut", TAU, 4.5, 7.8, cageMin, cageDraw("Out")) };
   // ---- the P-knuckle: drawn with the guide pulley's axle at the origin; it only slides
   const [ox, oy] = D.pOff;
   const pk = slab(roundedHull([[ox, oy, 8], [0, 0, 10], [7, 8, 7.5]]), 7.4, D.pLat - 2);
   once("pknuckle", "pknuckle", contactShadow(pk, cam, shadowAway) + drawMesh(lateralTurned(0, 0, 6, 7.6, [[0, 10.4], [1.6, 10.4]], 40), cam, { material: "slate" }) + drawMesh(pk, cam, { material: "slate", shine: true }));
   // ---- the chain: each piece drawn ahead at a few angles; an inner link carries its rollers
-  const LINK_BINS = BINS.link, Lp = D.p;
-  const linkDrawing = (kind, bin) => tpl(`${kind}-${bin}`, () => {
-    const a = (bin * TAU) / LINK_BINS, c = Math.cos(a), s = Math.sin(a);
+  const Lp = D.p;
+  const linkDraw = (kind) => (a) => {
+    const c = Math.cos(a), s = Math.sin(a);
     const outer = kind.startsWith("outer"), r = outer ? 3.9 : 3.6;
     const shape = roundedHull([[-Lp / 2, 0, r], [Lp / 2, 0, r]], 14).map(([x, y]) => [x * c - y * s, x * s + y * c]);
     const [s0, s1] = outer ? [1.95, 2.75] : [1.15, 1.9];
@@ -228,7 +229,14 @@ export function figure(M, cam, o = {}) {
     svg += drawMesh(m, cam, { material: "chain", shine: near, crease: 40 });
     if (outer && near) for (const sx of [-Lp / 2, Lp / 2]) svg += drawMesh(lateralTurned(sx * c, sx * s, s1, s1 + 0.5, [[0, 1.6], [0.5, 1.2]], 10), cam, { material: "alloy" });
     return svg;
-  });
+  };
+  // each piece's reach across the chain: plates, rivet heads, rollers
+  const linkTurn = {
+    outerNear: turning("outerNear", TAU, 1.95, 3.25, BINS.link, linkDraw("outerNear")),
+    outerFar: turning("outerFar", TAU, -2.75, -1.95, BINS.link, linkDraw("outerFar")),
+    innerNear: turning("innerNear", TAU, -1.15, 1.9, BINS.link, linkDraw("innerNear")),
+    innerFar: turning("innerFar", TAU, -1.9, -1.15, BINS.link, linkDraw("innerFar")),
+  };
   // ---- the gate marks: flat lines on a cog's face, so one exact transform turns them
   const gateMarks = (k) => tpl(`gates${k}`, () => {
     const R = M.Rk[k], e = cogE[k] + 0.86;
@@ -242,16 +250,14 @@ export function figure(M, cam, o = {}) {
     const a = (TAU * i) / 12;
     lock.push([16 * Math.cos(a - 0.12), 16 * Math.sin(a - 0.12)], [13.6 * Math.cos(a - 0.1), 13.6 * Math.sin(a - 0.1)], [13.6 * Math.cos(a + 0.1), 13.6 * Math.sin(a + 0.1)], [16 * Math.cos(a + 0.12), 16 * Math.sin(a + 0.12)]);
   }
-  tpl("lockring", () => drawMesh(slab(lock, 0.9, 3.1, [circlePoints(10, 30)]), cam, { material: "steel", shine: true }));
+  const lockTurn = turning("lockring", TAU / 12, 0.9, 3.1, 1, () => drawMesh(slab(lock, 0.9, 3.1, [circlePoints(10, 30)]), cam, { material: "steel", shine: true }));
 
   // Draw ahead, at mount, everything a frame may ask for, so no frame pays for a first drawing:
   // every cog, both pulley angles, every chain piece, and the cage across the angles it reaches.
-  M.cogs.forEach((_, k) => cogDrawing(k, 0));
-  for (let b = 0; b < PUL_BINS; b++) pulleyTeeth(b);
-  for (const kind of ["outerFar", "outerNear", "innerFar", "innerNear"]) for (let b = 0; b < LINK_BINS; b++) linkDrawing(kind, b);
+  for (const t of [...cogTurn, pulleyTurn, lockTurn, ...Object.values(linkTurn)]) t.drawAll();
   {
     const al = M.cogs.map((_, k) => (M.pose(M.pullFor(k), k).alpha * Math.PI) / 180);
-    for (let b = Math.floor(Math.min(...al) / CAGE_STEP) - 3; b <= Math.ceil(Math.max(...al) / CAGE_STEP) + 3; b++) (cageDrawing("In", b), cageDrawing("Out", b));
+    for (const t of Object.values(cageTurn)) t.drawAll(Math.min(...al) - 3 * t.step, Math.max(...al) + 3 * t.step);
   }
   M.cogs.forEach((_, k) => k > 0 && gateMarks(k));
 
@@ -285,15 +291,18 @@ export function figure(M, cam, o = {}) {
     const ph = st.phase ?? seatPhase(M, p, roll, theta);
     for (let k = 0; k <= M.last; k++) {
       const th = theta + (k === ph.k ? ph.offset : 0.37 * k);
-      const { bin, rest } = angleBin(th, TAU / M.cogs[k], COG_BINS);
-      put(`cog${k}`, cogKey(k), { href: cogDrawing(k, bin), transform: place(rest, [0, 0], cogE[k], cogE[k]), part: "cassette", flags: { on: k === eng } });
+      const { href, transform, turnErrPx } = cogTurn[k].place(th, [0, 0], 0);
+      put(`cog${k}`, cogKey(k), { href, transform, turnErrPx, part: "cassette", flags: { on: k === eng } });
       if (k > 0 && st.show?.gates && k === Math.min(M.last, eng + 1)) {
         put(`gates`, out(3.3), { href: gateMarks(k), transform: place(th, [0, 0], cogE[k] + 0.86, cogE[k] + 0.86), part: "cassette" });
         const best = [0, 1, 2].map((g) => th + 0.6 + (TAU * g) / D.gates).reduce((b, a) => (Math.cos(a - 0.5) > Math.cos(b - 0.5) ? a : b));
         at.gate = S((M.Rk[k] - 3) * Math.cos(best), (M.Rk[k] - 3) * Math.sin(best), cogE[k] + 0.86);
       }
     }
-    put("lockring", out(2), { href: `#${px}-lockring`, transform: place(angleBin(theta, TAU / 12, 1).rest, [0, 0], 2, 2), part: "cassette" });
+    {
+      const { href, transform, turnErrPx } = lockTurn.place(theta, [0, 0], 0);
+      put("lockring", out(2), { href, transform, turnErrPx, part: "cassette" });
+    }
     put("stays", -7, { transform: null });
     for (const [id, e] of [["dropout", 12], ["axle", 21.5], ["hanger", 19], ["bknuckle", BK[2] + 6], ["bscrew", BK[2] + 6.2], ["housing", BK[2] + 14]]) put(id, out(e), { transform: null });
 
@@ -302,16 +311,18 @@ export function figure(M, cam, o = {}) {
     // turns against the way the path goes round it: the cassette and the tension pulley clockwise
     // in the side view, the guide pulley counter-clockwise (the chain's S through the cage).
     for (const [name, cx, cy, spin] of [["guide", gx, gy, roll / M.r], ["tension", tx, ty, -roll / M.r]]) {
-      const { bin, rest } = angleBin(spin, TAU / D.pulleyT, PUL_BINS);
       // off line (the lab, a slack cable): the guide pulley's teeth turn red, out of line with their cog
       const off = name === "guide" && !!st.show?.offline && Math.abs(p.z - M.cogZ(st.ref ?? p.cog)) > 0.05;
-      put(`${name}Teeth`, gap(eG, 0.4), { href: pulleyTeeth(bin), transform: place(rest, [cx, cy], 0, eG), part: name, flags: { off } });
+      const { href, transform, turnErrPx } = pulleyTurn.place(spin, [cx, cy], eG);
+      put(`${name}Teeth`, gap(eG, 0.4), { href, transform, turnErrPx, part: name, flags: { off } });
       put(`${name}Hub`, gap(eG, 0.45), { href: pulleyHub, transform: place(0, [cx, cy], 0, eG), part: name });
     }
     const al = (p.alpha * Math.PI) / 180;
-    const cb = Math.round(al / CAGE_STEP), crest = al - cb * CAGE_STEP;
-    put("cageIn", gap(eG - 5.2, 0.1), { href: cageDrawing("In", cb), transform: place(crest, [gx, gy], -5.2, eG - 5.2), part: "cage" });
-    put("cageOut", gap(eG + 5.3, 0.8), { href: cageDrawing("Out", cb), transform: place(crest, [gx, gy], 5.3, eG + 5.3), part: "cage" });
+    {
+      const cin = cageTurn.In.place(al, [gx, gy], eG), cout = cageTurn.Out.place(al, [gx, gy], eG);
+      put("cageIn", gap(eG - 5.2, 0.1), { href: cin.href, transform: cin.transform, turnErrPx: cin.turnErrPx, part: "cage" });
+      put("cageOut", gap(eG + 5.3, 0.8), { href: cout.href, transform: cout.transform, turnErrPx: cout.turnErrPx, part: "cage" });
+    }
     put("pknuckle", out(eG + D.pLat - 6), { transform: place(0, [gx, gy], 0, eG) });
     at.guide = S(gx - M.r * 0.72, gy - M.r * 0.72, eG);
     at.tension = S(tx - M.r * 0.72, ty - M.r * 0.72, eG);
@@ -336,12 +347,12 @@ export function figure(M, cam, o = {}) {
           continue;
         }
         const em = (A.e + B.e) / 2, th = Math.atan2(B.y - A.y, B.x - A.x);
-        const { bin, rest } = angleBin(th, TAU, LINK_BINS);
-        // each plate is placed by its own mid-plane, so the turn left over is exact there
-        const sm = BINS.placeBy[outer ? "outer" : "inner"], ym = (A.y + B.y) / 2;
+        // each piece is placed by its own mid-plane, so the turn left over is exact there
+        const ym = (A.y + B.y) / 2;
         const opacity = alpha < 1 ? alpha : 1;
-        put(`cf${i}`, gap(em - s0, 0.2), { href: linkDrawing(outer ? "outerFar" : "innerFar", bin), transform: place(rest, [xm, ym], -sm, em - sm), opacity, part: "chain" });
-        put(`cn${i}`, gap(em + s0, 0.6), { href: linkDrawing(outer ? "outerNear" : "innerNear", bin), transform: place(rest, [xm, ym], sm, em + sm), opacity, part: "chain" });
+        const f = linkTurn[outer ? "outerFar" : "innerFar"].place(th, [xm, ym], em), n = linkTurn[outer ? "outerNear" : "innerNear"].place(th, [xm, ym], em);
+        put(`cf${i}`, gap(em - s0, 0.2), { href: f.href, transform: f.transform, turnErrPx: f.turnErrPx, opacity, part: "chain" });
+        put(`cn${i}`, gap(em + s0, 0.6), { href: n.href, transform: n.transform, turnErrPx: n.turnErrPx, opacity, part: "chain" });
       }
       const w = (x) => S(x.x, x.y, x.e);
       at.chain = w(pins.find((x) => x.q.on === "cog" && x.q.f > 0.35 && x.q.f < 0.65) ?? pins[0]);
