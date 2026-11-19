@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and show-and-tell
+    url: https://github.com/Aaryan1524/Visualize/discussions
+    about: Ask how to do something, or share a figure you made.
+  - name: Report a security problem
+    url: https://github.com/Aaryan1524/Visualize/security/advisories/new
+    about: Report it privately, never in a public issue.

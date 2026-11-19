@@ -1,8 +1,26 @@
 {
   "name": "visualize",
+  "description": "An Agent Skill that turns a one-line request into a step-through visual explanation, with a voice, a prediction and practice, checked against a running model of the idea.",
   "version": "1.0.0",
-  "description": "An engine for model-driven, step-through visual explanations: isometric stages, linked math panels, and checks that the picture matches the model.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aaryan1524/Visualize.git"
+  },
+  "homepage": "https://github.com/Aaryan1524/Visualize#readme",
+  "bugs": {
+    "url": "https://github.com/Aaryan1524/Visualize/issues"
+  },
+  "keywords": [
+    "agent-skill",
+    "claude-code",
+    "visualization",
+    "explainer",
+    "education",
+    "3d",
+    "svg",
+    "animation"
+  ],
   "private": true,
   "type": "module",
   "engines": {

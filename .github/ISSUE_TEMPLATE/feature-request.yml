@@ -1,0 +1,24 @@
+name: Feature request
+description: A new part, a new kind of concept, or a new capability.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: concept
+    attributes:
+      label: What should a reader be able to understand?
+      description: The concept or kind of concept, and a one-line request you would type.
+      placeholder: /visualize explain how a B-tree splits a full node
+    validations:
+      required: true
+  - type: textarea
+    id: missing
+    attributes:
+      label: What is missing today
+      description: What the skill draws now, or why it cannot, and how the field usually draws this.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: A sketch, a reference figure or a part you have in mind, if any.

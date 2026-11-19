@@ -1,0 +1,47 @@
+name: Figure problem
+description: A figure looks wrong, says something false, or does not help the reader understand.
+labels: ["figure"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most useful report there is. Every rule in the skill started as a report like this one.
+  - type: input
+    id: prompt
+    attributes:
+      label: The request
+      description: What you asked the agent to explain, word for word.
+      placeholder: /visualize explain how an LRU cache works
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is wrong
+      multiple: true
+      options:
+        - Something on the page is false (a number, a caption, the narration)
+        - It is hard to understand at first glance
+        - It looks ugly or cluttered (overlaps, cut-off labels, empty space)
+        - The motion or the voice is off (cuts, overlaps, wrong timing)
+        - The wrong kind of picture for this concept
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What you saw, and what you expected
+      description: Name the step (the page's address ends in #step=k) and attach a screenshot. A 4× close-up helps for small details.
+    validations:
+      required: true
+  - type: textarea
+    id: page
+    attributes:
+      label: The page or scene
+      description: Attach the built HTML page or the scene folder (model.ts, scene.ts) if you can.
+  - type: input
+    id: agent
+    attributes:
+      label: Agent and version
+      placeholder: Claude Code 2.x, Visualize 1.0.0

@@ -5,6 +5,7 @@ One version covers the kit and the skill (`package.json` `version` and `SKILL.md
 ## Unreleased
 
 - **Pages open light on every system.** They followed the reader's system theme, so a reader in dark mode met a black page first; the builder found it ugly. The Dark button switches, and a `#theme=dark` link opens dark. The checks set the theme on the page as a link does, so the dark checks still test dark (49 of 49 planted faults caught).
+- **Ready for contributors:** a contribution guide with the rules behind the checks, a code of conduct, a security policy, issue forms (a figure problem, a bug, a feature), a pull-request checklist, code owners and weekly dependency updates.
 - **The README opens with the rear derailleur playing**, and links the full narrated tour (MP4 with sound) on the release.
 
 ## 1.0.0 (2026-11-18), first public release

@@ -1,0 +1,27 @@
+name: Bug report
+description: A crash, a failing check, or an install that does not work.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Command and output
+      description: The exact command and its full output. For verify, paste the summary lines.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: Operating system, Node.js version, Chrome version, agent and Visualize version.
+      placeholder: macOS 15, Node 24.3, Chrome 142, Claude Code, Visualize 1.0.0
+    validations:
+      required: true

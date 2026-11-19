@@ -252,6 +252,10 @@ node scripts/shoot.mjs dist/lru-3d.html --out shot.png --step 4 --scale 4
 - **Labs are on machine pages only.** On a machine page the reader sets their own values (cut a key, move a step). Concept pages still offer prepared What if inputs.
 - **It is slow on purpose.** A page takes a long session: the model and its reference, the view, the checks, and a read of every screenshot.
 
+## Contributing
+
+Contributions are welcome, and the most useful one is a [report of a figure that looks wrong or teaches badly](https://github.com/Aaryan1524/Visualize/issues/new?template=figure-problem.yml): every rule in the skill began as one. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the set-up, the rules that keep figures good, and the checks a pull request must pass. Questions and figures you made go in [Discussions](https://github.com/Aaryan1524/Visualize/discussions). Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md); security problems go through [SECURITY.md](SECURITY.md).
+
 ## License
 
 [MIT](LICENSE) © 2026 Aaryan
