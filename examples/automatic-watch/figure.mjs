@@ -125,7 +125,8 @@ export function figure(M, cam, opts = {}) {
     const r = t.place(theta, [x, y], shift);
     return { href: r.href, transform: r.transform, turnErrPx: r.turnErrPx };
   };
-  // a soft shadow under a turning part that keeps its real outline (a C stays a C)
+  // a soft shadow under a turning part that keeps its real outline (a C stays a C); it lies below
+  // the part, so a part that carries one reaches down to shadowAway[2]
   const shadowAway = scale(keyLight(ax), -1.6);
 
   // ---- 1. Sleek Brushed-Steel Cutaway Watch Case (SMOOTH seamless back arc, sculpted 12 & 6 lugs, fluted 3 o'clock crown)
@@ -326,7 +327,7 @@ export function figure(M, cam, opts = {}) {
   escTurn.drawAll();
 
   // Steel Pallet Fork with twin ruby stones, swinging +/- 6.5 deg (drawn every 3.25 deg or finer)
-  const forkTurn = turning("fork", { n0: 0, n1: 1.45, minBins: Math.ceil(360 / 3.25), draw: (a) => {
+  const forkTurn = turning("fork", { n0: Math.min(0, shadowAway[2]), n1: 1.45, minBins: Math.ceil(360 / 3.25), draw: (a) => {
     const c = Math.cos(a), s = Math.sin(a);
     const rotP = ([x, y]) => [x * c - y * s, x * s + y * c];
     const arm = roundedHull([[-10.2, 0, 1.05], [0, 0, 2.0], [7.2, 4.2, 1.15]]).map(rotP);
@@ -380,7 +381,7 @@ export function figure(M, cam, opts = {}) {
   const placeRevSteel = binnedWheel("rev-s", 16, CAL.revA.r, 1.45, 4, 2.0, "alloy", 10);
 
   // ---- 6. Sculpted Ball-Bearing Oscillating Rotor (36 angle bins -> true rotating 3D light!)
-  const rotorTurn = turning("rotor", { n0: 0, n1: 3.1, minBins: 36, draw: (rot) => {
+  const rotorTurn = turning("rotor", { n0: Math.min(0, shadowAway[2]), n1: 3.1, minBins: 36, draw: (rot) => {
     const span = Math.PI * 0.47;
     const lowerArc = arcOutline(CAL.rotor.rIn, CAL.rotor.rOut, rot - span, rot + span, 28);
     const upperArc = arcOutline(CAL.rotor.rIn + 1.3, CAL.rotor.rOut - 1.1, rot - span + 0.03, rot + span - 0.03, 28);

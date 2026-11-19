@@ -64,7 +64,7 @@ export function paintGroups(mesh: Mesh, cam: Camera, sort: FaceSort = mesh.sort 
     for (const i of order) {
       const g = groups[groups.length - 1];
       const j = g?.[g.length - 1];
-      if (g && j !== undefined && single(i) && single(j) && tier[i] === tier[j] && shade[i] === shade[j] && (mesh.faces[i]!.role === "cap") === (mesh.faces[j]!.role === "cap")) g.push(i);
+      if (g && j !== undefined && single(i) && single(j) && tier[i] === tier[j] && shade[i] === shade[j] && mesh.faces[i]!.role === mesh.faces[j]!.role && mesh.faces[i]!.role !== "end") g.push(i);
       else groups.push([i]);
     }
     return { groups, tier, shade, seen };
