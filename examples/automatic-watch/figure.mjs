@@ -12,10 +12,10 @@
 // symmetry period and placed by its mid-plane so affine shear stays strictly sub-pixel (< 0.25 px).
 
 import {
-  add, affineString, angleBin, arcOutline, axesOf, chamferPlate, circlePoints, dot, drawMesh,
-  escapeWheelOutline, fitCamera, gearOutline, keyLight, linesOn, moveInPlane, n1, nearness,
-  pathThrough, planeOf, plate, RigStage, rod, roundedHull, scale, screenOf, shadeOf,
-  spokedHoles, turned,
+  add, affineString, arcOutline, axesOf, chamferPlate, circlePoints, drawMesh, drawSpiralRibbon,
+  escapeWheelOutline, fitCamera, gearOutline, keyLight, linesOn, moveInPlane, n1,
+  pathThrough, planeOf, plate, plateShadow, RigStage, rod, roundedHull, scale, screenOf,
+  spokedHoles, turned, turningPart,
 } from "../../src/rig/index.ts";
 export { RigStage, screenOf } from "../../src/rig/index.ts";
 
@@ -84,44 +84,6 @@ function wheelMesh(teeth, pitchR, th, spokes = 5, hubR = 3.0, rot = 0) {
   return plate(FLOOR, { outer, holes }, 0, th);
 }
 
-/**
- * True depth-sorted 3D coiled spring ribbon (mainspring or hairspring).
- * Every ribbon quad is shaded from its true outward normal and sorted back-to-front by
- * camera nearness so every coil occludes cleanly in 3D with zero bucket-merge glitches.
- */
-function drawSpiralRibbon(cam, cx, cy, r0, r1, turns, z0, z1, steps, mat, startAng = 0, topHighlight = true) {
-  const ax = axesOf(cam.azimuth, cam.elevation);
-  const light = keyLight(ax);
-  const pts = [];
-  for (let i = 0; i <= steps; i++) {
-    const f = i / steps;
-    const a = startAng + f * turns * TAU;
-    const r = r0 + (r1 - r0) * f;
-    pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
-  }
-  const quads = [];
-  for (let i = 0; i < steps; i++) {
-    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
-    const p00 = [x0, y0, z0], p10 = [x1, y1, z0], p11 = [x1, y1, z1], p01 = [x0, y0, z1];
-    const tx = x1 - x0, ty = y1 - y0, tl = Math.hypot(tx, ty) || 1;
-    let n = [ty / tl, -tx / tl, 0];
-    if (dot(n, ax.toward) < 0) n = [-n[0], -n[1], 0];
-    const s = Math.round(shadeOf(n, light) * 24) / 24;
-    const mid = [(x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5];
-    const d = nearness(cam, mid, ax);
-    const sp = [screenOf(cam, p00, ax), screenOf(cam, p10, ax), screenOf(cam, p11, ax), screenOf(cam, p01, ax)];
-    quads.push({ d, s, sp, top: [sp[3], sp[2]] });
-  }
-  quads.sort((a, b) => a.d - b.d);
-  let out = `<g class="rig-solid rig-m-${mat}">`;
-  for (const q of quads) {
-    out += `<path class="rig-face" style="fill:color-mix(in oklab,var(--rig-lit) ${Math.round(q.s * 100)}%,var(--rig-dark))" d="${pathThrough(q.sp, true)}"/>`;
-    if (topHighlight) out += `<path class="rig-crease" d="M${n1(q.top[0][0])} ${n1(q.top[0][1])}L${n1(q.top[1][0])} ${n1(q.top[1][1])}"/>`;
-  }
-  out += "</g>";
-  return out;
-}
-
 /** Flush horological jewel bearing inside a golden brass chaton + steel pivot dot. */
 function jewelSetting(cam, x, y, z, rOuter = 2.1, rRuby = 1.4) {
   return drawMesh(turned([x, y, z - 0.12], [0, 0, 1], [[0, rOuter], [0.35, rOuter], [0.5, rOuter * 0.85]], 18), cam, { material: "brass", shine: true })
@@ -155,6 +117,16 @@ export function figure(M, cam, opts = {}) {
     return out;
   };
   const place = (theta, x, y, fromN, toN) => affineString(moveInPlane(cam, FLOOR_AXES, theta, [x, y], fromN, toN));
+  // A thick part that turns: drawn per angle bin (through tpl), placed by the plane halfway through
+  // everything it draws (n0..n1 along z, at rest), with enough bins to keep it under half a pixel;
+  // each placement reports its exact error to the stage.
+  const turning = (id, o) => turningPart(cam, FLOOR_AXES, { id, def: tpl, ...o });
+  const turnedAt = (t, theta, x, y, shift) => {
+    const r = t.place(theta, [x, y], shift);
+    return { href: r.href, transform: r.transform, turnErrPx: r.turnErrPx };
+  };
+  // a soft shadow under a turning part that keeps its real outline (a C stays a C)
+  const shadowAway = scale(keyLight(ax), -1.6);
 
   // ---- 1. Sleek Brushed-Steel Cutaway Watch Case (SMOOTH seamless back arc, sculpted 12 & 6 lugs, fluted 3 o'clock crown)
   // One continuous 44-step arc from 3:30 around 12:00 to 8:30 -> zero brick seams, silky metallic shading!
@@ -293,37 +265,32 @@ export function figure(M, cam, opts = {}) {
 
   // ---- 5. Angle-Binned Turning Wheels & Subassemblies (Strictly < 0.25 px shear!)
   const binnedWheel = (name, teeth, r, th, spokes, hubR, mat, bins, period = spokes > 0 ? TAU / spokes : TAU / teeth) => {
-    const getTpl = (bin) => tpl(`${name}-${bin}`, () => {
-      const rot = (bin * period) / bins;
-      return drawMesh(wheelMesh(teeth, r, th, spokes, hubR, rot), cam, { material: mat, shine: true });
-    });
-    return (rad, x, y, z) => {
-      const b = angleBin(rad, period, bins);
-      return { href: getTpl(b.bin), transform: place(b.rest, x, y, th * 0.5, z + th * 0.5) };
-    };
+    const t = turning(name, { period, n0: 0, n1: th, minBins: bins, draw: (rot) => drawMesh(wheelMesh(teeth, r, th, spokes, hubR, rot), cam, { material: mat, shine: true }) });
+    t.drawAll();
+    return (rad, x, y, z) => turnedAt(t, rad, x, y, z);
   };
 
   // Mainspring Barrel Drum: 30 crisp watchmaker teeth, open cutaway top showing coiled spring + vermilion bridle!
   const BARREL_TH = 4.6;
   once("barrelFloor", "barrel", drawMesh(plate(FLOOR, { outer: circlePoints(CAL.barrel.r - 1.8, 32, CAL.barrel.x, CAL.barrel.y), holes: [circlePoints(3.4, 14, CAL.barrel.x, CAL.barrel.y)] }, CAL.barrel.z, CAL.barrel.z + 0.75), cam, { material: "slate" }));
-  const barrelDrumTpl = (bin) => tpl(`barrel-${bin}`, () => {
-    const rot = (bin * (TAU / 30)) / 2;
+  const barrelTurn = turning("barrel", { period: TAU / 30, n0: 0, n1: BARREL_TH, minBins: 2, draw: (rot) => {
     const outer = gearOutline(30, CAL.barrel.r, { addendum: 0.92, dedendum: 1.0, rot });
     const drum = plate(FLOOR, { outer, holes: [circlePoints(CAL.barrel.r - 2.1, 36)] }, 0, BARREL_TH);
     return drawMesh(drum, cam, { material: "brass", shine: true });
-  });
+  } });
+  barrelTurn.drawAll();
   // Thin slipping bridle collar lining the front-left inner barrel rim (gleams vermilion at 100% wind, never obscures coils!)
   const bridleTpl = (slipping) => tpl(`bridle-${slipping ? 1 : 0}`, () => {
     const bridle = plate(FLOOR, { outer: arcOutline(CAL.barrel.r - 3.35, CAL.barrel.r - 2.15, -2.85, -0.55, 24) }, 0.9, 4.95);
     return drawMesh(bridle, cam, { material: slipping ? "subject" : "steel", shine: true });
   });
-  // Depth-sorted blued-steel mainspring ribbon (outer coil fixed flush against bridle!)
+  // Blued-steel mainspring: a solid coiled strip, its coils hiding one another face by face
   const mainspringTpl = (level) => tpl(`mspr-${level}`, () => {
     const windF = level / 8;
     const turns = 3.2 + windF * 2.1;
     const r0 = 5.4 - windF * 1.6;
     const r1 = CAL.barrel.r - 3.5;
-    return drawSpiralRibbon(cam, 0, 0, r0, r1, turns, 0.95, 4.35, 80, "cobalt", 0.3, true);
+    return drawSpiralRibbon(cam, FLOOR, { r0, r1, turns, t0: 0.95, t1: 4.35, thick: 0.28, steps: 80, phase: 0.3 }, { material: "cobalt", shine: true, crease: 40 });
   });
 
   // Going train wheels + steel pinions (clean divisible tooth/spoke counts!)
@@ -335,9 +302,7 @@ export function figure(M, cam, opts = {}) {
   const placeFourth    = binnedWheel("fourth", 20, CAL.fourth.r, 1.5, 4, 2.5, "brass", 14);
 
   // Blued-steel sweep second hand mounted above fourth wheel jewel + brass hub cap
-  const HAND_BINS = 36;
-  const secondHandTpl = (bin) => tpl(`shand-${bin}`, () => {
-    const a = (bin * TAU) / HAND_BINS;
+  const handTurn = turning("shand", { n0: 0, n1: 0.55, minBins: 36, draw: (a) => {
     const c = Math.cos(a), s = Math.sin(a);
     const nx = -s, ny = c;
     const L = CAL.fourth.r * 0.94, B = -3.4;
@@ -348,37 +313,36 @@ export function figure(M, cam, opts = {}) {
       [c * B + nx * 0.65, s * B + ny * 0.65],
     ];
     return drawMesh(plate(FLOOR, { outer: poly }, 0, 0.55), cam, { material: "cobalt", shine: true });
-  });
+  } });
+  handTurn.drawAll();
   once("secondCap", "train", drawMesh(turned([CAL.fourth.x, CAL.fourth.y, 14.3], [0, 0, 1], [[0, 1.15], [0.65, 1.15]], 12), cam, { material: "brass", shine: true }));
 
   // 15-tooth Swiss club-tooth escape wheel (3 spokes -> 120 deg symmetry, 18 bins!)
-  const ESC_BINS = 18;
-  const escapeTpl = (bin) => tpl(`esc-${bin}`, () => {
-    const rot = (bin * (TAU / 3)) / ESC_BINS;
+  const escTurn = turning("esc", { period: TAU / 3, n0: 0, n1: 1.3, minBins: 18, draw: (rot) => {
     const outer = escapeWheelOutline(15, CAL.escape.r, CAL.escape.r * 0.68, rot);
     const holes = [circlePoints(1.5, 12), ...spokedHoles(2.3, CAL.escape.r * 0.55, 3, 0.22, rot, 8)];
     return drawMesh(plate(FLOOR, { outer, holes }, 0, 1.3), cam, { material: "brass", shine: true });
-  });
+  } });
+  escTurn.drawAll();
 
-  // Steel Pallet Fork with twin ruby stones (5 discrete angle bins across +/- 6.5 deg)
-  const forkTpl = (bin) => tpl(`fork-${bin}`, () => {
-    const a = (-6.5 + bin * 3.25) * RAD;
+  // Steel Pallet Fork with twin ruby stones, swinging +/- 6.5 deg (drawn every 3.25 deg or finer)
+  const forkTurn = turning("fork", { n0: 0, n1: 1.45, minBins: Math.ceil(360 / 3.25), draw: (a) => {
     const c = Math.cos(a), s = Math.sin(a);
     const rotP = ([x, y]) => [x * c - y * s, x * s + y * c];
     const arm = roundedHull([[-10.2, 0, 1.05], [0, 0, 2.0], [7.2, 4.2, 1.15]]).map(rotP);
     const arm2 = roundedHull([[0, 0, 1.85], [7.2, -4.2, 1.15]]).map(rotP);
     const stoneA = [[6.0, 3.0], [8.8, 3.8], [8.3, 5.2], [5.6, 4.3]].map(rotP);
     const stoneB = [[6.0, -4.3], [8.6, -5.0], [9.0, -3.5], [6.4, -2.8]].map(rotP);
-    return drawMesh(plate(FLOOR, { outer: arm }, 0, 1.25), cam, { material: "steel", shine: true })
-      + drawMesh(plate(FLOOR, { outer: arm2 }, 0, 1.25), cam, { material: "steel", shine: true })
+    const arms = [plate(FLOOR, { outer: arm }, 0, 1.25), plate(FLOOR, { outer: arm2 }, 0, 1.25)];
+    return arms.map((m) => plateShadow(m, cam, shadowAway)).join("")
+      + arms.map((m) => drawMesh(m, cam, { material: "steel", shine: true })).join("")
       + drawMesh(plate(FLOOR, { outer: stoneA }, 0.1, 1.45), cam, { material: "ruby", shine: true })
       + drawMesh(plate(FLOOR, { outer: stoneB }, 0.1, 1.45), cam, { material: "ruby", shine: true });
-  });
+  } });
+  forkTurn.drawAll(-6.5 * RAD - forkTurn.step, 6.5 * RAD + forkTurn.step);
 
   // Poised Glucydur Balance Wheel (3 spokes + 6 timing screws -> 120 deg symmetry, 18 bins!)
-  const BAL_BINS = 18;
-  const balanceTpl = (bin) => tpl(`bal-${bin}`, () => {
-    const rot = (bin * (TAU / 3)) / BAL_BINS;
+  const balTurn = turning("bal", { period: TAU / 3, n0: 0, n1: 1.85, minBins: 18, draw: (rot) => {
     const r = CAL.balance.r;
     const rim = plate(FLOOR, { outer: circlePoints(r, 44), holes: [circlePoints(2.2, 14), ...spokedHoles(3.2, r - 2.3, 3, 0.18, rot + 0.2, 12)] }, 0, 1.85);
     let weights = "";
@@ -387,25 +351,27 @@ export function figure(M, cam, opts = {}) {
       weights += drawMesh(turned([Math.cos(a) * (r + 0.45), Math.sin(a) * (r + 0.45), 0.3], [0, 0, 1], [[0, 0.85], [1.15, 0.85]], 10), cam, { material: "alloy", shine: true });
     }
     return drawMesh(rim, cam, { material: "brass", shine: true }) + weights;
-  });
+  } });
+  balTurn.drawAll();
 
   // Breathing 3D Blued-Steel Hairspring Ribbon (9 breathing radii, depth-sorted, stationary!)
   const hairspringTpl = (bin) => tpl(`hspr-${bin}`, () => {
     const f = 0.88 + (bin / 8) * 0.24;
-    return drawSpiralRibbon(cam, 0, 0, 2.3, 9.6 * f, 4.2, 0, 1.25, 64, "cobalt", 0.5, true);
+    return drawSpiralRibbon(cam, FLOOR, { r0: 2.3, r1: 9.6 * f, turns: 4.2, t0: 0, t1: 1.25, thick: 0.2, steps: 64, phase: 0.5 }, { material: "cobalt", shine: true, crease: 40 });
   });
 
   // Regulator index pointer arm (sweeps cleanly atop balance cock)
-  const REG_BINS = 17;
-  const regArmTpl = (bin) => tpl(`reg-${bin}`, () => {
-    const a = (-40 + bin * 5) * RAD;
+  // drawn every 5 deg or finer; its pin reaches 2.5 below the arm, so it is placed by the plane
+  // halfway between the pin's foot and the arm's top
+  const regTurn = turning("reg", { n0: -2.5, n1: 1.2, minBins: 72, draw: (a) => {
     const c = Math.cos(a), s = Math.sin(a);
     const rotP = ([x, y]) => [x * c - y * s, x * s + y * c];
     const arm = roundedHull([[0, 0, 2.0], [-14.0, 0, 0.92]]).map(rotP);
     const px0 = -10.2 * c, py0 = -10.2 * s;
     return drawMesh(plate(FLOOR, { outer: arm }, 0, 0.95), cam, { material: "subject", shine: true })
       + drawMesh(rod([px0, py0, -2.5], [px0, py0, 1.2], 0.52, 8), cam, { material: "brass", shine: true });
-  });
+  } });
+  regTurn.drawAll(-40 * RAD - regTurn.step, 40 * RAD + regTurn.step);
 
   // Coplanar Automatic Winding Train (bright machined alloy/steel gears + active teal click wheel!)
   const placeRotorPin = binnedWheel("rpin", 20, CAL.center.rotorPinR, 1.35, 4, 2.8, "alloy", 10);
@@ -414,9 +380,7 @@ export function figure(M, cam, opts = {}) {
   const placeRevSteel = binnedWheel("rev-s", 16, CAL.revA.r, 1.45, 4, 2.0, "alloy", 10);
 
   // ---- 6. Sculpted Ball-Bearing Oscillating Rotor (36 angle bins -> true rotating 3D light!)
-  const ROTOR_BINS = 36;
-  const rotorTpl = (bin) => tpl(`rotor-${bin}`, () => {
-    const rot = (bin * TAU) / ROTOR_BINS;
+  const rotorTurn = turning("rotor", { n0: 0, n1: 3.1, minBins: 36, draw: (rot) => {
     const span = Math.PI * 0.47;
     const lowerArc = arcOutline(CAL.rotor.rIn, CAL.rotor.rOut, rot - span, rot + span, 28);
     const upperArc = arcOutline(CAL.rotor.rIn + 1.3, CAL.rotor.rOut - 1.1, rot - span + 0.03, rot + span - 0.03, 28);
@@ -436,11 +400,13 @@ export function figure(M, cam, opts = {}) {
       const p1 = [Math.cos(a) * (CAL.rotor.rIn + 1.8), Math.sin(a) * (CAL.rotor.rIn + 1.8)];
       arms += drawMesh(plate(FLOOR, { outer: roundedHull([[0, 0, 4.7], [p1[0], p1[1], 1.9]]) }, 0.4, 1.65), cam, { material: "alloy", shine: true });
     }
-    return arms
+    return plateShadow(lowerRim, cam, shadowAway)
+      + arms
       + drawMesh(lowerRim, cam, { material: "steel", shine: true })
       + drawMesh(upperRim, cam, { material: "subject", shine: true })
       + linesOn(cam, ribs, "rig-crease");
-  });
+  } });
+  rotorTurn.drawAll();
 
   // Stationary Central Ball-Bearing Hub mounted flush onto the rotor shaft
   const rotorHubOuter = turned([0, 0, CAL.rotor.z - 0.2], [0, 0, 1], [[0, 6.0], [2.2, 6.0], [2.95, 5.0]], 28);
@@ -482,13 +448,11 @@ export function figure(M, cam, opts = {}) {
     items.push({ id: `${px}-arbors`, key: 8 });
 
     // Mainspring barrel drum + stationary slipping bridle + depth-sorted coiled mainspring ribbon
-    const bBin = angleBin(barrelDeg * RAD, TAU / 30, 2);
     const windLevel = Math.max(0, Math.min(8, Math.round((windPct / 100) * 8)));
     items.push({ id: `${px}-barrelFloor`, key: 11 });
     items.push({
       id: `${px}-barrel`, part: slipping ? "bridle" : "barrel", key: 12,
-      href: barrelDrumTpl(bBin.bin),
-      transform: place(bBin.rest, CAL.barrel.x, CAL.barrel.y, BARREL_TH * 0.5, CAL.barrel.z + BARREL_TH * 0.5),
+      ...turnedAt(barrelTurn, barrelDeg * RAD, CAL.barrel.x, CAL.barrel.y, CAL.barrel.z),
     });
     items.push({
       id: `${px}-mainspring`, part: "barrel", key: 13,
@@ -515,28 +479,21 @@ export function figure(M, cam, opts = {}) {
     items.push({ id: `${px}-third`, part: "train", key: 23, ...placeThird(thirdRad, CAL.third.x, CAL.third.y, CAL.third.z) });
 
     // Swiss lever escapement: club-tooth escape wheel + ruby-stone pallet fork
-    const eb = angleBin(escRad, TAU / 3, ESC_BINS);
     items.push({
       id: `${px}-escape`, part: "escapement", key: 25,
-      href: escapeTpl(eb.bin),
-      transform: place(eb.rest, CAL.escape.x, CAL.escape.y, 0.65, CAL.escape.z + 0.65),
+      ...turnedAt(escTurn, escRad, CAL.escape.x, CAL.escape.y, CAL.escape.z),
     });
-    const fBin = Math.max(0, Math.min(4, Math.round((esc.forkDeg + 6.5) / 3.25)));
-    const fRest = (esc.forkDeg - (-6.5 + fBin * 3.25)) * RAD;
     items.push({
       id: `${px}-fork`, part: "escapement", key: 27,
-      href: forkTpl(fBin),
-      transform: place(fRest, CAL.fork.x, CAL.fork.y, 0.625, CAL.fork.z + 0.625),
+      ...turnedAt(forkTurn, esc.forkDeg * RAD, CAL.fork.x, CAL.fork.y, CAL.fork.z),
     });
     items.push({ id: `${px}-escBridge`, key: 28 });
 
     // Poised balance wheel + depth-sorted breathing hairspring
-    const bb = angleBin(esc.balDeg * RAD, TAU / 3, BAL_BINS);
     const breathBin = Math.max(0, Math.min(8, Math.round(((esc.breath - 0.88) / 0.24) * 8)));
     items.push({
       id: `${px}-balance`, part: "balance", key: 30,
-      href: balanceTpl(bb.bin),
-      transform: place(bb.rest, CAL.balance.x, CAL.balance.y, 0.925, CAL.balance.z + 0.925),
+      ...turnedAt(balTurn, esc.balDeg * RAD, CAL.balance.x, CAL.balance.y, CAL.balance.z),
     });
     items.push({
       id: `${px}-hairspring`, part: "balance", key: 32,
@@ -546,21 +503,16 @@ export function figure(M, cam, opts = {}) {
 
     // Sculpted bridges + sweep second hand + regulator index
     items.push({ id: `${px}-trainBridge`, key: 35 });
-    const hb = angleBin(fourthRad, TAU, HAND_BINS);
     items.push({
       id: `${px}-secondHand`, part: "train", key: 36,
-      href: secondHandTpl(hb.bin),
-      transform: place(hb.rest, CAL.fourth.x, CAL.fourth.y, 0.275, 14.4),
+      ...turnedAt(handTurn, fourthRad, CAL.fourth.x, CAL.fourth.y, 14.4 - 0.275),
     });
     items.push({ id: `${px}-secondCap`, key: 37 });
     items.push({ id: `${px}-balanceCock`, key: 38 });
     const rDeg = Math.max(-40, Math.min(40, regRateDeg ?? 0));
-    const rBin = Math.max(0, Math.min(REG_BINS - 1, Math.round((rDeg + 40) / 5)));
-    const rRest = (rDeg - (-40 + rBin * 5)) * RAD;
     items.push({
       id: `${px}-regArm`, part: "regulator", key: 40,
-      href: regArmTpl(rBin),
-      transform: place(rRest, CAL.balance.x, CAL.balance.y, 0.475, 14.3),
+      ...turnedAt(regTurn, rDeg * RAD, CAL.balance.x, CAL.balance.y, 14.3 - 0.475),
     });
 
     // Coplanar automatic winding train: rotor pinion <-> twin reversing wheels <-> barrel ratchet
@@ -571,12 +523,10 @@ export function figure(M, cam, opts = {}) {
     items.push({ id: `${px}-revA`, part: "reversing", key: 45, ...(revDir >= 0 ? placeRevTeal : placeRevSteel)(rRad * 1.26, CAL.revA.x, CAL.revA.y, CAL.revA.z) });
 
     // Ball-bearing oscillating rotor (36 angle bins -> true rotating 3D light!)
-    const rb = angleBin(rRad, TAU, ROTOR_BINS);
     items.push({
       id: `${px}-rotor`, part: "rotor", key: 50,
       hidden: !!hideRotor,
-      href: rotorTpl(rb.bin),
-      transform: place(rb.rest, CAL.rotor.x, CAL.rotor.y, 1.525, CAL.rotor.z + 1.525),
+      ...turnedAt(rotorTurn, rRad, CAL.rotor.x, CAL.rotor.y, CAL.rotor.z),
     });
     items.push({ id: `${px}-rotorHub`, part: "rotor", key: 52, hidden: !!hideRotor });
 
