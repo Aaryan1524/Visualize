@@ -1,63 +1,84 @@
-/* The rig's look: Visualize tokens for solids drawn by src/rig/draw.ts.
+/* The rig's look: Visualize tokens for solids drawn by src/rig/draw.ts. Rules and reasons: references/look.md.
    Each material is a pair, lit and dark; a face's fill is mixed between them by how square it
    stands to the key light. Outlines are the page's ink: the silhouette heavier than creases.
+   A pair spans a wide value range (lit end below the stage's white, dark end well down), so a top
+   and the wall beside it never land on the same value and every solid reads as a solid.
    --recede (0% to 100%) fades a part toward the stage without making it see-through. */
 .vz{
   --rig-ink:var(--ink);
   --rig-sil-w:1.5px;--rig-crease-w:.7px;--rig-shine:#ffffff;--rig-shine-w:1.1px;
-  --rig-contact:#2b2416;
-  --rig-steel-lit:#ecebe6;--rig-steel-dark:#46443f;
-  --rig-alloy-lit:#ffffff;--rig-alloy-dark:#8d897f;
-  --rig-chain-lit:#77736b;--rig-chain-dark:#1b1a18;
-  --rig-subject-lit:#ffcfae;--rig-subject-dark:#b8461b;
-  --rig-slate-lit:#a9b6c5;--rig-slate-dark:#26303d;
-  --rig-frame-lit:#f3f0e8;--rig-frame-dark:#cbc5b8;
-  --rig-cell-lit:#fbf9f3;--rig-cell-dark:#b7b0a3;--rig-card-lit:#ffffff;--rig-card-dark:#a9a397;
-  --rig-set-lit:#8e8a82;--rig-set-dark:#2b2925;--rig-set-ink:#ffffff;--rig-good-lit:#bfe3da;--rig-good-dark:#2f7d6d;
-  --rig-brass-lit:#f6e3ae;--rig-brass-dark:#8d6920;
-  --rig-ruby-lit:#f4889f;--rig-ruby-dark:#8f1533;
-  --rig-cobalt-lit:#c2d9ff;--rig-cobalt-dark:#1f4fa8;
-  --rig-teal-lit:#aee7de;--rig-teal-dark:#0e6f64;
-  --rig-amber-lit:#fde3ac;--rig-amber-dark:#a86a14;
-  --rig-ceramic-lit:#fffefb;--rig-ceramic-dark:#cbc5b8;
-  --rig-obsidian-lit:#777e89;--rig-obsidian-dark:#1c2027;
+  --rig-contact:#16181c;
+  /* metals: machined steel (cool, wide range), anodized aluminium (bright, satin), chain (dark oiled steel) */
+  --rig-steel-lit:#e3e5e8;--rig-steel-dark:#3a3e44;
+  --rig-alloy-lit:#f6f7f8;--rig-alloy-dark:#767b82;
+  --rig-chain-lit:#71747a;--rig-chain-dark:#17181b;
+  /* the followed part: anodized orange, the same hue as the page's --orange signal */
+  --rig-subject-lit:#ffad86;--rig-subject-dark:#a83a12;
+  --rig-slate-lit:#a3b0bf;--rig-slate-dark:#232c38;
+  /* context and concept bodies: neutral, recessive, but still a real top-to-side step */
+  --rig-frame-lit:#e9e9e6;--rig-frame-dark:#9c9b95;
+  --rig-cell-lit:#fafaf8;--rig-cell-dark:#a6a59f;--rig-card-lit:#ffffff;--rig-card-dark:#a2a19b;
+  --rig-set-lit:#8b8c8f;--rig-set-dark:#26272a;--rig-set-ink:#ffffff;--rig-good-lit:#bfe3da;--rig-good-dark:#2f7d6d;
+  /* horology: gilt brass, synthetic ruby, heat-blued steel, rhodium plate, graphite, bead-blasted aluminium */
+  --rig-brass-lit:#f2d991;--rig-brass-dark:#7a560f;
+  --rig-ruby-lit:#ec4f74;--rig-ruby-dark:#6e0a24;
+  --rig-cobalt-lit:#b9d2fb;--rig-cobalt-dark:#1c479c;
+  --rig-teal-lit:#a6e3d9;--rig-teal-dark:#0b675d;
+  --rig-amber-lit:#fcd896;--rig-amber-dark:#9a5e0e;
+  --rig-ceramic-lit:#fdfdfc;--rig-ceramic-dark:#b0afa9;
+  --rig-obsidian-lit:#737a85;--rig-obsidian-dark:#1a1e25;
+  --rig-gilt-lit:#f5df9e;--rig-gilt-dark:#86610f;
+  --rig-blued-lit:#8fb2f2;--rig-blued-dark:#12245a;
+  --rig-rhodium-lit:#f1f3f6;--rig-rhodium-dark:#5d636c;
+  --rig-graphite-lit:#868a91;--rig-graphite-dark:#1d1f23;
+  --rig-alu-lit:#eceef0;--rig-alu-dark:#8a9098;
   --recede:0%;
 }
 @media (prefers-color-scheme:dark){.vz:not([data-theme="light"]){
   --rig-shine:#ffffff;--rig-contact:#000000;
-  --rig-steel-lit:#d2d0ca;--rig-steel-dark:#2d2b28;
-  --rig-alloy-lit:#f2f1ec;--rig-alloy-dark:#55524c;
-  --rig-chain-lit:#9b978e;--rig-chain-dark:#262421;
-  --rig-subject-lit:#ffb489;--rig-subject-dark:#8d3311;
-  --rig-slate-lit:#b2c0d0;--rig-slate-dark:#2b3644;
-  --rig-frame-lit:#46433d;--rig-frame-dark:#26241f;
-  --rig-cell-lit:#5a5750;--rig-cell-dark:#2a2824;--rig-card-lit:#e9e7e1;--rig-card-dark:#6d6a63;
-  --rig-set-lit:#d6d3cc;--rig-set-dark:#77736b;--rig-set-ink:#1d1b18;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
-  --rig-brass-lit:#ebd496;--rig-brass-dark:#634812;
-  --rig-ruby-lit:#f593a9;--rig-ruby-dark:#70122a;
-  --rig-cobalt-lit:#a4c5fc;--rig-cobalt-dark:#1a3d80;
-  --rig-teal-lit:#8dd8cd;--rig-teal-dark:#0d544c;
-  --rig-amber-lit:#f5d38e;--rig-amber-dark:#7b4d0f;
-  --rig-ceramic-lit:#484b50;--rig-ceramic-dark:#222428;
-  --rig-obsidian-lit:#8e96a3;--rig-obsidian-dark:#1f242c;
+  --rig-steel-lit:#d0d3d7;--rig-steel-dark:#2a2d32;
+  --rig-alloy-lit:#eef0f2;--rig-alloy-dark:#50545b;
+  --rig-chain-lit:#989ba1;--rig-chain-dark:#232529;
+  --rig-subject-lit:#ffa47a;--rig-subject-dark:#8a2e0c;
+  --rig-slate-lit:#aebccc;--rig-slate-dark:#283342;
+  --rig-frame-lit:#5a5b5f;--rig-frame-dark:#222326;
+  --rig-cell-lit:#5c5d61;--rig-cell-dark:#262729;--rig-card-lit:#e8e9eb;--rig-card-dark:#6a6c70;
+  --rig-set-lit:#d4d5d8;--rig-set-dark:#74767a;--rig-set-ink:#1b1c1f;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
+  --rig-brass-lit:#eed38a;--rig-brass-dark:#5e430c;
+  --rig-ruby-lit:#f4648a;--rig-ruby-dark:#640b23;
+  --rig-cobalt-lit:#a0c2fb;--rig-cobalt-dark:#193a7c;
+  --rig-teal-lit:#8bd6cb;--rig-teal-dark:#0c5249;
+  --rig-amber-lit:#f5d18a;--rig-amber-dark:#784a0c;
+  --rig-ceramic-lit:#505257;--rig-ceramic-dark:#202124;
+  --rig-obsidian-lit:#8c94a1;--rig-obsidian-dark:#1d222a;
+  --rig-gilt-lit:#f0d98f;--rig-gilt-dark:#614509;
+  --rig-blued-lit:#8db0f0;--rig-blued-dark:#15275c;
+  --rig-rhodium-lit:#e4e7eb;--rig-rhodium-dark:#40454d;
+  --rig-graphite-lit:#9a9ea5;--rig-graphite-dark:#232529;
+  --rig-alu-lit:#dfe2e6;--rig-alu-dark:#5e646c;
 }}
 .vz[data-theme="dark"]{
   --rig-shine:#ffffff;--rig-contact:#000000;
-  --rig-steel-lit:#d2d0ca;--rig-steel-dark:#2d2b28;
-  --rig-alloy-lit:#f2f1ec;--rig-alloy-dark:#55524c;
-  --rig-chain-lit:#9b978e;--rig-chain-dark:#262421;
-  --rig-subject-lit:#ffb489;--rig-subject-dark:#8d3311;
-  --rig-slate-lit:#b2c0d0;--rig-slate-dark:#2b3644;
-  --rig-frame-lit:#46433d;--rig-frame-dark:#26241f;
-  --rig-cell-lit:#5a5750;--rig-cell-dark:#2a2824;--rig-card-lit:#e9e7e1;--rig-card-dark:#6d6a63;
-  --rig-set-lit:#d6d3cc;--rig-set-dark:#77736b;--rig-set-ink:#1d1b18;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
-  --rig-brass-lit:#ebd496;--rig-brass-dark:#634812;
-  --rig-ruby-lit:#f593a9;--rig-ruby-dark:#70122a;
-  --rig-cobalt-lit:#a4c5fc;--rig-cobalt-dark:#1a3d80;
-  --rig-teal-lit:#8dd8cd;--rig-teal-dark:#0d544c;
-  --rig-amber-lit:#f5d38e;--rig-amber-dark:#7b4d0f;
-  --rig-ceramic-lit:#484b50;--rig-ceramic-dark:#222428;
-  --rig-obsidian-lit:#8e96a3;--rig-obsidian-dark:#1f242c;
+  --rig-steel-lit:#d0d3d7;--rig-steel-dark:#2a2d32;
+  --rig-alloy-lit:#eef0f2;--rig-alloy-dark:#50545b;
+  --rig-chain-lit:#989ba1;--rig-chain-dark:#232529;
+  --rig-subject-lit:#ffa47a;--rig-subject-dark:#8a2e0c;
+  --rig-slate-lit:#aebccc;--rig-slate-dark:#283342;
+  --rig-frame-lit:#5a5b5f;--rig-frame-dark:#222326;
+  --rig-cell-lit:#5c5d61;--rig-cell-dark:#262729;--rig-card-lit:#e8e9eb;--rig-card-dark:#6a6c70;
+  --rig-set-lit:#d4d5d8;--rig-set-dark:#74767a;--rig-set-ink:#1b1c1f;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
+  --rig-brass-lit:#eed38a;--rig-brass-dark:#5e430c;
+  --rig-ruby-lit:#f4648a;--rig-ruby-dark:#640b23;
+  --rig-cobalt-lit:#a0c2fb;--rig-cobalt-dark:#193a7c;
+  --rig-teal-lit:#8bd6cb;--rig-teal-dark:#0c5249;
+  --rig-amber-lit:#f5d18a;--rig-amber-dark:#784a0c;
+  --rig-ceramic-lit:#505257;--rig-ceramic-dark:#202124;
+  --rig-obsidian-lit:#8c94a1;--rig-obsidian-dark:#1d222a;
+  --rig-gilt-lit:#f0d98f;--rig-gilt-dark:#614509;
+  --rig-blued-lit:#8db0f0;--rig-blued-dark:#15275c;
+  --rig-rhodium-lit:#e4e7eb;--rig-rhodium-dark:#40454d;
+  --rig-graphite-lit:#9a9ea5;--rig-graphite-dark:#232529;
+  --rig-alu-lit:#dfe2e6;--rig-alu-dark:#5e646c;
 }
 /* No ancestor in these selectors: they must also match inside <use> copies. */
 .rig-m-steel{--rig-a:var(--rig-steel-lit);--rig-b:var(--rig-steel-dark)}
@@ -95,6 +116,11 @@
 .rig-m-amber{--rig-a:var(--rig-amber-lit);--rig-b:var(--rig-amber-dark)}
 .rig-m-ceramic{--rig-a:var(--rig-ceramic-lit);--rig-b:var(--rig-ceramic-dark)}
 .rig-m-obsidian{--rig-a:var(--rig-obsidian-lit);--rig-b:var(--rig-obsidian-dark)}
+.rig-m-gilt{--rig-a:var(--rig-gilt-lit);--rig-b:var(--rig-gilt-dark)}
+.rig-m-blued{--rig-a:var(--rig-blued-lit);--rig-b:var(--rig-blued-dark)}
+.rig-m-rhodium{--rig-a:var(--rig-rhodium-lit);--rig-b:var(--rig-rhodium-dark)}
+.rig-m-graphite{--rig-a:var(--rig-graphite-lit);--rig-b:var(--rig-graphite-dark)}
+.rig-m-alu{--rig-a:var(--rig-alu-lit);--rig-b:var(--rig-alu-dark)}
 .rig-solid{
   --rig-lit:color-mix(in oklab,var(--rig-a) calc(100% - var(--recede)),var(--stage));
   --rig-dark:color-mix(in oklab,var(--rig-b) calc(100% - var(--recede)),var(--stage));
@@ -106,7 +132,7 @@
 .rig-crease{stroke:var(--rig-line);stroke-width:var(--rig-crease-w);stroke-opacity:.7}
 .rig-shine{stroke:var(--rig-shine);stroke-width:var(--rig-shine-w);stroke-opacity:calc(.85 - var(--recede) / 100%)}
 .rig-contact{fill:var(--rig-contact);fill-opacity:.16;stroke:var(--rig-contact);stroke-opacity:.07;stroke-width:6px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.rig-part[data-recede]{--recede:50%}
+.rig-part[data-recede]{--recede:42%}
 .rig-part[data-recede] .rig-contact{display:none}
 .rig-part[data-named]{--rig-sil-w:2.4px}
 /* Architectural deck blueprint rules, dial needles and 3D routed conduits */
