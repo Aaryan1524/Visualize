@@ -1,0 +1,88 @@
+{
+  "stamp": "6eaacf84a9a4b1c8",
+  "reviewer": "independent",
+  "summary": "All nine earlier findings are now genuinely fixed across the text, horological model, unit tests, 3D cutaway, and View A Swiss lever escapement loupe, with no new errors introduced.",
+  "findings": [
+    {
+      "where": "variants.modern.captions[5], variants.vintage.captions[5]",
+      "text": "the balance roller's ruby impulse jewel unlocks a stone, receives one brief push from the angled club tooth, and drops the next tooth onto the opposite stone",
+      "severity": "wrong",
+      "finding": "In a detached Swiss lever escapement, the balance roller's impulse jewel never contacts an escape-wheel tooth and never receives a push directly from the club tooth. Correctly: the impulse jewel enters the pallet fork notch to swing the fork and pull the locking pallet stone clear (unlock); the escape wheel's angled club tooth then slides across the impulse plane of that ruby pallet stone to swing the pallet fork, and the pallet fork notch delivers the brief push (impulse) to the balance's impulse jewel; once the tooth leaves the stone, the escape wheel turns freely through the small clearance angle (drop) until another tooth (~2.5 pitches away) strikes and locks onto the opposite pallet stone.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. Both modern and vintage captions[5] and voice[5] now accurately trace the detached Swiss lever impulse path: balance impulse jewel enters the fork notch to unlock the locking stone, the angled club tooth slides across that stone's impulse plane to drive the fork, and the fork delivers the brief push to the balance's impulse jewel before another tooth drops and locks on the opposite stone."
+    },
+    {
+      "where": "drawing (View A Swiss Lever Escapement loupe, steps 1–6 and vintage)",
+      "text": "VIEW A · SWISS LEVER ESCAPEMENT · 4.5 : 1",
+      "severity": "wrong",
+      "finding": "View A rotates the escape wheel backwards against its own club-tooth rake and opposite to the 3D movement: escapeWheelOutline rakes the 15 club teeth forward in the CCW (+angle) direction and the 3D cutaway advances +esc.escapeDeg (CCW), but renderEscapementLoupe passes -esc.escapeDeg while flipping y (ey - y), which spins View A's escape wheel clockwise (tooth backs leading). In addition, the ruby pallet stones extend too deep into the wheel (to r ≈ 561 vs root 540 and tip 819), visibly intersecting tooth shanks during LOCK (step 3) and missing the club tips during IMPULSE (step 5), while the pallet lever floats clear of both banking pins during LOCK instead of resting against a pin.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. Escape-wheel rotation (+esc.escapeDeg + 9.2° with ey - y, CCW matching the club-tooth rake and 3D cutaway), banking-pin contact at ±6.5°, and pallet stone geometry are all verified correct. Entry and exit stones are now symmetrically placed around 180° with a 2.5-pitch (60°) locked span: on Beat 0 LOCK (step 1), entryStone engages the club-tooth tip cleanly at r/escR = 0.88..1.03 while exitStone clears at 1.09..1.21 (gap 70.2); on Beat 1 LOCK (step 3), exitStone engages cleanly at 0.88..1.03 while entryStone clears at 1.09..1.21 (gap 106.8); and on Beat 1 IMPULSE (step 5), the club tooth slides directly across exitStone's impulse face (0.95..1.08) while entryStone clears outside the tip circle (1.02..1.15, gap 57.8)."
+    },
+    {
+      "where": "step:1 (View A readout & loupe), variants.modern.captions[5], details.facts[2]",
+      "text": "52° lift angle / UNLOCK · 8 BEATS/S",
+      "severity": "wrong",
+      "finding": "In model.mjs escapementAt(), halfLift is computed as (WATCH.liftAngle / 2) / ampDeg without dividing by Math.PI, even though balDeg = -dir * ampDeg * cos(Math.PI * u). That widens the unlock-to-end-of-impulse engagement arc to ~108° (-68.8° to +39.1° at 290° amplitude) — more than double the stated 52° lift angle — and causes step 1 to display UNLOCK in View A and the readout while the balance roller's red impulse jewel is still visibly outside the pallet fork notch. Use Math.asin((WATCH.liftAngle / 2) / ampDeg) / Math.PI (and note that during unlock, draw causes slight escape-wheel recoil rather than forward advance).",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. escapementAt() now uses Math.asin(Math.min(0.95, (WATCH.liftAngle / 2) / Math.max(90, ampDeg))) / Math.PI, yielding an exact 52° lift arc (±26°), includes slight draw recoil (-0.04 * sin(pi * f)) during unlock, and Step 1 now shows LOCK · 8 BEATS/S matching the lock phase readout with the impulse jewel well outside the fork notch."
+    },
+    {
+      "where": "lab (model.mjs windingRate & lab winding readout)",
+      "text": "Set wrist activity, mainspring wind level and regulator pin offset",
+      "severity": "wrong",
+      "finding": "windingRate() scales rotorRpm up to 12 rpm (4.8 rpm at 40%), which at 120:1 reduction and 6 h/barrel turn yields +14.4 h/h (net +13.4 h/h) at 40% wrist motion and +36.0 h/h at 100% — exactly 6× faster than the model's own documented desk-activity rate (~2.4 h/h, net +1.4 h/h at 40%). At default 45% activity it claims +16.2 h/h (empty to full 42 h in 2.6 h), at 100% it winds all 840 turns in 70 minutes, and even at the lowest non-zero slider step (5%) it gains +1.8 h/h so the reserve can never drain while worn. Scaling max effective rotorRpm to 2.0 matches the 840-turn/42 h calibre (+2.4 h/h at 40%, +6.0 h/h at 100%, and realistic net drain at 5–15% sedentary motion).",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. WATCH.maxRotorRpm is now 2.0, producing +2.4 h/h (net +1.4 h/h) at 40% desk activity, +6.0 h/h (net +5.0 h/h) at 100%, and realistic net reserve drain (-0.7 to -0.1 h/h) at 5–15% sedentary motion, matching the 840-turn/42 h calibre and verified by model.test.mjs."
+    },
+    {
+      "where": "variants.modern.captions[4], variants.vintage.captions[4]",
+      "text": "barrel (72 teeth) to center pinion (12 leaves) is 6 : 1, making the center wheel turn once per hour for the minute hand.",
+      "severity": "misleading",
+      "finding": "Cause and effect are inverted: the 6 : 1 barrel-to-center ratio does not make the center wheel turn once per hour. In a mechanical watch, the balance frequency and the train ratios between the center wheel and escape wheel (960 : 1 modern, 600 : 1 vintage) fix the center wheel at 1 rev/hour; the 6 : 1 barrel-to-center ratio instead fixes the barrel at 1 revolution every 6 hours.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. Modern and vintage captions[4], voice[4], and details.facts[0] now correctly state that the balance rate and the 960:1 (modern) / 600:1 (vintage) center-to-escape train fix the center wheel at 1 rev/hour and fourth wheel at 1 rev/min, while the 6:1 barrel stage paces the barrel at 1 turn every 6 hours."
+    },
+    {
+      "where": "step:3 (drawing — mainspring barrel cutaway & Slipping bridle callout)",
+      "text": "Slipping bridle / once torque hits 7.2 N·mm at full wind, the bridle slides safely along the smooth barrel wall",
+      "severity": "misleading",
+      "finding": "Two visual contradictions appear at 100% wind in step 3: (1) the 'Slipping bridle' leader line passes right across the bright orange slipping bridle rim and lands its dot deep inside the blue mainspring coils near the arbor; (2) mainspringTpl shrinks the outer coil radius inward (r1 = 11.5) as wind increases, visibly detaching the outer coil from the slipping bridle (r = 13.2) at full wind. Physically, inner coils tighten around the arbor as wind increases while the outer end remains attached to and presses outward against the slipping bridle on the barrel wall.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. mainspringTpl now keeps the outer coil seated at r1 = CAL.barrel.r - 3.35 flush against the slipping bridle while inner coils tighten around the arbor (r0 = 5.6 to 3.6), and the 'Slipping bridle' leader dot lands squarely on the bright vermilion slipping bridle rim in step 3."
+    },
+    {
+      "where": "variants.modern.heads[4], variants.vintage.heads[4], details.legend[0], variants.modern.voice[1]",
+      "text": "Four geared wheels step barrel speed up by 5,760 : 1 to the escape wheel. / Mainspring barrel, four-wheel going train, escape wheel and balance rim",
+      "severity": "misleading",
+      "finding": "Listing the barrel and escape wheel separately from a 'four-wheel going train' double-counts the barrel: between the barrel and the escape wheel there are only three wheels (center, third, fourth). In horology the four-wheel going train counts the mainspring barrel (great/first wheel) as wheel 1 alongside center, third and fourth, producing four geared stages (as captions[4] accurately writes).",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. Step 4 headings now say 'Four geared stages', captions[1] names 'the toothed mainspring barrel, the center, third and fourth wheels of the going train', voice[1] says 'the geared going train', and details.legend[0] says 'Mainspring barrel, going train wheels, escape wheel and balance rim', eliminating the double-count."
+    },
+    {
+      "where": "step:1, step:2 (drawing — Reversing wheels callout & meshing)",
+      "text": "Reversing wheels / Twin reversing click wheels engage on opposite directions of rotation so both clockwise and counter-clockwise swings drive the barrel ratchet in one direction only",
+      "severity": "misleading",
+      "finding": "In step 1, the oscillating rotor sits over the left half of the calibre so the 'Reversing wheels' (and 'Mainspring barrel') callout dots land directly on top of the orange rotor weight, visually mislabeling the rotor. In step 2, once uncovered, the two reversing wheels float separated by air from each other, from the rotor hub and from the barrel rather than visibly meshing to drive the barrel ratchet.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. Step 1 parks the rotor on the upper-right (18°), leaving the reversing wheels and mainspring barrel completely uncovered under their callout dots, and figure.mjs now places the coaxial rotor pinion, twin reversing wheels (revB, revA), and barrel ratchet coplanar at z = 19.6 with pitch-circle tangency (within 0.08 units) so the entire winding train visibly meshes tooth-to-tooth in steps 1 and 2."
+    },
+    {
+      "where": "variants.modern.captions[4], details.facts[4]",
+      "text": "Not covered here: keyless works and crown hand-setting clutch (located on the dial side under the hands) and date-jumper complications.",
+      "severity": "missing",
+      "finding": "Step 4 derives both the minute hand (center wheel, 1 rev/hour) and second hand (fourth wheel, 1 rev/min) from the going train, but the hour hand is never accounted for. Either Step 4 or Details ('Not covered here') should note the dial-side motion works (cannon pinion -> minute wheel -> hour wheel, 12 : 1 reduction) that drives the hour hand.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. WATCH.motionWorks = 12 is now modeled and both captions[4] (modern and vintage) and details.facts[0,4] explicitly account for the dial-side 12 : 1 motion-works reduction driving the hour hand."
+    }
+  ]
+}
