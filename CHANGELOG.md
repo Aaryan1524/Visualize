@@ -2,7 +2,10 @@
 
 One version covers the kit and the skill (`package.json` `version` and `SKILL.md` `metadata.version` move together). Each entry names the failure that caused it, so the reason for a rule is never lost.
 
-## Unreleased
+## 1.0.0 (2026-11-18), first public release
+
+A skill that turns a one-line request into a step-through explanation checked against a working model: abstract concepts in Clay 3D, machines as technical cutaways, each with a voice that explains first and lights what it names, a prediction, What if and Now you try. Installs in Claude Code, Codex and the Antigravity CLI. Desktop first; phone layouts work but are not yet polished.
+
 
 What a machine needs. The escalator built in Clay came out as about forty identical soft wheels in front of two thin track lines, with a floor shadow that meant nothing. The builder called it unprofessional. Drawn as a to-scale side cutaway, the same mechanism read at a glance.
 
@@ -51,7 +54,7 @@ What a machine needs. The escalator built in Clay came out as about forty identi
 - **Arrow keys work on a fresh Clay page.** They did nothing until the reader clicked the page (found on the hashing eval, reproduced on the LRU flagship). A standalone page now passes unfocused keys to the figure; an embedded figure still takes keys only when focused. `verify` presses → on a fresh page, with a planted control.
 - **Codex and Antigravity.** Install paths, a Chrome hint for sandboxed agents, and a compatibility line. These were written for the README change but never reached main.
 
-## 1.0.0
+## 0.9.0 (internal, desktop first)
 
 First release, desktop first.
 
