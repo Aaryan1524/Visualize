@@ -23,10 +23,10 @@
 </p>
 
 <p align="center">
-  <img src=".github/assets/lru-cache-predict.jpg" width="720" alt="A page titled LRU Cache in the drawing look. Three keys drawn in ink, B, C and an orange A, sit in a hatched cache tray marked least recent to most recent, with a queue of upcoming requests below and a title block with the legend at the top right. A card asks the reader to predict: D is next, which key leaves? A strip under the figure lists each request as a hit or a miss.">
+  <a href="https://github.com/Aaryan1524/Visualize/releases/download/v1.0.0/derailleur-tour.mp4"><img src=".github/assets/derailleur.gif" width="760" alt="A page titled Rear Derailleur, playing. A shaded rear derailleur under an eleven-cog cassette shifts the chain from cog to cog while the cage swings to take up slack; a magnified circle follows the guide pulley from behind, and readouts under the drawing (teeth, cable pull, cage swing, chain tension) change with every shift."></a>
 </p>
 
-<p align="center"><sub><code>examples/lru-3d</code>, the flagship: an LRU cache in the drawing look, paused on a prediction before the first eviction.</sub></p>
+<p align="center"><sub><b>Rear Derailleur</b>, made from one line: <code>/visualize explain how a bicycle rear derailleur works</code>. The model solves the spring and chain forces; the voice explains, the reader predicts, and a lab lets them back out the limit screw.<br><a href="https://github.com/Aaryan1524/Visualize/releases/download/v1.0.0/derailleur-tour.mp4"><b>▶ Watch the full narrated tour (MP4, with sound)</b></a></sub></p>
 
 ---
 
@@ -50,6 +50,10 @@ Then, in Claude Code:
 That's it. For Codex or Antigravity, clone into that agent's folder instead (see [Install](#install)); in Codex, type `$visualize`.
 
 ## Gallery
+
+<p align="center"><img src=".github/assets/lru-cache-predict.jpg" width="720" alt="A page titled LRU Cache in the drawing look. Three keys drawn in ink, B, C and an orange A, sit in a hatched cache tray marked least recent to most recent, with a queue of upcoming requests below and a title block with the legend at the top right. A card asks the reader to predict: D is next, which key leaves? A strip under the figure lists each request as a hit or a miss."></p>
+
+<p align="center"><sub><b>lru-3d</b>, the flagship for concepts: an LRU cache in the drawing look, paused on a prediction before the first eviction.</sub></p>
 
 <p align="center"><img src=".github/assets/escalator.jpg" width="720" alt="A page titled Escalator: a to-scale side cutaway of an escalator in a hatched building section. A blue chain-wheel track and a green trailer-wheel track run up a 30 degree incline, one step is followed in orange, and Detail A at 2.6 to 1 shows the step's 200 mm rise. Readouts under the drawing give step rise, tread tilt, tread height, speed and step count."></p>
 
@@ -89,7 +93,7 @@ Every screenshot is the light theme of a page built from [`examples/`](examples)
 | **The right look for the subject** | A real machine is a sharp technical cutaway, drawn to scale, with hatched sections, dimensions and a magnified detail for each step. An idea is built from 3D parts in the same style (ink outlines, hatched base plates, the same palette and title block) on a directed stage that opens flat, moves to each step's focus and ends flat. Clay and Paper looks remain on request. |
 | **A voice** | Recorded locally by an open-source voice model, offline after one download. It explains the concept first, then narrates each step in one take and lights each part as it is named. ▶ plays the narrated tour and waits for every sentence. |
 | **Predict, What if, Now you try** | A pause to predict before the key moment, the same idea on other inputs, and questions the model makes and marks. |
-| **A page you own** | One standalone HTML file per scene, light and dark themes, reduced motion, keyboard control, `#step=` links and a text version of every step. Also an SVG of any step, or a React component. |
+| **A page you own** | One standalone HTML file per scene. It opens in the light theme on every system; a Dark button (or a `#theme=dark` link) switches it. Reduced motion, keyboard control, `#step=` links and a text version of every step. Also an SVG of any step, or a React component. |
 
 ## Install
 
@@ -198,11 +202,13 @@ visualize/
 │   ├── iso/            the isometric projection and depth sort
 │   ├── parts/          finished parts: rail, ring, tree, network, flow
 │   ├── drawing/        the Drawing page and player shared by every machine
+│   ├── rig/            the engine for machine figures that read as 3D (the derailleur)
+│   ├── claims/         the audit of what a page says, not only what its model computes
 │   ├── render/         the player, SVG stage, panels, components, styles
 │   └── react/          the React adapter
 ├── references/         kit.md, authoring.md, craft.md, verify.md
 ├── scripts/            build, verify, voice, shoot, export-svg, new-scene
-├── examples/           lru-3d (concept flagship), escalator (mechanism flagship), lock, lru, attention, retries
+├── examples/           derailleur, escalator and lock (machines), lru-3d (concept flagship), lru, attention, retries
 ├── test/fixtures/      gallery scenes and the planted faults
 └── evals/evals.json    test prompts and what a good answer contains
 ```
@@ -221,6 +227,7 @@ pnpm typecheck
 pnpm build                # dist/<scene>.html, one standalone file each
 pnpm verify               # every example and gallery, checked in headless Chrome
 pnpm verify:controls      # planted faults: proves the checks can fail
+pnpm check:drawing        # machine pages: layout, timeline, callouts and frame time
 node scripts/voice.mjs examples/lru-3d                    # record the narration
 node scripts/shoot.mjs dist/lru-3d.html --out shot.png --step 4 --scale 4
 ```

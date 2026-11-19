@@ -2,6 +2,11 @@
 
 One version covers the kit and the skill (`package.json` `version` and `SKILL.md` `metadata.version` move together). Each entry names the failure that caused it, so the reason for a rule is never lost.
 
+## Unreleased
+
+- **Pages open light on every system.** They followed the reader's system theme, so a reader in dark mode met a black page first; the builder found it ugly. The Dark button switches, and a `#theme=dark` link opens dark. The checks set the theme on the page as a link does, so the dark checks still test dark (49 of 49 planted faults caught).
+- **The README opens with the rear derailleur playing**, and links the full narrated tour (MP4 with sound) on the release.
+
 ## 1.0.0 (2026-11-18), first public release
 
 A skill that turns a one-line request into a step-through explanation checked against a working model: abstract concepts in Clay 3D, machines as technical cutaways, each with a voice that explains first and lights what it names, a prediction, What if and Now you try. Installs in Claude Code, Codex and the Antigravity CLI. Desktop first; phone layouts work but are not yet polished.

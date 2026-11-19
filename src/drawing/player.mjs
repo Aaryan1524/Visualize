@@ -565,7 +565,8 @@ export function player(DATA, machine) {
     themeBtn.textContent = th === "dark" ? "Light" : "Dark";
     themeBtn.setAttribute("aria-label", `Switch to ${th === "dark" ? "light" : "dark"} theme`);
   };
-  applyTheme(matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  // Light by default, whatever the reader's system uses; #theme=dark opens dark.
+  applyTheme(/(?:^|[#&])theme=dark/.test(location.hash) ? "dark" : "light");
   themeBtn.addEventListener("click", () => applyTheme(root.dataset.theme === "dark" ? "light" : "dark"));
   // On the document, so the arrows work on a fresh page before anything has focus.
   document.addEventListener("keydown", (e) => {
@@ -590,6 +591,7 @@ export function player(DATA, machine) {
   goTo(first, { pose: true, speak: false });
   setRunning(false);
   window.__viz = {
+    setTheme: (th) => applyTheme(th),
     steps: LAST + 1,
     predictStep: PRED,
     seekStep(k) {

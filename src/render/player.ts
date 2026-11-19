@@ -68,6 +68,8 @@ export interface PlayerApi {
   frame(): Frame;
   /** The step whose caption and panels are on screen. */
   shownIndex(): number;
+  /** Switch the figure's theme, as the theme button does. */
+  setTheme(theme: "light" | "dark"): void;
   viewBox: [number, number, number, number];
   /** Stop playback, disconnect every listener and remove the figure. */
   destroy(): void;
@@ -352,21 +354,26 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
   });
 
   // ---- Theme -----------------------------------------------------------
+  // Light by default, whatever the reader's system uses: the builder found dark ugly as a first
+  // impression. The Dark button switches; a page link can open dark with #theme=dark.
   // The theme belongs to the figure; a standalone page mirrors it on its body.
   const media = matchMedia("(prefers-color-scheme: dark)");
-  if (options.theme) root.dataset.theme = options.theme;
-  const currentTheme = () => (root.dataset.theme as "light" | "dark" | undefined) ?? (media.matches ? "dark" : "light");
+  const hashTheme = page ? /(?:^|[#&])theme=(dark|light)/.exec(location.hash)?.[1] as "light" | "dark" | undefined : undefined;
+  root.dataset.theme = options.theme ?? hashTheme ?? "light";
+  if (page) document.body.dataset.theme = root.dataset.theme;
+  const currentTheme = () => (root.dataset.theme as "light" | "dark" | undefined) ?? "light";
   const syncThemeBtn = () => {
     const next = currentTheme() === "dark" ? "light" : "dark";
     themeBtn.textContent = next === "dark" ? "Dark" : "Light";
     themeBtn.setAttribute("aria-label", `Switch to ${next} theme`);
   };
-  themeBtn.addEventListener("click", () => {
-    root.dataset.theme = currentTheme() === "dark" ? "light" : "dark";
-    if (page) document.body.dataset.theme = root.dataset.theme;
+  const setTheme = (theme: "light" | "dark") => {
+    root.dataset.theme = theme;
+    if (page) document.body.dataset.theme = theme;
     syncThemeBtn();
     stage.refreshInk();
-  });
+  };
+  themeBtn.addEventListener("click", () => setTheme(currentTheme() === "dark" ? "light" : "dark"));
   const onScheme = () => {
     syncThemeBtn();
     stage.refreshInk();
@@ -979,6 +986,7 @@ export function mount<S, E>(host: HTMLElement, sceneIn: Scene<S, E>, options: Mo
     time: () => t,
     frame: () => current,
     shownIndex: () => shown,
+    setTheme: (theme) => setTheme(theme),
     destroy: () => {
       if (raf) cancelAnimationFrame(raf);
       raf = 0;

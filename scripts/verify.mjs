@@ -507,6 +507,8 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant, hash = 
     page.on("console", (m) => m.type() === "error" && errors.push(`console: ${m.text()}`));
     if (plant) await page.evaluateOnNewDocument(PLANTS[plant]);
     await page.setViewport({ width: opts.width ?? 1280, height: opts.height ?? 1000, deviceScaleFactor: opts.scale ?? 1 });
+    // Pages open light whatever the system uses; the theme under test is set the way a link sets it.
+    await page.evaluateOnNewDocument((t) => { if (!/theme=/.test(location.hash)) history.replaceState(null, "", `${location.pathname}${location.search}${location.hash ? `${location.hash}&` : "#"}theme=${t}`); }, opts.theme ?? "light");
     await page.emulateMediaFeatures([
       { name: "prefers-color-scheme", value: opts.theme ?? "light" },
       { name: "prefers-reduced-motion", value: opts.reduced ? "reduce" : "no-preference" },
@@ -673,7 +675,7 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant, hash = 
     if (scene.presentation === "editorial") {
       const issues={composition:new Set(),semantics:new Set(),callouts:new Set()};
       for (const theme of ["light","dark"]) for (const width of [1280,390]) {
-        await page.emulateMediaFeatures([{name:"prefers-color-scheme",value:theme}]);
+        await page.emulateMediaFeatures([{name:"prefers-color-scheme",value:theme}]); await page.evaluate((t) => window.__viz?.setTheme?.(t), theme);
         await page.setViewport({width,height:1000,deviceScaleFactor:1});
         await settle(page);
         for (let k=0;k<=last;k++) {
@@ -683,13 +685,13 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant, hash = 
         }
       }
       await page.setViewport({width:1280,height:1000,deviceScaleFactor:1});
-      await page.emulateMediaFeatures([{name:"prefers-color-scheme",value:"light"}]);
+      await page.emulateMediaFeatures([{name:"prefers-color-scheme",value:"light"}]); await page.evaluate((t) => window.__viz?.setTheme?.(t), "light");
       await settle(page);
       for (const [name,problems] of Object.entries(issues)) report.add(name,"every step at desktop and phone widths, both themes",[...problems]);
 
       const viewportProblems = new Set(), copyProblems = new Set(), drawerProblems = [], coverProblems = new Set();
       for (const theme of ["light", "dark"]) for (const [width, height] of [[1440, 900], [1920, 1080]]) {
-        await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: theme }]);
+        await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: theme }]); await page.evaluate((t) => window.__viz?.setTheme?.(t), theme);
         await page.setViewport({ width, height, deviceScaleFactor: 1 });
         await settle(page);
         for (let k = 0; k <= last; k++) {
@@ -742,7 +744,7 @@ async function verifyPage(browser, { name, scene, file, shotsDir, plant, hash = 
       }
       report.add("details drawer", "contained transcript, modal focus, Escape, focus restoration; underlying timeline stays fixed", drawerProblems);
       await page.setViewport({ width: 1280, height: 1000, deviceScaleFactor: 1 });
-      await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }]);
+      await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }]); await page.evaluate((t) => window.__viz?.setTheme?.(t), "light");
       await settle(page);
     }
 
