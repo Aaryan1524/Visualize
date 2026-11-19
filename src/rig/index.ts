@@ -12,3 +12,4 @@ export * from "./shapes.ts";
 export * from "./draw.ts";
 export * from "./motion.ts";
 export * from "./stage.ts";
+export * from "./concept.ts";
