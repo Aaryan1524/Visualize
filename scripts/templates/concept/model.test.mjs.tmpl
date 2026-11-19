@@ -1,0 +1,47 @@
+// node --test model.test.mjs
+//
+// The model against a separately written reference: a table filled by scanning for the first free slot
+// from the key's remainder, written the plain way, and the cases the story needs.
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { MODELS, KEYS, ASK, insert, lookup } from "./model.mjs";
+
+// the reference: no shared code with the model
+function reference(m, keys) {
+  const t = Array(m).fill(null);
+  for (const k of keys) {
+    let s = k % m;
+    while (t[s] !== null) s = (s + 1) % m;
+    t[s] = k;
+  }
+  return t;
+}
+
+for (const [name, M] of Object.entries(MODELS)) {
+  test(`${name}: the table matches a separately written reference`, () => {
+    assert.deepEqual(M.table, reference(M.m, KEYS));
+  });
+  test(`${name}: a lookup finds every key put in, and stops at an empty slot for one that is not`, () => {
+    for (const k of KEYS) assert.ok(lookup(M.table, k).found);
+    const l = lookup(M.table, ASK);
+    assert.ok(!l.found && M.table[l.slot] === null && !M.table.includes(ASK));
+  });
+  test(`${name}: random keys, against the reference`, () => {
+    let seed = 7;
+    const r = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+    for (let n = 0; n < 200; n++) {
+      const keys = [...new Set(Array.from({ length: 1 + Math.floor(r() * (M.m - 1)) }, () => Math.floor(r() * 100)))];
+      let t = Array(M.m).fill(null);
+      for (const k of keys) t = insert(t, k).table;
+      assert.deepEqual(t, reference(M.m, keys));
+    }
+  });
+}
+
+test("the story's cases happen in the 8-slot table: a key placed at once, a collision that probes on, and a lookup that probes to an empty slot", () => {
+  const s = MODELS.eight.steps;
+  assert.equal(s[0].probes.length, 1);
+  assert.ok(s[1].probes.length > 1);
+  assert.ok(s[3].op === "lookup" && !s[3].found && s[3].probes.length > 1);
+});

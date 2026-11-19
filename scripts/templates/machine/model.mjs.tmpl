@@ -1,0 +1,33 @@
+// __TITLE__: the model. REPLACE THIS FIRST. The scaffold's machine is a pair of spur gears so that
+// everything around it builds and passes its checks; your machine's physics goes here, and every
+// number the page prints comes from it (src/claims/audit.mjs fails a number the model does not have).
+//
+// The page inlines this file (its `export` keywords removed), so it must not import anything.
+//
+// World: x along the line of centres, y up, e toward the viewer's side, mm. The driving gear turns
+// about the origin, the driven gear about (centre, 0); the pitch point, where they mesh, is (r1, 0).
+
+export const MODULE = 4; // mm of pitch diameter per tooth
+export const VARIANTS = {
+  third: { label: "12 : 36 teeth", z1: 12, z2: 36 },
+  half: { label: "16 : 32 teeth", z1: 16, z2: 32 },
+};
+const TAU = Math.PI * 2;
+
+export function makeModel(v) {
+  const z1 = v.z1, z2 = v.z2, m = MODULE;
+  const r1 = (m * z1) / 2, r2 = (m * z2) / 2, centre = r1 + r2, ratio = z2 / z1;
+  // the driven gear is set so a gap faces the driving gear's tooth at the pitch point
+  const phase2 = Math.PI - Math.PI / z2;
+  /** Angles (radians, counter-clockwise) after the driving gear has turned `turns` turns. */
+  const pose = (turns) => ({ turns, a1: turns * TAU, a2: phase2 - (turns * TAU * z1) / z2, out: turns / ratio });
+  /** How fast each pitch circle moves at the pitch point, in mm a second, for the driving gear at `rpm`. */
+  const pitchSpeed = (rpm) => ({ driver: (TAU * r1 * rpm) / 60, driven: (TAU * r2 * (rpm / ratio)) / 60 });
+  const speedOut = (rpm) => rpm / ratio;
+  const torqueOut = (nm) => nm * ratio;
+  // the numbers the page prints, for the audit: everything a reader sees is one of these
+  const N = { z1, z2, m, r1, r2, centre, ratio, inv: 1 / ratio, d1: 2 * r1, d2: 2 * r2, rpm: 60, rpmOut: speedOut(60), torque: 10, torqueOut: torqueOut(10) };
+  return { v, z1, z2, m, r1, r2, centre, ratio, tip: m, pose, pitchSpeed, speedOut, torqueOut, N };
+}
+
+export const MODELS = Object.fromEntries(Object.entries(VARIANTS).map(([k, v]) => [k, makeModel(v)]));

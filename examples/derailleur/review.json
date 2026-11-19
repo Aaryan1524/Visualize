@@ -1,7 +1,7 @@
 {
-  "stamp": "b8ee221583eecd3d",
+  "stamp": "b9b3c2e1eb4e0710",
   "reviewer": "independent",
-  "summary": "Every finding from rounds 1 and 2 is fixed or accepted, and I recomputed all the new sums from the model (73 = 46.94 + 26.02; 29.41 + 11.99 - 5.19 - 10.18 = 26.02; 102.50 = 54.96 + 47.54; 51.49 + 15.66 - 6.33 - 13.28 = 47.54; tight cable leaves the largest cog on its line). I found nothing new that is wrong, misleading or missing.",
+  "summary": "Every finding from rounds 1 to 5 is fixed or accepted. The off-line arrow, its label, the readout and the lab rows now agree in every case I tried (tight 0.5, 1.5 and 3; slack 1, 2 and 3 on the 17; and both limit-screw cases), each measured from the cog asked for. I found nothing new.",
   "findings": [
     {
       "where": "setup, concept, variants.*.captions.0, variants.*.voice.0",
@@ -146,6 +146,42 @@
       "resolved": false,
       "fixed": true,
       "response": "Fixed: captions 2 and 6 and Details now say 'the linkage is refitted for each cassette'."
+    },
+    {
+      "where": "step:4 (picture), steps.4.heading, variants.*.captions.4, variants.*.voice.4",
+      "text": "The pulley moves at once; the chain waits for a ramp to come round. ... With the pedals still, the pulley moves at once and the chain just runs at an angle.",
+      "severity": "missing",
+      "finding": "With View A gone, nothing on screen shows this step's subject. Through the whole step (I sampled it every second, from the click to the chain seated on the 15) the camera frames the cassette, with the parallelogram cut off at the bottom edge. The guide pulley is out of frame, so the reader never sees it move one cog ahead while the chain stays on the 14, or the chain running at an angle between them. Only the readout ('14 teeth · pulley under the 15') carries it. View A ('follows the guide pulley') was what showed this. Frame the guide pulley and the cog it has moved under together with the gates, or pull the camera back far enough to include them. Separately, the 'Ramp and pin' label sits on top of the chain's upper run, so it reads as naming the chain. Put it beside a gate on a cog.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: through step 4 the frame now holds the gates, the chain coming off the 14, and the labelled guide pulley under the 15 (sampled at 78, 83 and 87 s). 'Ramp and pin' now points at a gate on the cog, not at the chain."
+    },
+    {
+      "where": "lab (picture), step:7 (picture), details.legend 'The chain out of line with its cog', drawing legend 'Off line'",
+      "text": "Off line / The chain out of line with its cog",
+      "severity": "misleading",
+      "finding": "The lab's alignment lesson still reads, but only through the words: the verdict ('Skips under load: 1.40 mm outboard of the 17'), the worked rows and the readout. In the figure, the only off-line cue is the guide pulley's teeth turning dark red. That shows that something is wrong, but not which way or by how much. The red off-line mark the legend's swatch stands for (a line from the cog's line to the pulley's) is drawn about 1 px long, and the parallelogram links cover it in this view (checked in the lab with a cable 1 mm slack). In step 7's close frame the guide pulley is mostly behind the P-knuckle, in the receded tone, so '1.4 mm outboard of its cog' is not visible there either. The legend also says 'the chain out of line', while what turns red is the pulley. Either draw the off-line mark where it can be seen (below the pulley, or as an outboard arrow on the pulley's teeth) and point the legend at it, or change the legend to 'Guide pulley out of line with its cog' and say in the lab that the red teeth mean off line, with the direction given in the verdict.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: the lab and step 7 show a red tick on the guide pulley's plane and an arrow toward the cog's line, with the offset printed, and the legend names the guide pulley. The fixed-length arrow is honest. A true 0.7 to 1.9 mm would be one or two pixels at this scale, so a to-scale arrow would teach nothing. The legend says the arrow is drawn longer than the offset and the number is exact, and the arrow carries only direction while the number carries size. I checked the directions: slack gives the pulley outboard of its cog, tight gives it inboard. See the two new findings on how the label reads, and on the wrong-cog case."
+    },
+    {
+      "where": "lab and step 7 (figure: off-line arrow label), readout 'mm outboard / inboard', lab rows",
+      "text": "Wrong cog: the chain sits on the 19, not the 17. ... 2.10 mm off its cog. [figure and readout: '1.64 mm outboard']",
+      "severity": "misleading",
+      "finding": "Once the cable error passes half a cog, the arrow, its label and the readout switch to the nearest cog and reverse direction, while the lab rows still measure from the wanted cog. Take cog 6 (the 17) with the cable 1.5 mm tight. The pulley is 2.10 mm inboard of the 17, which the rows say. But the figure and the readout say '1.64 mm outboard', measured from the 19, and the arrow points to the 19's line. With the cable 1.5 mm slack they say '1.64 mm inboard', and at 2 mm slack '0.94 mm inboard'. That contradicts the caption's rule that a slack cable puts the pulley outboard, and it contradicts the rows on the same screen. The barrel direction a reader would take from the arrow is also the wrong one. Measure the arrow and the readout from the cog asked for (2.10 mm inboard of the 17). Or, at the least, name the cog in the label ('1.64 mm outboard of the 19').",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed. Checked in the lab on cog 6 (the 17). With the cable 1.5 mm tight, the label, the readout and the rows all say 2.10 mm inboard of the 17, and the verdict says the chain sits on the 19. With it 1 mm slack they say 1.40 mm outboard of the 17; 2 mm slack, 2.80 mm outboard (the chain is on the 15); 3 mm slack, 4.20 mm outboard; 3 mm tight, 4.20 mm inboard. Each figure is the cable error times 1.4, and each verdict's cog matches the nearest cog line (14.50 mm is nearer the 15 at 14.96; 22.90 mm is nearer the 19 at 22.44). At the limits (cog 1 slack, cog 11 tight) no arrow is drawn, and the rows name the H or the L screw."
+    },
+    {
+      "where": "lab and step 7 (figure: off-line arrow label)",
+      "text": "1.40 mm outboard (printed at the head of an arrow that points inboard)",
+      "severity": "misleading",
+      "finding": "The arrow runs from the pulley's plane toward the cog's line, so for a slack cable it points inboard. The label sits at its head and says 'outboard'. At a glance, an arrow with a word at its tip reads as 'this way, this far', so the picture says 'outboard' while pointing inboard. A tight cable shows the mirror image ('inboard' at the head of an outboard arrow). The legend explains it, but the figure should read without the legend. Put the number at the tick (the pulley's end) as '1.40 mm outboard of its cog'. Or make the label say what the arrow shows ('to the cog: 1.40 mm inboard'), which is also the way the barrel adjuster has to move the pulley.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed. The label now sits at the pulley's end and reads as the pulley's position ('pulley 1.40 mm outboard of the 17'), and the arrow runs from the pulley back to the 17's line. Slack and tight point opposite ways, which is right. The details legend says the same. Step 7 shows the same mark at a readable size, with the pulley lit."
     }
   ]
 }

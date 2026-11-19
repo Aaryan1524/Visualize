@@ -1,0 +1,89 @@
+// __TITLE__: the figure, on Visualize's rig with its concept parts (src/rig/parts.ts). Every solid is
+// drawn once; each frame only places it, swaps a printed value, or sets a tone by attribute.
+//
+//   const F = figure(M, camera)   // once per variant
+//   F.parts                       // drawings put in the page once: { id, part, svg }
+//   F.pose(state)                 // each frame: { items, at } (at: callout anchors on screen)
+//
+// The world: x along the rail, y away from the viewer, z up, mm. The table's slots stand in a row on a
+// board; the key card waits in front of them; an arrow runs from the card to the slot being looked at,
+// and a marker stands on it.
+
+import { arrow, boardDrawing, cardDrawing, cellDrawing, CONCEPT_VIEW, decalAt, fitCamera, markerDrawing, placeAt, railCentres, screenOf, valueText } from "__ROOT__/src/rig/index.ts";
+export { RigStage, screenOf } from "__ROOT__/src/rig/index.ts";
+
+export const VIEW = CONCEPT_VIEW;
+export const CELL = { w: 20, d: 20, h: 8, pitch: 26 };
+const CARD = { w: 30, d: 18, h: 4 };
+
+/** Where things stand, for a table of m slots. */
+export function layout(M) {
+  const slots = railCentres(M.m, CELL.pitch, [0, 0, 0]);
+  const width = (M.m - 1) * CELL.pitch;
+  return { slots, width, card: [width / 2, -42, 0], board: { at: [width / 2, -10, 0], w: width + CELL.w + 24, d: CELL.d + 64 } };
+}
+
+/** The camera for one variant, fitted to the board, the slots, the card and the marker above them. */
+export function cameraFor(M, box) {
+  const L = layout(M), pts = [];
+  const bw = L.board.w / 2, bd = L.board.d / 2;
+  for (const [x, y] of [[-bw, -bd], [bw, -bd], [bw, bd], [-bw, bd]]) pts.push([L.board.at[0] + x, L.board.at[1] + y, -3], [L.board.at[0] + x, L.board.at[1] + y, 30]);
+  return fitCamera(pts, box, VIEW.azimuth, VIEW.elevation);
+}
+
+export function figure(M, cam) {
+  const L = layout(M), parts = [];
+  const once = (id, part, svg) => parts.push({ id, part, svg });
+  once("board", "board", boardDrawing(cam, { w: L.board.w, d: L.board.d }));
+  const cell = cellDrawing(cam, CELL);
+  for (let i = 0; i < M.m; i++) once(`slot${i}`, "slots", cell);
+  // each slot's index, printed on the board in front of it: drawn once, in place
+  for (let i = 0; i < M.m; i++) once(`index${i}`, "slots", `<g transform="${decalAt(cam, [L.slots[i][0], L.slots[i][1] - CELL.d / 2 - 6, 0.05])}">${valueText(String(i), 6, "rig-index")}</g>`);
+  once("card", "card", cardDrawing(cam, CARD));
+  once("marker", "probe", markerDrawing(cam, { h: 26 }));
+
+  /**
+   * state: { table: [key|null], key: the card's key or null, target: slot looked at or null,
+   *          probed: [slots looked at so far], placed: the slot the key went into or null,
+   *          home: the key's home slot or null }
+   */
+  function pose(st) {
+    const items = [], at = {};
+    items.push({ id: "board", key: 0, transform: placeAt(cam, L.board.at) });
+    const probed = new Set(st.probed ?? []);
+    for (let i = 0; i < M.m; i++) {
+      const v = st.table[i], s = L.slots[i];
+      const flags = { "t-set": v !== null && i !== st.placed && !probed.has(i), "t-hot": i === st.placed || (i === st.target && st.placed === null), "t-bad": probed.has(i) && v !== null && i !== st.target, "t-good": false };
+      items.push({ id: `slot${i}`, key: 10 + i * 0.01, transform: placeAt(cam, s), flags });
+      items.push({ id: `index${i}`, key: 5, transform: null });
+      // the printed value: a small decal on the slot's top, swapped when the value changes
+      items.push({ id: `value${i}`, key: 11 + i * 0.01, part: "slots", transform: decalAt(cam, [s[0], s[1], CELL.h]), svg: valueText(v === null ? "" : String(v), 9), flags });
+    }
+    // the card walks along the front with the key: in front of the slot it is looking at, else its home
+    // slot, else the middle; so the arrow stays short and crosses no other slot's value
+    const at0 = st.target ?? st.home;
+    const card = at0 === null || at0 === undefined ? L.card : [L.slots[at0][0], L.card[1], 0];
+    if (st.key !== null && st.key !== undefined) {
+      items.push({ id: "card", key: 20, transform: placeAt(cam, card) });
+      items.push({ id: "cardValue", key: 21, part: "card", transform: decalAt(cam, [card[0], card[1], CARD.h]), svg: valueText(String(st.key), 10, "rig-value rig-on-card") });
+    } else items.push({ id: "card", key: 20, hidden: true }, { id: "cardValue", key: 21, hidden: true });
+    if (st.target !== null && st.target !== undefined) {
+      const t = L.slots[st.target];
+      // into the slot's front face, beside the index printed in front of it, so the arrow covers neither
+      // the value on its top nor its index (check-drawing fails an arrow across a printed value)
+      const off = CELL.w / 2 - 2;
+      const a = arrow(cam, [card[0] + off, card[1] + CARD.d / 2, CARD.h], [t[0] + off, t[1] - CELL.d / 2 - 0.5, CELL.h * 0.55], { lift: 4 });
+      items.push({ id: "arrow", key: 30, part: "arrow", transform: null, svg: a.svg });
+      items.push({ id: "marker", key: 25, transform: placeAt(cam, [t[0] + CELL.w / 2 - 2, t[1] + CELL.d / 2 - 2, CELL.h]) });
+      at.target = screenOf(cam, [t[0], t[1], CELL.h]);
+      at.probe = screenOf(cam, [t[0] + CELL.w / 2 - 2, t[1] + CELL.d / 2 - 2, CELL.h + 24]);
+    } else items.push({ id: "arrow", key: 30, hidden: true }, { id: "marker", key: 25, hidden: true });
+    // the slots this key has looked at, the one it is on included: what a step about probing frames
+    at.run = [...(st.probed ?? []), ...(st.target === null || st.target === undefined ? [] : [st.target])].map((i) => screenOf(cam, [L.slots[i][0], L.slots[i][1], CELL.h]));
+    at.rail = screenOf(cam, [L.slots[0][0] - CELL.w / 2, L.slots[0][1], CELL.h / 2]);
+    at.railEnd = screenOf(cam, [L.slots[M.m - 1][0] + CELL.w / 2, L.slots[0][1], CELL.h / 2]);
+    at.card = screenOf(cam, [card[0] - CARD.w / 2, card[1], CARD.h]);
+    return { items, at };
+  }
+  return { parts, pose, layout: L };
+}

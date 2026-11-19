@@ -12,7 +12,7 @@ Build both (`node examples/escalator/build.mjs`, `node examples/lock/build.mjs`)
 | Subject | Look | Why |
 |---|---|---|
 | A real machine or physical system: escalator, engine, lock, gearbox, pump, disk drive, a lift | **Drawing**: a sharp 2D side elevation or section, drawn to scale; or, when it works in depth as well (a bicycle's rear derailleur), an isometric figure (see "Isometric machine figures") | In Clay, a machine's many parts became identical soft blobs. Forty wheels hid the two tracks that are the whole point, and the builder called it unprofessional |
-| An abstract concept with no physical figure: binary search, LRU, heaps, retries, attention | **A scene in the drawing look** (`look: "drawing"`): the kit's 3D parts in the same ink, hatching, palette and title block | There is no real geometry to draw to scale, but the page should still look like a plate from the same book |
+| An abstract concept with no physical figure: binary search, LRU, heaps, retries, attention, a Bloom filter | **A rig figure of concept parts** (`references/figures.md`, `examples/bloom/`): cells, cards, markers and arrows as shaded solids, on this same page and player | There is no real geometry to draw to scale, but the page is a plate from the same book, with the same camera and checks. (The older `look: "drawing"` scene is legacy.) |
 
 Aim for sharp and precise, not photo-real: an engineering drawing a reader trusts, not a render.
 
@@ -41,7 +41,7 @@ These are all in the escalator. A page missing one of them is not done.
 
 A plain agent beat the skill on depth in both blind evals of round 4, each time by doing these three things. Every Drawing page does them:
 
-- **The problem first.** Step 0 says what the machine must achieve and the number that makes it hard: "A lock has one job: turn for one key, and refuse more than ninety thousand others." Fold it into the concept, not an extra step. The lock is the model for this; the escalator's opening predates the rule and still starts with the mechanism.
+- **The problem first.** Step 0, the concept (no tab), says what the machine must achieve and the number that makes it hard: "A lock has one job: turn for one key, and refuse more than ninety thousand others." Fold it into the concept, not an extra step. The lock is the model for this; the escalator's opening predates the rule and still starts with the mechanism.
 - **The second idea.** One step for what the field teaches right after the core: picking for a lock, the handrail drive for an escalator. Ask "what does someone who just understood this ask next?"
 - **A lab.** The reader sets their own values and the model answers, with the drawing following where it can: cut a key and see each pin land, or move the orange step anywhere and set a track error. Inputs are bounded, and the model's tests sweep the lab's whole range (the lock tests 3,000 random keys for each tolerance).
 
@@ -104,7 +104,7 @@ audit: {
   facts: [/* numbers derived in the build, not stored in the model */],
   allow: [{ value: 5, why: "the tests' sweep step" }],
   claims: [{ text: "the sentence exactly as the page says it", test: (M) => /* true by the model */ true }],
-  coverage: { source: "where the topic list came from", topics: [{ topic, where: "step:3" | "lab" | "whatif" | "practice" | "deferred", why }] },
+  coverage: { source: "where the topic list came from", topics: [{ topic, where: "step:0" (the concept) | "step:3" | "lab" | "whatif" | "practice" | "deferred", why }] },
   reviewFile: join(HERE, "review.json"),
   report: join(ROOT, "dist", "<name>.audit.json"),   // for scripts/review-brief.mjs
 }
@@ -139,6 +139,12 @@ node scripts/check-drawing.mjs dist/<name>.html     # must print: drawing: passe
 - the right arrow doing nothing on a fresh page;
 - a narrated tour (run with stand-in audio) that does not stop at the prediction, or play near the end that does not stop at the end;
 - any console error;
+- the camera, on a page whose steps name a shot (see "Point the camera at what the step teaches"):
+  - a named part it cannot frame, or framed under a card or too small;
+  - a subject off centre, too small, or outweighed by other parts in focus;
+  - a figure clipped by anything but the stage, or bounds bigger than the figure or missing their part's anchor;
+  - a camera that differs by how a step or time was reached;
+  - a camera that moves too fast or holds a shot under 0.8 s;
 - playback: the 95th-percentile frame over 8 ms, or any frame outside a step change over one 60 fps frame (16.7 ms), both scaled to the machine (see "Check it plays"). Every frame of the whole story is timed, for every variant, from its start to its layout being done.
 
 It is proven against faults: the old looping escalator, the round-4 eval lock (no lab, an incomplete contract) and the eval's clipped "Plug turns anyway" label planted back into the new lock.
@@ -146,6 +152,8 @@ It is proven against faults: the old looping escalator, the round-4 eval lock (n
 It cannot judge beauty. Shoot every step with `node scripts/shoot.mjs <page> --step k`, plus the detail circle at 4× (`--select "#detailFrame" --scale 4`). Read every image, then fix and reshoot. The escalator took three rounds.
 
 ## Isometric machine figures
+
+`references/figures.md` is the recipe: start there, from `node <skill>/scripts/new-figure.mjs <name> --kind machine|concept`. This section is the rig's reference.
 
 Two drawings serve a machine. Pick by what the reader must see.
 
@@ -158,7 +166,7 @@ An isometric figure keeps everything else on this page: the model and its tests,
 
 ### Build one with `src/rig/`
 
-- **Camera** (`camera.ts`): `fitCamera(points, box, azimuth, elevation)` fits an orthographic view to the figure's bounds; fit it to every pose the story reaches, so nothing leaves the stage. `insetCamera` makes a second, magnified view, such as the derailleur's View A, which follows the guide pulley by sliding its group.
+- **Camera** (`camera.ts`): `fitCamera(points, box, azimuth, elevation)` fits an orthographic view to the figure's bounds; fit it to every pose the story reaches, so nothing leaves the stage. `insetCamera` makes a second, magnified view. Insets are optional and off by default: the main figure carries the explanation. If you add one, make it a true elevation (`references/figures.md`, "Insets").
 - **Shapes** (`shapes.ts`): every part is a closed mesh whose faces carry their outward normals.
   - `plate(plane, { outer, holes }, t0, t1)` extrudes any outline: teeth, windows and slots included.
   - `turned(origin, axis, profile)` makes pulleys, bolts and barrels.
@@ -198,10 +206,66 @@ A page that redraws its figure every frame stutters: the derailleur's first isom
 
 The derailleur's redraw-every-frame version fails at 1x (p95 38 ms) and at 2.5x (p95 94 ms); the draw-once version passes at both (p95 1.9 and 4.4 ms), as do the escalator and the lock.
 
+### Point the camera at what the step teaches
+
+A figure that shows the whole machine at every step leaves the reader hunting for a 4 mm screw. The shared player has a camera (`src/drawing/camera.mjs`): zoom and pan only, as one transform on the figure's group, so nothing is redrawn and the viewing angle never changes.
+
+- **A step names its subject:** `shot: ["barrel"]` in `DATA.steps`. The camera centres those parts in the stage's clear area, zoomed at most 2× (`CAP`), never below 1×. At 3× the derailleur lost its context and became a field of teeth around a 4 mm part.
+  - **What it attaches to stays in view:** `DATA.camera.around[k]`, e.g. `["links"]` for the barrel adjuster. These parts limit the zoom, and the subject moves off centre only as far as keeping them in view needs.
+  - **What the heading names stays in frame:** `DATA.camera.subject[k]` lists every part the step's heading names. The derailleur's step 4, "The pulley moves at once; the chain waits for a ramp to come round", lists `["guide", "chainrun", "ramp"]`: the guide pulley, the run of chain from its cog down to the pulley, and the shift gate. Put those names in the shot too.
+    - Its first framing showed only the cassette, so the pulley moving ahead of the chain was never seen.
+    - It lives under `DATA.camera`, not `DATA.steps`, because part names are not reader text and must stay out of the audit's stamp.
+  - **No shot:** a step without one shows the whole figure.
+- **The subject is lit.** While the voice names nothing else, the shot's parts are lit and every other part recedes by tone, still recognisable. The camera alone cannot make a small part the subject: the derailleur's barrel at 2× is a fifth of the size of the parallelogram it sits on.
+- **The voice points too.** The narration may speak a `[phrase|part]` that the step's shot does not frame well (inside the clear area and at least 6% of its shorter side). The camera then eases to that part before the words reach it, holds at least 0.8 s, and comes back when there is room. Links too close together share one shot, so the camera never chases every word.
+- **Calm.** Each move is long enough that the picture never moves faster than 2 clear-area short sides a second, eased in and out. Under reduced motion it jumps instead.
+- **Deterministic.** The camera is a function of the story time.
+  - Running on from the step before, a step eases in from that step's camera.
+  - Reached by a tab, it eases from wherever the camera is to the step's shot.
+  - A seek and a play to the same time give the same camera.
+- **Only the stage clips it.** Give the drawing `overflow: visible`, and put no clip-path or mask on the camera's group: a zoomed figure runs to the stage's rounded edge.
+  - The heading stays readable on a soft wash of the stage colour behind it, never a hard edge through the drawing.
+  - Callout text has a halo.
+- **What does not zoom:** callout text, the title block and the cards. Leaders follow the camera to their parts; a callout whose point leaves the picture hides.
+- **The machine supplies two hooks:**
+  - `boundsOf(names)`: the named parts' bounds in the figure's own units, without the camera, or null for a name it does not have;
+  - `clearArea()`: `{ x0, y0, x1, y1 }`, where the camera centres its shots: clear of the heading, the callout columns, any inset and the cards.
+
+  Put `data-camera` on the group the camera moves, and `data-camera-avoid` on anything framed parts must stay out from under (the derailleur marks its title block). Keep insets and labels outside the camera's group. `DATA.camera.alias` adds names only the camera uses, with the parts they light. All of `DATA.camera` stays out of the audit's stamp.
+- **Every name must be framable.** The derailleur's build stops on a shot or a voice link naming a part the figure does not draw.
+- **A part too small to read alone** is framed with what it acts on. The derailleur's B screw, a 5 mm head, is framed with the mounting bolt it turns the derailleur about.
+
+`check-drawing` checks the camera on any page whose steps name a shot (`VIZ_ONLY_CAMERA=1` runs these checks alone):
+- **Framing.** At each step's still frame, and at the moment each spoken name begins, every named part has bounds. Each must:
+  - sit inside the clear area;
+  - stay off the cards, the heading and anything marked `data-camera-avoid`;
+  - be at least 6% of the stage's shorter side;
+  - have its callout point at it on the stage.
+
+  Checked at 1440×900 and 1280×800, for every variant.
+- **The heading's parts.** Every part in `DATA.camera.subject[k]` passes the framing rules at the step's still frame and at four moments through the step.
+- **Centring and subject.** At a step's still frame, and when a voice-led shot has arrived:
+  - the subject's centre lies in the middle half of the clear area, both ways;
+  - it spans at least 15% of the clear area's shorter side;
+  - the lit parts take more of the frame than every other part in focus put together.
+- **No hard crop.** No clip-path or mask on the camera's group or above it, and the drawing does not clip to a box inside the stage.
+- **Bounds sanity.** Every name a shot, its `around` or the voice uses has bounds smaller than the whole figure, and they hold the point its callout marks.
+- **Determinism.** A step's camera matches by `seekStep` and by its tab. A time's camera matches by `seek` and by playing up to it.
+- **Calm.** Run frame by frame through the whole story, the picture never moves faster than the limit. Every shot is held 0.8 s or more, and a tab's eased move keeps to the same speed.
+
+It fails each of the derailleur's planted faults (`node examples/derailleur/build.mjs --plant <fault> --out <page>`):
+- `missing-shot`: a shot naming a part the figure lacks;
+- `unknown-link`: a voice link to an unknown part;
+- `under-card`: a clear area that frames parts under the cards;
+- `off-centre`: a shot whose `around` pushes the subject off centre;
+- `missing-subject`: step 4 framing only the cassette, leaving out the pulley its heading names.
+
+Then look. `node examples/derailleur/shots.mjs --only step` shoots every step in both What ifs and themes, plus two frames halfway through voice-led moves, and prints each image's time. `--check-fresh` fails if any shot is older than the page.
+
 ## Known gaps
 
 - **The drawing itself is still per machine.** The page and the player are shared; hatching, dimension lines, arrowheads, detail circles and the title block are still small functions in each `build.mjs` (the two examples draw them differently: the escalator in world mm with y up, the lock in page units). Copy them from `examples/lock/build.mjs`.
-- **`voice.mjs` is per example**, a copy of the same recorder with the machine's own script. `scripts/voice.mjs` records concept scenes only.
+- **`voice.mjs` is per page**, a copy of the same recorder reading the page's own `script` (`story.mjs`). `scripts/voice.mjs` records legacy scene.ts pages only.
 - **`scripts/verify.mjs` does not read Drawing pages.** The model tests and `check-drawing` stand in for it.
 - **Desktop only,** like the rest of the kit for now.
 - **The rig sorts by fixed slots, not by a general solver.** Parts that are not slabs between parallel planes need keys chosen by hand; two parts that interpenetrate on screen in both orders need splitting.

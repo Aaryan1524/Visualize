@@ -1,5 +1,9 @@
 # Verification
 
+> **Legacy.** This page describes the scene.ts route (the Unfold stage, `verify.mjs`), kept so `examples/lru/`, `retries/`, `attention/` and `lru-3d/` still build. **Do not use it for a new page:** every new page, machine or concept, is a Drawing page on the rig (`references/figures.md`). Where this page and `figures.md` disagree (the camera, the checks, the parts), `figures.md` is right.
+
+A Drawing page is checked by `scripts/check-drawing.mjs`, `scripts/check-arithmetic.mjs` and `scripts/shoot-steps.mjs` instead; `references/figures.md` lists what each catches, and their failure lines say what to fix. `verify.mjs` does not read Drawing pages, and the Drawing checks refuse a scene.ts page with a message saying so.
+
 `node scripts/verify.mjs <dir>` runs the model in Node, independently of the page, builds the scene, and drives the built page in headless Chrome. It prints `ok` or `FAIL` per check with the first problems, and ends `<id>: passed` or `FAILED`.
 
 ## Checks, and how to fix their failures

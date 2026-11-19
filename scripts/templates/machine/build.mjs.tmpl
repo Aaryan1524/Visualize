@@ -1,0 +1,226 @@
+#!/usr/bin/env node
+// __TITLE__: the page. Made by scripts/new-figure.mjs --kind machine as a starting point; replace the model first
+// (model.mjs), then the figure (figure.mjs) and the story (story.mjs). references/figures.md is the recipe.
+//
+//   node build.mjs [--out <page.html>]     then: node <skill>/scripts/check-drawing.mjs <page.html>
+
+import { createRequire } from "node:module";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { MODELS, VARIANTS } from "./model.mjs";
+import { cameraFor, figure } from "./figure.mjs";
+import { STEPS, PRED_STEP, headings, captions, CLAIMS, COVERAGE } from "./story.mjs";
+import { drawingPage, esc } from "__ROOT__/src/drawing/page.mjs";
+
+const { buildSync } = createRequire(new URL("__ROOT__/package.json", import.meta.url))("esbuild");
+const HERE = dirname(fileURLToPath(import.meta.url));
+const outArg = process.argv.indexOf("--out");
+const out = outArg > 0 ? process.argv[outArg + 1] : join(HERE, "dist", "__NAME__.html");
+
+// The drawing's units: about 10 to a screen pixel at 1440 x 900. The figure fills BOX, between the
+// two columns of callouts (LX, RX), clear of the heading on the left and the cards on the right.
+const VBW = 14200, VBH = 6550, FS = 150, LX = 3900, RX = 9420;
+const BOX = { x: 4400, y: 500, w: 4900, h: 5500 };
+const CLEAR = { x0: LX + 150, y0: 150, x1: RX - 150, y1: VBH - 150 };
+const VOICE = existsSync(join(HERE, "voice.json")) ? JSON.parse(readFileSync(join(HERE, "voice.json"), "utf8")) : null;
+
+// Callouts: text in the columns, a leader drawn live to the part's anchor (figure.mjs `at`).
+const label = (id, text, x, y, to, beats, anchor) => ({ id, text, at: [x, y], to, beats, anchor });
+const LABELS = [
+  label("driver", "Driving gear", LX, 2200, "driver", [1, 3], "end"),
+  label("shaft", "Shafts", LX, 3400, "shaft", [1], "end"),
+  label("driven", "Driven gear", RX, 2600, "driven", [1, 3, 4], "start"),
+  label("mesh", "Pitch point", RX, 3800, "mesh", [2], "start"),
+];
+const labelSvg = (l) => `<g class="label" data-label="${l.id}" data-beats="${l.beats.join(" ")}" data-at="${l.to}" data-to="${l.at[0]},${l.at[1]}"><path class="leader"/><circle class="ldot" r="26"/><text x="${l.at[0]}" y="${l.at[1]}" text-anchor="${l.anchor}">${esc(l.text)}</text></g>`;
+const skeleton = () => `<defs id="rigDefs"></defs><g id="scene" data-camera=""></g><g id="labels">${LABELS.map(labelSvg).join("")}</g>`;
+
+function variantData(name) {
+  const M = MODELS[name];
+  return { name, label: VARIANTS[name].label, svg: skeleton(), heads: headings(M), captions: captions(M), voice: VOICE?.variants?.[name] ?? null };
+}
+const VARIANT_DATA = Object.fromEntries(Object.keys(VARIANTS).map((n) => [n, variantData(n)]));
+
+// ---------------------------------------------------------------- the machine (runs in the page)
+function machine(DATA) {
+  const $ = (id) => document.getElementById(id);
+  const root = $("vz");
+  const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
+  const clamp = (u) => Math.max(0, Math.min(1, u));
+  let V = null, model = null, cur = null, F = null, stage = null, lastAt = null, lastFocus = { focus: null, lit: [] };
+
+  // the driving gear's turns, t seconds into step k (u: 0..1 through the step's motion)
+  function stateAt(k, u, t) {
+    if (k === 3) return { turns: ease(u) }; // exactly one turn of the driving gear: count the driven gear's
+    return { turns: 0.12 * t };
+  }
+  const anim = (k) => (V.voice?.[k] ? Math.max(2, 0.8 * V.voice[k].duration) : 0.75 * DATA.plain);
+  const POSE = [0, 0.3, 0.3, 1, 0.5];
+  const at = (k, t, still, SEG) => {
+    const tt = still ? POSE[k] * anim(k) : Math.max(0, t - SEG.lead);
+    return { ...stateAt(k, clamp(tt / anim(k)), tt), k };
+  };
+  const stillAt = (k, SEG) => SEG.lead + POSE[k] * anim(k);
+
+  function mount(v, m) {
+    V = v;
+    model = m;
+    F = FIG.figure(model, FIG.cameraFor(model, DATA.box));
+    $("scene").replaceChildren();
+    stage = new FIG.RigStage($("scene"));
+    for (const p of F.parts) stage.add(p.id, p.part, p.svg);
+  }
+  function render(state, S) {
+    cur = state;
+    const o = F.pose(state);
+    stage.apply(o.items);
+    lastAt = o.at;
+    focusParts();
+    const p = model.pose(state.turns ?? 0);
+    $("r-in").textContent = (state.turns ?? 0).toFixed(2);
+    $("r-out").textContent = p.out.toFixed(2);
+    $("r-ratio").textContent = model.ratio.toFixed(2);
+  }
+  // Out-of-focus parts recede in tone, not by opacity: a see-through solid would show what it hides.
+  function focusParts() {
+    const { focus, lit } = lastFocus, lab = root.hasAttribute("data-lab");
+    stage?.focus((part) => ({ recede: lit.length ? !lit.includes(part) : !lab && focus ? !focus.includes(part) : false, named: lit.includes(part) }));
+  }
+  const focus = (f) => ((lastFocus = f), focusParts());
+
+  // What the camera can frame: a part (data-part), or "mesh", the teeth either side of the pitch point.
+  function boundsOf(names) {
+    const scene = $("scene");
+    if (!scene) return null;
+    const inv = scene.getCTM().inverse();
+    let b = null;
+    const add = (x0, y0, x1, y1) => (b = b ? { x0: Math.min(b.x0, x0), y0: Math.min(b.y0, y0), x1: Math.max(b.x1, x1), y1: Math.max(b.y1, y1) } : { x0, y0, x1, y1 });
+    for (const n of names) {
+      if (n === "mesh") {
+        const p = lastAt?.mesh, r = 520;
+        if (p) add(p[0] - r, p[1] - r, p[0] + r, p[1] + r);
+        continue;
+      }
+      for (const el of scene.querySelectorAll(`[data-part="${n}"]`)) {
+        if (el.style.display === "none") continue;
+        const r = el.getBBox();
+        if (!r.width && !r.height) continue;
+        const m = inv.multiply(el.getCTM());
+        const pts = [[r.x, r.y], [r.x + r.width, r.y], [r.x, r.y + r.height], [r.x + r.width, r.y + r.height]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+        add(Math.min(...pts.map((q) => q[0])), Math.min(...pts.map((q) => q[1])), Math.max(...pts.map((q) => q[0])), Math.max(...pts.map((q) => q[1])));
+      }
+    }
+    return b;
+  }
+
+  // The lab: the reader's own input speed and torque, through this pair of gears.
+  function lab(values) {
+    const rpm = Number(values.rpm), nm = Number(values.nm), m = model;
+    const outRpm = m.speedOut(rpm), outNm = m.torqueOut(nm);
+    return {
+      ok: true,
+      verdict: `${rpm} rpm and ${nm} N·m in: ${outRpm.toFixed(1)} rpm and ${outNm.toFixed(1)} N·m out.`,
+      rows: [`Speed: ${rpm} ÷ ${m.ratio.toFixed(2)} = ${outRpm.toFixed(1)} rpm.`, `Torque: ${nm} × ${m.ratio.toFixed(2)} = ${outNm.toFixed(1)} N·m.`, `Power in and out: the same, as speed falls by the ratio that torque rises.`],
+      state: { turns: 0.2, lab: true },
+    };
+  }
+
+  // Now you try: questions made from the model.
+  function question(n, r) {
+    const m = model, kind = n % 3, rpm = [30, 45, 60, 90, 120][Math.floor(r() * 5)];
+    if (kind === 0)
+      return { q: `The ${m.z1}-tooth gear turns at ${rpm} rpm. How fast does the ${m.z2}-tooth gear turn?`, choices: [`${(rpm / m.ratio).toFixed(1)} rpm`, `${(rpm * m.ratio).toFixed(1)} rpm`, `${rpm.toFixed(1)} rpm`], explain: `${rpm} ÷ ${m.ratio.toFixed(2)} = ${(rpm / m.ratio).toFixed(1)} rpm: each turn of the small gear moves ${m.z1} of the large gear's ${m.z2} teeth.` };
+    if (kind === 1) {
+      const nm = [2, 5, 8, 12][Math.floor(r() * 4)];
+      return { q: `${nm} N·m turns the ${m.z1}-tooth gear. What torque does the ${m.z2}-tooth gear give?`, choices: [`${(nm * m.ratio).toFixed(1)} N·m`, `${(nm / m.ratio).toFixed(1)} N·m`, `${nm.toFixed(1)} N·m`], explain: `${nm} × ${m.ratio.toFixed(2)} = ${(nm * m.ratio).toFixed(1)} N·m: the same force at a radius ${m.ratio.toFixed(2)} times larger.` };
+    }
+    return { q: `The driving gear turns clockwise. Which way does the driven gear turn?`, choices: ["Anticlockwise", "Clockwise", "It does not turn"], explain: "At the pitch point both gears move the same way, so their centres lie on opposite sides: they turn opposite ways." };
+  }
+
+  return {
+    model: (v) => MODELS_IN_PAGE[v.name],
+    mount, at, stillAt, render, focus, anchors: () => lastAt, lab, question, boundsOf, clearArea: () => DATA.camera.clear,
+    heading: (k) => V.heads[k] ?? null,
+    info: () => (cur ? { turns: cur.turns } : {}),
+  };
+}
+
+// ---------------------------------------------------------------- page
+const bundle = buildSync({ entryPoints: [join(HERE, "figure.mjs")], bundle: true, format: "iife", globalName: "FIG", write: false, minify: true, legalComments: "none" }).outputFiles[0].text;
+if (/<\/script/i.test(bundle)) throw new Error("the figure bundle contains </script");
+const modelSrc = readFileSync(join(HERE, "model.mjs"), "utf8").replace(/^export /gm, "") + "\nconst MODELS_IN_PAGE = MODELS;\n";
+const M0 = MODELS[Object.keys(VARIANTS)[0]], std = VARIANT_DATA[Object.keys(VARIANTS)[0]];
+
+const DATA = {
+  box: BOX, plain: 8,
+  base: Object.keys(VARIANTS)[0],
+  steps: STEPS.map((s, k) => ({ heading: headings(M0)[k], focus: s.focus, ...(s.shot ? { shot: s.shot } : {}) })),
+  camera: { clear: CLEAR, items: {}, alias: {}, around: {} },
+  alias: { mesh: ["driver", "driven"] },
+  predict: {
+    step: PRED_STEP,
+    question: `The ${M0.z1}-tooth driving gear turns once. How far does the ${M0.z2}-tooth gear turn?`,
+    choices: [`${(1 / M0.ratio).toFixed(2)} of a turn`, `${M0.ratio.toFixed(2)} turns`, "One turn"],
+    answer: 0,
+    explanation: Object.fromEntries(Object.entries(MODELS).map(([k, m]) => [k, `${m.z1} teeth pass through the mesh, and the driven gear needs ${m.z2} to turn once: ${(1 / m.ratio).toFixed(2)} of a turn.`])),
+    locked: "Locked in. Press play to watch one turn.",
+  },
+  lab: {
+    button: "Adjust it",
+    title: "Your own speed and torque",
+    heading: "What comes out of the pair?",
+    intro: "Set the driving gear's speed and torque.",
+    inputs: [
+      { id: "rpm", label: "Speed in", min: 30, max: 120, step: 10, value: 60, format: "{} rpm" },
+      { id: "nm", label: "Torque in", min: 2, max: 20, step: 1, value: 10, format: "{} N·m" },
+    ],
+  },
+  variants: VARIANT_DATA,
+};
+
+// The rig's look (its material tokens, in both themes), then the page's own marks.
+const CSS = `
+${readFileSync(new URL("__ROOT__/src/rig/rig.css", import.meta.url), "utf8")}
+.label text{font-size:${FS}px;font-weight:500;fill:var(--ink);paint-order:stroke;stroke:var(--stage);stroke-width:48px;stroke-linejoin:round}
+.leader{fill:none;stroke:var(--ink);stroke-width:.5}
+.ldot{fill:var(--ink)}
+.vz-step-heading{text-shadow:0 0 6px var(--stage),0 0 12px var(--stage),0 0 18px var(--stage)}
+#fig{overflow:visible}
+.vz[data-practice] #fig .label{visibility:hidden}
+`;
+
+const HTML = drawingPage({
+  title: "__TITLE__",
+  about: "A small gear drives a large one: the large one turns slower, with more torque.",
+  scene: "__NAME__",
+  steps: STEPS,
+  stageLabel: "__TITLE__, drawn in isometric. Left and right arrows step through the explanation; space plays and pauses.",
+  viewBox: `0 0 ${VBW} ${VBH}`,
+  figLabel: "Isometric drawing of two meshing spur gears on their shafts",
+  concept: std.voice ? std.voice[0].text : std.captions[0],
+  setup: std.captions[0],
+  whatIf: { label: "Gears", variants: Object.entries(VARIANTS).map(([k, v]) => [k, v.label]) },
+  totals: `            <span><b id="r-in">0.00</b> turns in</span>
+            <span><b id="r-out">0.00</b> turns out</span>
+            <span><b id="r-ratio">0.00</b> ratio</span>`,
+  readoutNote: "Readouts are computed by the model on this page",
+  legend: [["var(--orange)", "The part to follow: the driving gear"]],
+  facts: [`Both gears have ${M0.m} mm of pitch diameter a tooth, so their teeth are the same size and mesh. Every number here comes from the model on this page.`],
+  css: CSS,
+  modelSrc,
+  scripts: bundle,
+  machine,
+  audit: {
+    models: Object.values(MODELS),
+    claims: CLAIMS,
+    coverage: COVERAGE,
+    reviewFile: join(HERE, "review.json"),
+    report: out.replace(/\.html$/, ".audit.json"),
+  },
+  data: DATA,
+});
+
+mkdirSync(dirname(out), { recursive: true });
+writeFileSync(out, HTML);
+console.log(`wrote ${out} (${(HTML.length / 1024 / 1024).toFixed(2)} MB)`);

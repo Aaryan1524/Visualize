@@ -378,3 +378,29 @@ export function pathAt(path, s) {
   }
   return { p: path.runs[n - 1].p1, on: "run" + (n - 1), i: n - 1, f: 1 };
 }
+
+// Where the guide pulley sits, measured from the cog the reader asked for (`ref`), not from whichever
+// cog is nearest: past half a cog off, the nearest cog is the wrong one and the side flips. Positive
+// is inboard. The figure's arrow, the readout and the lab's rows all say it with this.
+export function offLine(M, z, ref) {
+  const off = z - M.cogZ(ref), a = Math.abs(off), teeth = M.cogs[ref];
+  const side = a < 0.005 ? "on" : off > 0 ? "inboard" : "outboard";
+  return { ref, teeth, off, side, mm: a.toFixed(2), text: side === "on" ? `on the ${teeth}'s line` : `${a.toFixed(2)} mm ${side} of the ${teeth}` };
+}
+
+// The lab's worked rows for cog `gear` (1 is the smallest), a cable error `err` mm and the L screw out
+// `lOut` mm.
+export function labRows(M, gear, err, lOut = 0) {
+  const x = indexing(M, gear, err, lOut), two = (v) => v.toFixed(2), teeth = M.cogs[x.k];
+  return [
+    `Cable: ${two(M.pullFor(x.k))} mm for cog ${gear}, ${err >= 0 ? "+" : "−"}${Math.abs(err).toFixed(1)} mm error: ${two(Math.max(0, x.pull))} mm pulled.`,
+    `Guide pulley: ${(x.z).toFixed(2)} mm inboard of the smallest cog's line; the ${teeth} is at ${M.cogZ(x.k).toFixed(2)} mm.`,
+    x.stopped === "high"
+      ? `The H screw stops it on the smallest cog's line: ${offLine(M, x.z, x.k).text}.`
+      : x.stopped === "low"
+        ? lOut > 0
+          ? `The L screw, backed out ${lOut.toFixed(1)} mm, stops it ${(x.z - M.zMax).toFixed(1)} mm past the largest cog: ${offLine(M, x.z, x.k).text}.`
+          : `The L screw stops it on the ${M.N.big}'s line: ${offLine(M, x.z, x.k).text}.`
+        : `${Math.abs(err).toFixed(1)} × ${M.D.ratio} = ${offLine(M, x.z, x.k).text}.`,
+  ];
+}

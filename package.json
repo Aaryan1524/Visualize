@@ -27,7 +27,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "node --test \"src/**/*.test.ts\" \"src/**/*.test.mjs\" \"examples/**/*.test.ts\" \"examples/**/*.test.mjs\"",
+    "test": "node --test \"src/**/*.test.ts\" \"src/**/*.test.mjs\" \"examples/**/*.test.ts\" \"examples/**/*.test.mjs\" \"scripts/**/*.test.mjs\"",
     "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs",
     "verify": "node scripts/verify.mjs",
@@ -37,7 +37,7 @@
     "check:embed": "node scripts/check-embed.mjs",
     "new-scene": "node scripts/new-scene.mjs",
     "check:reproducible": "node scripts/check-reproducible.mjs",
-    "check:drawing": "node examples/escalator/build.mjs && node scripts/check-drawing.mjs dist/escalator.html && node examples/lock/build.mjs && node scripts/check-drawing.mjs dist/lock.html && node examples/derailleur/build.mjs && node scripts/check-drawing.mjs dist/derailleur.html"
+    "check:drawing": "node examples/escalator/build.mjs && node scripts/check-drawing.mjs dist/escalator.html && node scripts/check-arithmetic.mjs dist/escalator.html && node examples/lock/build.mjs && node scripts/check-drawing.mjs dist/lock.html && node scripts/check-arithmetic.mjs dist/lock.html && node examples/derailleur/build.mjs && node scripts/check-drawing.mjs dist/derailleur.html && node scripts/check-arithmetic.mjs dist/derailleur.html && node examples/bloom/build.mjs && node scripts/check-drawing.mjs dist/bloom.html && node scripts/check-arithmetic.mjs dist/bloom.html"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

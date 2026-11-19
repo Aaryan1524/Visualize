@@ -14,7 +14,12 @@
 // the escalator said its two tracks "come together" (they converge to 30 mm apart).
 
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// the shooting script by its absolute path: the reviewer runs from wherever it was started, not from
+// the skill's folder
+const SHOOT = join(dirname(fileURLToPath(import.meta.url)), "shoot-steps.mjs");
 
 const [report, reviewFile, page] = process.argv.slice(2);
 if (!report || !reviewFile) {
@@ -42,8 +47,9 @@ the way a demanding expert in the field would. Do not edit the page or its files
 3. Check the topic list: is anything a reader would expect from a good reference on this subject
    missing, and is any deferral unreasonable?
 4. Check that statements agree with each other (a heading and a readout, the intro and Details).${page ? `
-5. Look at the page: open ${resolve(page)} in a browser, or shoot each step with
-   node scripts/shoot.mjs ${page} --out <png> --step <k> --width 1440 --height 900
+5. Look at the page: open ${resolve(page)} in a browser, or shoot every step, theme, What if,
+   lab end and Now you try with
+   node ${SHOOT} ${resolve(page)} --out <folder>
    and read the images. Note anything the picture shows that the words contradict.` : ""}
 
 ## Write your verdict

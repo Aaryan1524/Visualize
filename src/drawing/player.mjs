@@ -17,19 +17,34 @@
 //                       not turn see-through); without it, the player dims .part groups by opacity
 //   anchors()           optional: { name: [x, y] } each frame; a callout with data-at="name" points
 //                       its leader there, so leaders follow moving parts
+//   boundsOf(names)     optional: the bounds of the named parts, in the figure's own units (the camera's
+//                       transform excluded), or null. With it, a step's `shot` (a list of part names in
+//                       DATA.steps: the step's subject, centred and lit) moves the camera, and
+//                       DATA.camera.around[k] (parts the subject attaches to) stays in view, and
+//                       DATA.camera.subject[k] lists the parts the step's heading names, which
+//                       check-drawing requires in frame;
+//                       DATA.camera.alias adds names the camera may light: see "The camera" below
+//                       and camera.mjs
+//   clearArea()         optional: { x0, y0, x1, y1 } in the figure's units, where framed parts may go
+//   cardShot(state)     optional: the part names to frame while the lab or Now you try is open (else the
+//                       whole figure, unmoved), in cardClear() (the space beside the card they open in);
+//                       the camera may zoom out below 1 there to fit them
+//   question(n, r).state, lab(values).state: what the stage draws while that card is open
 //   lab(values)         optional, the free-input lab: { state, verdict, rows: [string] } for the
 //                       reader's own values (DATA.lab lists the inputs); state is drawn by render()
 //
 // The timeline runs once, from the concept to the last step. Each step lasts as long as its
 // narration (or PLAIN seconds without a voice); play stops at the prediction and at the end.
-export function player(DATA, machine) {
+export function player(DATA, machine, kit) {
   const $ = (id) => document.getElementById(id);
   const root = $("vz"), fig = $("fig");
   const fx = (v) => v.toFixed(1);
   const pad2 = (n) => String(n).padStart(2, "0");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const STEPS = DATA.steps, LAST = STEPS.length - 1, PRED = DATA.predict.step;
-  const ALIAS = DATA.alias || {};
+  // The camera's own data (DATA.camera: names it may light, and each step's parts to keep in view) is
+  // not reader text, so it stays out of the audit's stamp.
+  const ALIAS = { ...(DATA.alias || {}), ...(DATA.camera?.alias || {}) }, AROUND = DATA.camera?.around || {}, SUBJECT = DATA.camera?.subject || {};
   const S = { variant: null, step: -1, T: 0, pinPose: true, state: null, running: false, touring: false, voiceOn: true, armed: false, answer: null, last: 0, lit: [], heard: -1 };
   let V = null, E = null;
 
@@ -56,6 +71,7 @@ export function player(DATA, machine) {
       m.style.left = `${(t / SEG.total) * 100}%`;
       return m;
     }));
+    camBuild();
   }
 
   // Leaders run from the measured text box to the dot on the part, and the title-block key is
@@ -88,6 +104,7 @@ export function player(DATA, machine) {
   const boxes = new Map();
   function followLeaders() {
     const at = machine.anchors?.();
+    if (C.el) return followCamera(at);
     if (!at) return;
     for (const g of E.labels) {
       const name = g.dataset.at, to = name && at[name];
@@ -102,9 +119,127 @@ export function player(DATA, machine) {
       if (dot) (dot.setAttribute("cx", fx(to[0])), dot.setAttribute("cy", fx(to[1])));
     }
   }
+  // With the camera on, every leader points at its part as the camera shows it; the labels themselves
+  // stay put and keep their size. A callout whose part has left the picture is hidden.
+  function followCamera(at) {
+    const c = C.clear, m = C.cur ?? CAM.ID;
+    for (const g of E.labels) {
+      if (g.style.display === "none") continue;
+      const name = g.dataset.at;
+      let to = (name && at?.[name]) || (g.dataset.to ? g.dataset.to.split(",").map(Number) : null);
+      if (!to) continue;
+      to = CAM.apply(m, to);
+      const off = to[0] < c.x0 - 300 || to[0] > c.x1 + 300 || to[1] < c.y0 - 300 || to[1] > c.y1 + 300;
+      if (g.getAttribute("visibility") !== (off ? "hidden" : "visible")) g.setAttribute("visibility", off ? "hidden" : "visible");
+      if (off) continue;
+      let bb = boxes.get(g);
+      if (!bb) boxes.set(g, (bb = g.querySelector("text").getBBox()));
+      const cy = bb.y + bb.height * 0.56;
+      const right = to[0] > bb.x + bb.width / 2;
+      const ax = right ? bb.x + bb.width + 45 : bb.x - 45, ex = ax + (right ? 110 : -110);
+      g.querySelector(".leader")?.setAttribute("d", `M${fx(ax)},${fx(cy)}L${fx(ex)},${fx(cy)}L${fx(to[0])},${fx(to[1])}`);
+      const dot = g.querySelector(".ldot");
+      if (dot) (dot.setAttribute("cx", fx(to[0])), dot.setAttribute("cy", fx(to[1])));
+    }
+  }
+
+  // ------------------------------------------------ the camera: zoom and pan to what the step teaches
+  // One transform on the figure's group ([data-camera]); nothing is redrawn. Each step with a `shot`
+  // gets a track (camera.mjs): its shot, plus voice-led shots when the narration names a part the
+  // shot does not frame well. The camera is a function of the story time, so a step or a time gives
+  // the same camera however it was reached; navigation eases into it (a blend), seeks jump.
+  const CAM = kit && STEPS.some((s) => s.shot) ? kit : null;
+  // cont: the story reached this step by running on from the one before (or by its time, a seek or the
+  // scrubber), so the step's track starts with the move from that step's camera; flow: it is running on
+  // now, so the track itself makes the move and no blend is needed.
+  const C = { el: null, clear: null, tracks: [], cur: null, target: null, blend: null, instant: false, raf: 0, cont: false, flow: false, on: null }; // on: the voice-led shot's names, lit while it is shown
+  function defaultClear() {
+    const vb = fig.viewBox.baseVal, inv = fig.getScreenCTM().inverse();
+    const ux = (x) => new DOMPoint(x, 0).matrixTransform(inv).x;
+    const cap = heading.parentElement.getBoundingClientRect(), cards = document.querySelector(".vz-cards").getBoundingClientRect();
+    return { x0: ux(cap.right) + 100, y0: vb.y + 100, x1: ux(cards.left) - 100, y1: vb.y + vb.height - 100 };
+  }
+  // A name the voice or a shot uses: the machine's own bounds, or else its alias's parts.
+  const boundsOfIds = (ids) => ids.reduce((b, id) => CAM.union(b, machine.boundsOf([id]) ?? (ALIAS[id] ? machine.boundsOf(ALIAS[id]) : null)), null);
+  function sampleBounds(k, ids, t0, t1, n) {
+    let b = null;
+    for (let i = 0; i <= n; i++) {
+      const T = t0 + ((t1 - t0) * i) / Math.max(1, n);
+      machine.render(machine.at(k, T - SEG.s[k], false, SEG), S);
+      b = CAM.union(b, boundsOfIds(ids));
+    }
+    return b;
+  }
+  function camBuild() {
+    C.el = CAM && machine.boundsOf ? fig.querySelector("[data-camera]") : null;
+    C.tracks = [];
+    if (!C.el) return;
+    C.clear = machine.clearArea?.() ?? defaultClear();
+    let before = CAM.ID;
+    for (let k = 0; k <= LAST; k++) {
+      const names = STEPS[k].shot;
+      let shot = CAM.ID;
+      if (names?.length) {
+        // centred on the subject at the step's still frame; the subject wherever it goes in the step,
+        // and the parts around it (`around`), stay in view
+        const keepNames = [...names, ...(AROUND[k] ?? [])];
+        const keep = sampleBounds(k, keepNames, SEG.s[k], SEG.s[k + 1] - 0.01, 8);
+        machine.render(machine.at(k, poseT(k) - SEG.s[k], true, SEG), S);
+        shot = CAM.frame(boundsOfIds(names), C.clear, { keep: CAM.union(keep, boundsOfIds(keepNames)) });
+      }
+      const links = (V.voice?.[k]?.links ?? []).map((l) => {
+        const a = SEG.s[k] + SEG.lead + l.start, e = SEG.s[k] + SEG.lead + l.end;
+        return { a, b: e, ids: l.ids, bounds: sampleBounds(k, l.ids, a, e, 2) };
+      });
+      const tr = CAM.stepTrack({ start: SEG.s[k], end: SEG.s[k + 1], shot, from: before, links }, C.clear);
+      C.tracks.push(tr);
+      before = CAM.at(tr, tr.end);
+    }
+    C.cur = null;
+  }
+  function camTarget() {
+    const tr = C.tracks[S.step];
+    if (labOpen || practiceOpen) return C.cardCam ?? CAM.ID;
+    if (!tr) return CAM.ID;
+    return S.pinPose ? tr.shot : CAM.at(tr, S.T, reduced, !C.cont);
+  }
+  // Ease from where the camera is to wherever it should be now (navigation, the scrubber, a step change).
+  function camBlend() {
+    if (!C.el || reduced || C.instant || C.flow || !C.cur) return void (C.blend = null);
+    C.blend = { from: C.cur, t0: performance.now(), d: null }; // its length is set on the first frame, once the target is known
+  }
+  function camApply() {
+    if (!C.el) return;
+    const target = camTarget();
+    let m = target;
+    if (C.blend) {
+      if (C.blend.d === null) C.blend.d = CAM.duration(C.blend.from, target, C.clear) * 1000;
+      const u = C.blend.d ? (performance.now() - C.blend.t0) / C.blend.d : 1;
+      if (u >= 1) C.blend = null;
+      else m = CAM.lerp(C.blend.from, target, CAM.ease(u), C.clear);
+    }
+    C.target = target;
+    // a voice-led shot lights what it shows, with or without the voice
+    const tr = C.tracks[S.step], on = tr && !S.pinPose ? CAM.subjectAt(tr, S.T, !C.cont) : null;
+    if ((on ?? []).join() !== (C.on ?? []).join()) ((C.on = on), applyFocus());
+    if (!C.cur || !CAM.same(C.cur, m)) {
+      C.cur = m;
+      C.el.setAttribute("transform", CAM.same(m, CAM.ID) ? "" : `matrix(${m.s.toFixed(5)} 0 0 ${m.s.toFixed(5)} ${m.x.toFixed(2)} ${m.y.toFixed(2)})`);
+    }
+    if (C.blend && !S.running && !C.raf)
+      C.raf = requestAnimationFrame(() => {
+        C.raf = 0;
+        camApply();
+        followLeaders();
+      });
+  }
+
+  // With the camera on, a step's shot is its subject: lit while the voice names nothing else, so the
+  // parts around it recede by tone and stay recognisable.
+  const subject = () => (!C.el || labOpen || practiceOpen ? [] : C.on ?? STEPS[S.step]?.shot ?? []);
   function applyFocus() {
     const focus = STEPS[S.step]?.focus;
-    const lit = S.lit.flatMap((id) => [id, ...(ALIAS[id] || [])]);
+    const lit = (S.lit.length ? S.lit : subject()).flatMap((id) => [id, ...(ALIAS[id] || [])]);
     if (machine.focus) {
       machine.focus({ focus: labOpen ? null : focus ?? null, lit });
       machine.lit?.(S.lit);
@@ -158,6 +293,7 @@ export function player(DATA, machine) {
   function setStep(k) {
     if (k === S.step) return;
     S.step = k;
+    camBlend();
     S.heard = -1;
     root.dataset.step = String(k);
     root.toggleAttribute("data-opening", k === 0);
@@ -187,12 +323,15 @@ export function player(DATA, machine) {
     const still = reduced || S.pinPose;
     S.state = machine.at(k, still ? poseT(k) - SEG.s[k] : S.T - SEG.s[k], still, SEG);
     machine.render(S.state, S);
+    camApply();
     followLeaders();
     scrub.value = String(S.T);
   }
   // Go to a step: paused, show its still frame; running, start the step from its beginning.
   function goTo(k, how = {}) {
     k = Math.max(0, Math.min(LAST, k));
+    C.cont = false;
+    if (k === S.step) camBlend();
     setStep(k);
     S.T = S.running && !how.pose ? SEG.s[k] : poseT(k);
     S.pinPose = !S.running || !!how.pose;
@@ -244,14 +383,18 @@ export function player(DATA, machine) {
         draw();
         return setRunning(false);
       }
-      if (k !== S.step) setStep(k);
+      if (k !== S.step) {
+        C.cont = C.flow = true;
+        setStep(k);
+        C.flow = false;
+      }
     }
     draw();
     requestAnimationFrame(tick);
   }
   // Continuous play runs the step from its start if the machine is elsewhere (after a tour, say).
   function startPlain() {
-    if (S.pinPose || segOf(S.T) !== S.step) S.T = SEG.s[S.step];
+    if (S.pinPose || segOf(S.T) !== S.step) (S.T = SEG.s[S.step]), (C.cont = false);
     S.pinPose = false;
     setRunning(true);
   }
@@ -311,7 +454,11 @@ export function player(DATA, machine) {
   }
   // With the voice on, play is the narrated tour: a step moves on only when its clip has ended.
   function tourAt(k) {
+    // the tour running on from the step before, which it left at its end
+    C.cont = C.flow = S.touring && k === S.step + 1 && S.T >= SEG.s[k] - 0.01;
+    if (!C.cont) camBlend();
     setStep(k);
+    C.flow = false;
     S.T = SEG.s[k];
     S.pinPose = false;
     draw();
@@ -382,6 +529,8 @@ export function player(DATA, machine) {
     stopTour(false);
     S.T = Number(scrub.value);
     S.pinPose = false;
+    C.cont = true;
+    camBlend();
     setStep(segOf(S.T));
     draw();
   });
@@ -399,7 +548,7 @@ export function player(DATA, machine) {
     const reveal = k === PRED + 1;
     predict.replaceChildren();
     const kicker = Object.assign(document.createElement("span"), { className: "vz-predict-kicker", textContent: reveal ? "Your prediction" : "Predict" });
-    const q = Object.assign(document.createElement("p"), { textContent: PR.question });
+    const q = Object.assign(document.createElement("p"), { textContent: typeof PR.question === "string" ? PR.question : PR.question[S.variant] });
     const opts = Object.assign(document.createElement("div"), { className: "vz-predict-options" });
     const fb = Object.assign(document.createElement("p"), { className: "vz-predict-feedback" });
     fb.setAttribute("aria-live", "polite");
@@ -438,6 +587,8 @@ export function player(DATA, machine) {
   const shuffle = (r, xs) => xs.map((x) => [r(), x]).sort((a, b) => a[0] - b[0]).map((p) => p[1]);
   function renderPractice() {
     const Q = machine.question(seed, rng(seed * 2654435761));
+    // the stage draws the question's own filter, when the machine gives one
+    if (Q.state) (machine.render(Q.state, S), cardFrame(Q.state), camApply());
     const r = rng(seed * 31 + 7);
     const order = shuffle(r, Q.choices.map((_, i) => i));
     practice.replaceChildren();
@@ -482,8 +633,13 @@ export function player(DATA, machine) {
     tryBtn.setAttribute("aria-pressed", String(practiceOpen));
     practice.hidden = !practiceOpen;
     if (practiceOpen) renderPractice();
+    else if (C.cardCam !== undefined) ((C.cardCam = null), draw());
     showPredict();
     syncCards();
+    if (C.el) applyFocus(); // the step's subject is lit only while the story is showing
+    camBlend();
+    camApply();
+    followLeaders();
     if (practiceOpen) practice.querySelector(".vz-predict-options button")?.focus();
   });
 
@@ -496,11 +652,14 @@ export function player(DATA, machine) {
   function renderLab() {
     const out = machine.lab(labValues, S.variant);
     machine.render(out.state, S);
+    cardFrame(out.state);
     S.state = out.state;
+    camApply();
+    followLeaders();
     $("lab-verdict").textContent = out.verdict;
     $("lab-verdict").dataset.ok = String(!!out.ok);
     $("lab-rows").replaceChildren(...out.rows.map((r) => Object.assign(document.createElement("li"), { textContent: r })));
-    for (const inp of DATA.lab.inputs) $("lab-v-" + inp.id).textContent = inp.format ? inp.format.replace("{}", labValues[inp.id]) : String(labValues[inp.id]);
+    for (const inp of DATA.lab.inputs) if (inp.type !== "text") $("lab-v-" + inp.id).textContent = inp.format ? inp.format.replace("{}", labValues[inp.id]) : String(labValues[inp.id]);
   }
   function openLab() {
     if (practiceOpen) tryBtn.click();
@@ -514,10 +673,19 @@ export function player(DATA, machine) {
     heading.textContent = DATA.lab.heading ?? DATA.lab.title;
     showPredict();
     syncCards();
+    if (C.el) applyFocus();
+    camBlend();
     renderLab();
     lab.querySelector("input")?.focus();
   }
+  // While the lab or Now you try is open, the camera frames what the machine asks (cardShot) in the space
+  // beside the card (cardClear); a machine without them keeps the whole figure, unmoved.
+  function cardFrame(state) {
+    if (!C.el || !machine.cardShot) return;
+    C.cardCam = CAM.frame(boundsOfIds(machine.cardShot(state)), machine.cardClear?.() ?? C.clear, { min: 0.4 });
+  }
   function closeLab() {
+    C.cardCam = null;
     labOpen = false;
     root.toggleAttribute("data-lab", false);
     labBtn.setAttribute("aria-pressed", "false");
@@ -532,6 +700,13 @@ export function player(DATA, machine) {
     for (const inp of lab.querySelectorAll("input[type=range]")) {
       inp.addEventListener("input", () => {
         labValues[inp.dataset.id] = Number(inp.value);
+        renderLab();
+      });
+    }
+    // a typed entry (a word, a key): the model reads it as typed
+    for (const inp of lab.querySelectorAll("input[type=text]")) {
+      inp.addEventListener("input", () => {
+        labValues[inp.dataset.id] = inp.value;
         renderLab();
       });
     }
@@ -596,18 +771,39 @@ export function player(DATA, machine) {
     predictStep: PRED,
     seekStep(k) {
       root.classList.add("instant");
+      C.instant = true;
       if (labOpen) closeLab();
       stop(false);
+      C.blend = null;
       goTo(Number(k) || 0, { pose: true, speak: false });
+      C.instant = false;
     },
     seek(ms) {
       root.classList.add("instant");
+      C.instant = true;
       if (labOpen) closeLab();
       stop(false);
+      C.blend = null;
       S.T = Math.min(SEG.total, Number(ms) / 1000);
       S.pinPose = false;
+      C.cont = true;
       setStep(segOf(S.T));
       draw();
+      C.instant = false;
+    },
+    // The camera: where it is, where it is going, the clear area, and each step's track (camera.mjs).
+    camera: () => ({ active: !!C.el, m: C.cur, target: C.target, blending: !!C.blend, cont: C.cont, clear: C.clear, T: S.T, step: S.step, pinned: S.pinPose, running: S.running, starts: SEG.s, lead: SEG.lead, shots: STEPS.map((s) => s.shot ?? null), around: STEPS.map((s, k) => AROUND[k] ?? null), subject: STEPS.map((s, k) => SUBJECT[k] ?? null), tracks: C.tracks.map((t) => ({ shot: t.shot, enter: t.enter, start: t.start, end: t.end, moves: t.moves.map((m) => ({ t0: m.t0, d: m.d, from: m.from, to: m.to, ids: m.ids, enter: !!m.enter })) })), links: V.voice ? V.voice.map((tr) => tr.links.map((l) => ({ start: l.start, end: l.end, ids: l.ids }))) : [] }),
+    // The named parts' bounds and the callout anchors, in the figure's own units (no camera).
+    boundsOf: (names) => (C.el ? boundsOfIds(names) : null),
+    anchors: () => machine.anchors?.() ?? {},
+    // The named parts as the camera shows them now, in page pixels (null if the figure has none of them).
+    partsOnScreen(names) {
+      if (!C.el) return null;
+      const b = boundsOfIds(names);
+      if (!b) return null;
+      const r = CAM.onScreen(C.cur ?? CAM.ID, b), ctm = fig.getScreenCTM();
+      const p0 = new DOMPoint(r.x0, r.y0).matrixTransform(ctm), p1 = new DOMPoint(r.x1, r.y1).matrixTransform(ctm);
+      return { x: Math.min(p0.x, p1.x), y: Math.min(p0.y, p1.y), r: Math.max(p0.x, p1.x), b: Math.max(p0.y, p1.y) };
     },
     variant(name) {
       document.querySelector(`.vz-whatif button[data-variant="${name}"]`)?.click();

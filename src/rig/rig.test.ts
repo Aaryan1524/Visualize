@@ -5,7 +5,9 @@ import { plate, planeOf, pointOn, circlePoints, rod, sprocket, turned, type Mesh
 import { drawMesh, keyLight, shadeOf } from "./draw.ts";
 import { applyAffine, moveInPlane, planeKey, slotKey } from "./motion.ts";
 import { keepInPlace } from "./stage.ts";
-import { dot, sub, type V3 } from "./vec.ts";
+import { carry, checkContacts } from "./contacts.ts";
+import { arrow, cellDrawing, CONCEPT_VIEW, decalAt, placeAt, railCentres, ringSlots, turnAt, workingStrip } from "./parts.ts";
+import { dot, sub, type P2, type V3 } from "./vec.ts";
 
 const rng = (a: number) => () => {
   a = (a + 0x6d2b79f5) | 0;
@@ -170,4 +172,69 @@ test("stage: reordering moves as few groups as it can: one part crossing the who
     }
     assert.equal(stay.length, best, `keeps the most it can in ${pos}`);
   }
+});
+
+// ---------------------------------------------------------------- contacts
+test("contacts: a wheel moving with its chain passes; reversed, stopped or slow, it fails", () => {
+  const along = (p: P2, d: P2): readonly [P2, P2] => [p, [p[0] + d[0], p[1] + d[1]]];
+  const good = { where: "cog", chain: along([0, 0], [3, 1]), wheel: along([0, 0], [3.1, 0.9]) };
+  assert.deepEqual(checkContacts([good]).faults, []);
+  assert.equal(checkContacts([good]).byWhere.cog, 1);
+  // a planted fault: the wheel turned the wrong way
+  const reversed = { where: "guide", chain: along([0, 0], [3, 1]), wheel: along([0, 0], [-3, -1]) };
+  assert.match(checkContacts([good, reversed]).faults.join(), /^guide: the wheel moves against the chain/);
+  assert.match(checkContacts([{ where: "t", chain: along([0, 0], [3, 0]), wheel: along([0, 0], [0.1, 0]) }]).faults.join(), /does not move/);
+  assert.match(checkContacts([{ where: "t", chain: along([0, 0], [3, 0]), wheel: along([0, 0], [1.5, 0]) }]).faults.join(), /0\.50 of the chain's speed/);
+  assert.equal(checkContacts([]).checked, 0, "an empty list checks nothing, so a caller must assert its counts");
+});
+
+test("contacts: carry() takes a point drawn under one transform to where the next one puts it", () => {
+  assert.deepEqual(carry(null, "translate(5 -2)", [1, 1]), [6, -1]);
+  const p = carry("matrix(0 1 -1 0 10 0)", "matrix(1 0 0 1 0 0)", [10, 1]);
+  assert.ok(Math.abs(p[0] - 1) < 1e-12 && Math.abs(p[1]) < 1e-12);
+});
+
+// ---------------------------------------------------------------- concept parts
+test("parts: a cell drawn once and placed by a translate lands where drawing it there would", () => {
+  const cam = { ...CONCEPT_VIEW, scale: 30, origin: [500, 400] as P2 };
+  const svg = cellDrawing(cam, { w: 20, d: 20, h: 9 });
+  assert.match(svg, /rig-m-cell/);
+  const at: V3 = [44, -6, 0], m = placeAt(cam, at).match(/translate\(([-\d.]+) ([-\d.]+)\)/)!;
+  const want = sub(screenOf(cam, at) as unknown as V3, [...screenOf(cam, [0, 0, 0]), 0] as unknown as V3);
+  assert.ok(Math.abs(Number(m[1]) - want[0]) < 0.06 && Math.abs(Number(m[2]) - want[1]) < 0.06);
+});
+
+test("parts: a decal on a face maps the face's own millimetres to the screen", () => {
+  const cam = { ...CONCEPT_VIEW, scale: 30, origin: [500, 400] as P2 };
+  const c: V3 = [10, 4, 9], t = decalAt(cam, c).match(/matrix\(([^)]*)\)/)![1]!.split(" ").map(Number);
+  const on = (x: number, y: number): P2 => [t[0]! * x + t[2]! * y + t[4]!, t[1]! * x + t[3]! * y + t[5]!];
+  for (const [x, y] of [[0, 0], [3, 0], [0, 2], [-4, 5]] as const) {
+    const want = screenOf(cam, [c[0] + x, c[1] - y, c[2]]), got = on(x, y);
+    assert.ok(Math.hypot(got[0] - want[0], got[1] - want[1]) < 0.2, `(${x}, ${y})`);
+  }
+});
+
+test("parts: rails, rings and arrows are where they say", () => {
+  assert.deepEqual(railCentres(3, 25, [10, 0, 0]).map((p) => p[0]), [10, 35, 60]);
+  const r = ringSlots(4, 30);
+  assert.ok(Math.abs(r[0]!.at[1] + 30) < 1e-9 && Math.abs(r[0]!.at[0]) < 1e-9, "the first slot is at the front");
+  const cam = { ...CONCEPT_VIEW, scale: 30, origin: [500, 400] as P2 };
+  const a = arrow(cam, [0, 0, 5], [40, 0, 5]);
+  const want = screenOf(cam, [40, 0, 5]);
+  assert.ok(Math.hypot(a.b[0] - want[0], a.b[1] - want[1]) < 1e-6, "the head is at the end");
+  assert.match(turnAt(cam, Math.PI / 2, [5, 5, 0]), /^matrix\(/);
+});
+
+test("parts: an arrow routed through points passes them and ends at its end; the working strip fits its rows", () => {
+  const cam = { ...CONCEPT_VIEW, scale: 30, origin: [500, 400] as P2 };
+  const via: V3 = [20, 30, 12], a = arrow(cam, [0, 0, 5], [40, 60, 5], { via: [via] });
+  const want = screenOf(cam, [40, 60, 5]);
+  assert.ok(Math.hypot(a.b[0] - want[0], a.b[1] - want[1]) < 1e-6, "the head is at the end");
+  const v = screenOf(cam, via), d = a.svg.match(/class="rig-arrow-line" d="([^"]+)"/)![1]!;
+  const pts = [...d.matchAll(/(-?\d+(?:\.\d+)?)[ ,](-?\d+(?:\.\d+)?)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+  assert.ok(pts.some(([x, y]) => Math.hypot(x! - v[0], y! - v[1]) < 1), "the curve passes through the point it is routed by");
+  const s = workingStrip(["h1  2,668,802,083 mod 16 = 3", "h2  9 mod 16 = 9"], [10, 20], 100);
+  assert.equal((s.svg.match(/<text/g) ?? []).length, 2);
+  assert.ok(s.w >= 28 * 100 * 0.6 && s.h > 2 * 100, "wide enough for its longest row, tall enough for both");
+  assert.match(s.svg, /translate\(10 20\)/);
 });

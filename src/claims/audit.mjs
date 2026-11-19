@@ -103,7 +103,7 @@ export function factsFrom(model, depth = 3, seen = new Set()) {
 /** Every string a reader can see, gathered from a build's data (skipping audio, SVG and ids). */
 export function textsOf(data, where = "data") {
   const out = [];
-  const skip = new Set(["audio", "svg", "type", "links", "id", "ids", "key", "variant", "href", "base"]);
+  const skip = new Set(["audio", "svg", "type", "links", "id", "ids", "key", "variant", "href", "base", "shot", "camera"]);
   const walk = (x, path) => {
     if (typeof x === "string") return x.trim() && out.push({ where: path, text: x });
     if (!x || typeof x !== "object") return;

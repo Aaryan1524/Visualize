@@ -18,6 +18,16 @@
 // - play: the narrated tour (with a stand-in for audio) stops at the prediction, and play near
 //   the end stops at the end;
 // - no text anywhere reads NaN, undefined or Infinity, and nothing logs a console error;
+// - the camera, on a page whose steps name a `shot` (src/drawing/camera.mjs): at each step's still
+//   frame and as each spoken [phrase|part] begins, every named part has bounds (a name the figure
+//   cannot frame fails), sits in the clear area, off the cards, the heading and anything marked
+//   [data-camera-avoid], and is at least 6% of the stage's shorter side, and its callout points at it
+//   on the stage and off the cards; a shot's subject is centred (the middle half of the clear area),
+//   spans 15% of it and outweighs the other parts in focus; nothing clips the figure but the stage;
+//   every name's bounds are smaller than the figure and hold its anchor; a step's camera is the same by seekStep and by its tab, and a
+//   time's the same by seek and by playing up to it; through the whole story, frame by frame, the
+//   picture never moves faster than 2 clear-area short sides a second and every shot it stops on is
+//   held at least 0.8 s, and the eased move a tab click makes keeps to the same speed;
 // - playback: every frame of the whole story, at 60 fps, for every What if variant, is timed from
 //   the frame's start to its layout being done. The 95th percentile must stay under 8 ms (half a
 //   frame, leaving the rest for paint), and no frame outside a step change may take a whole frame
@@ -28,11 +38,12 @@
 //   max(1, measured / reference), capped at 3. Set VIZ_CPU_THROTTLE=2.5 to run the check as if on
 //   a machine 2.5 times slower (Chrome's CPU throttling applies to the reference and the page alike).
 //   A page that is clearly over its limit stops being timed once 800 frames of a variant have been,
-//   so a failing page fails in seconds. VIZ_ONLY_PLAYBACK=1 skips every other check, to time a page alone.
+//   so a failing page fails in seconds. VIZ_ONLY_PLAYBACK=1 skips every other check, to time a page alone;
+//   VIZ_ONLY_CAMERA=1 runs only the camera's checks.
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { launch } from "./lib/browser.mjs";
+import { drawingPageProblem, launch } from "./lib/browser.mjs";
 
 const page = process.argv[2];
 if (!page) {
@@ -50,8 +61,65 @@ const REFERENCE_MS = 0.28;
 const MAX_SCALE = 3;
 const THROTTLE = Number(process.env.VIZ_CPU_THROTTLE || 1);
 const ONLY_PLAYBACK = !!process.env.VIZ_ONLY_PLAYBACK;
+const ONLY_CAMERA = !!process.env.VIZ_ONLY_CAMERA;
 const throttle = async (page) => THROTTLE > 1 && (await (await page.createCDPSession()).send("Emulation.setCPUThrottlingRate", { rate: THROTTLE }));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// An arrow (src/rig/parts.ts `arrow`) must not run across a value or an index printed on a part: the
+// Bloom filter's first arrows to its back row crossed the front row's 0s and 1s. Samples each visible arrow's line on
+// screen against each visible printed value's box (shrunk by a sixth, since a decal's box is a
+// parallelogram's), and names the part the value is on.
+const arrowsOverValues = () => {
+  const shown = (el) => {
+    for (let e = el; e && e.id !== "fig"; e = e.parentElement) if (e.style?.display === "none" || getComputedStyle(e).display === "none") return false;
+    return true;
+  };
+  const boxes = [...document.querySelectorAll("#fig .rig-value, #fig .rig-index")].filter((t) => t.textContent.trim() && shown(t)).map((t) => {
+    const r = t.getBoundingClientRect(), sx = r.width / 6, sy = r.height / 6;
+    return { name: `${t.closest("[data-part]")?.dataset.part ?? "a part"} "${t.textContent.trim()}"`, x0: r.left + sx, x1: r.right - sx, y0: r.top + sy, y1: r.bottom - sy };
+  });
+  const out = new Set();
+  for (const line of document.querySelectorAll("#fig .rig-arrow-line")) {
+    if (!shown(line)) continue;
+    const L = line.getTotalLength(), m = line.getScreenCTM();
+    for (let d = 0; d <= L; d += Math.max(L / 80, 0.5)) {
+      const q = line.getPointAtLength(d), x = m.a * q.x + m.c * q.y + m.e, y = m.b * q.x + m.d * q.y + m.f;
+      for (const b of boxes) if (x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1) out.add(b.name);
+    }
+  }
+  return [...out];
+};
+
+// Every part lit right now (data-named: what the step's shot, the voice or the current operation lights)
+// is wholly on the stage and under no open card. The camera's subject is only what a step names; a
+// Bloom filter's word lit bits the frame cut off, and the lab card hid the bit that decided the answer.
+// A part more than a third of the stage across (a chain round a cassette, a cable running off to the
+// frame) is structure the figure runs through, not a subject that can be framed whole, and is skipped.
+const litOutOfView = () => {
+  const stage = document.getElementById("stage")?.getBoundingClientRect();
+  if (!stage) return [];
+  const open = (e) => e && !e.hidden && getComputedStyle(e).display !== "none" && getComputedStyle(e).visibility !== "hidden";
+  const cards = ["lab", "predict", "concept", "practice"].map((id) => document.getElementById(id)).filter(open).map((e) => ({ id: e.id, r: e.getBoundingClientRect() }));
+  const shown = (el) => {
+    for (let e = el; e && e.id !== "fig"; e = e.parentElement) if (getComputedStyle(e).display === "none") return false;
+    return true;
+  };
+  const parts = new Map();
+  for (const el of document.querySelectorAll("#fig [data-named]")) {
+    if (!shown(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) continue;
+    const p = el.dataset.part ?? "a part", b = parts.get(p);
+    parts.set(p, b ? { l: Math.min(b.l, r.left), t: Math.min(b.t, r.top), r: Math.max(b.r, r.right), b: Math.max(b.b, r.bottom) } : { l: r.left, t: r.top, r: r.right, b: r.bottom });
+  }
+  const out = [];
+  for (const [p, r] of parts) {
+    if (r.r - r.l > stage.width / 3 || r.b - r.t > stage.height / 3) continue;
+    if (r.l < stage.left - 1 || r.r > stage.right + 1 || r.t < stage.top - 1 || r.b > stage.bottom + 1) out.push(`"${p}" is lit but runs off the stage`);
+    for (const c of cards) if (Math.min(r.r, c.r.right) - Math.max(r.l, c.r.left) > 1 && Math.min(r.b, c.r.bottom) - Math.max(r.t, c.r.top) > 1) out.push(`"${p}" is lit but under the #${c.id} card`);
+  }
+  return out;
+};
 
 // Measure what a reader sees right now: scroll, callouts, open cards, and any broken number.
 const measure = () => {
@@ -118,8 +186,16 @@ const fakeAudio = () => {
 };
 
 const browser = await launch();
+{
+  const problem = await drawingPageProblem(browser, page);
+  if (problem) {
+    console.log(`drawing: ${problem}`);
+    await browser.close();
+    process.exit(2);
+  }
+}
 try {
-  for (const [w, h] of ONLY_PLAYBACK ? [] : [[1440, 900], [1280, 800]]) {
+  for (const [w, h] of ONLY_PLAYBACK || ONLY_CAMERA ? [] : [[1440, 900], [1280, 800]]) {
     const p = await browser.newPage();
     await p.setViewport({ width: w, height: h });
     await p.evaluateOnNewDocument(fakeAudio);
@@ -148,6 +224,13 @@ try {
     else if (!au.ok) for (const q of au.problems) fail(`audit: ${q}`);
     if (contract.ids.length) fail(`${at}: missing #${contract.ids.join(", #")}`);
     if (!contract.voice) fail(`${at}: no recorded voice is embedded (run the example's voice script)`);
+    // A rig figure without the rig's look draws every solid black, and every other check still passes
+    // (the scaffold's first build did): its material tokens must resolve.
+    const look = await p.evaluate(() => {
+      const solid = document.querySelector("#fig .rig-solid");
+      return solid ? getComputedStyle(solid).getPropertyValue("--rig-lit").trim() : null;
+    });
+    if (look === "") fail(`${at}: the figure's solids have no material colours; put src/rig/rig.css in the page's CSS`);
     if (contract.missingFns.includes("seekStep") || contract.missingFns.includes("state")) continue;
     const has = (f) => !contract.missingFns.includes(f);
 
@@ -175,6 +258,8 @@ try {
         if (r.T <= lastT) fail(`${s}: the timeline goes backwards (${r.T} after ${lastT}); it must run once, start to end`);
         lastT = r.T;
         judge(s, r);
+        for (const name of await p.evaluate(arrowsOverValues)) fail(`${s}: an arrow runs across the value ${name}; route it over a gap between parts (arrow's via) or end it on a face`);
+        for (const f of await p.evaluate(litOutOfView)) fail(`${s}: ${f}; frame it (the step's shot or subject), or light less`);
       }
       if (!has("answer") || !has("labInputs") || !has("lab")) continue;
       // The prediction, answered, on the step that reveals it.
@@ -193,15 +278,19 @@ try {
       judge(`${at} ${v} answered prediction`, r);
       await p.evaluate(() => window.__viz.answer(null));
 
-      // The lab, every input at its minimum and at its maximum.
+      // The lab, every input at its minimum and at its maximum (a typed input: each of its samples, and
+      // an empty entry, which must still get a verdict).
       const inputs = await p.evaluate(() => window.__viz.labInputs());
       if (!inputs.length) fail(`${at}: the page has no lab (DATA.lab), so the reader cannot try values of their own`);
       for (const inp of inputs) {
-        for (const end of ["min", "max"]) {
-          const out = await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, inp[end]);
+        for (const val of inp.type === "text" ? [...(inp.samples ?? []), ""] : [inp.min, inp.max]) {
+          const out = await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, val);
           await wait(80);
+          // the camera may move to frame the lab's state (cardShot): measure it at rest
+          await p.waitForFunction(() => !window.__viz.camera?.().blending, { timeout: 4000 }).catch(() => {});
           const r = await p.evaluate(measure);
-          const s = `${at} ${v} lab ${inp.id}=${inp[end]}`;
+          const s = `${at} ${v} lab ${inp.id}=${JSON.stringify(val)}`;
+          for (const f of await p.evaluate(litOutOfView)) fail(`${s}: ${f}; frame the lab's state clear of its card (the machine's cardShot)`);
           if (!out || !out.verdict || !Array.isArray(out.rows)) fail(`${s}: the lab gave no verdict`);
           judge(s, r);
           await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, inp.value);
@@ -276,8 +365,321 @@ try {
     await p.close();
   }
 
+  // The camera (a page whose steps name shots, src/drawing/camera.mjs): framing, voice sync,
+  // determinism and calm. Pages without one are not touched.
+  if (!ONLY_PLAYBACK) {
+    const p = await browser.newPage();
+    await p.setViewport({ width: 1440, height: 900 });
+    await p.evaluateOnNewDocument(fakeAudio);
+    const errors = [];
+    p.on("pageerror", (e) => errors.push(e.message));
+    await p.goto(url);
+    await p.evaluate(() => document.fonts.ready);
+    await wait(300);
+    const cam0 = await p.evaluate(() => window.__viz.camera?.() ?? null);
+    if (cam0?.active) {
+      const variants = await p.evaluate(() => window.__viz.variants ?? []);
+      const near = (a, b) => Math.abs(a.s - b.s) < 1e-6 && Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01;
+      const show = (m) => `s ${m.s.toFixed(4)} x ${m.x.toFixed(1)} y ${m.y.toFixed(1)}`;
+      // how far the picture moves from camera a to camera b: the largest move of the figure points
+      // under the clear area's corners, in the clear area's shorter side (as the camera reckons speed)
+      const moved = (a, b, c) => {
+        let d = 0;
+        for (const m of [a, b])
+          for (const [sx, sy] of [[c.x0, c.y0], [c.x1, c.y0], [c.x0, c.y1], [c.x1, c.y1]]) {
+            const q = [(sx - m.x) / m.s, (sy - m.y) / m.s];
+            d = Math.max(d, Math.hypot((a.s - b.s) * q[0] + a.x - b.x, (a.s - b.s) * q[1] + a.y - b.y));
+          }
+        return d / Math.min(c.x1 - c.x0, c.y1 - c.y0);
+      };
+
+      // Framing: where a step's shot or a spoken link names parts, each named part is inside the clear
+      // area, clear of the cards, the heading and whatever the figure marks [data-camera-avoid], and at
+      // least 6% of the stage's shorter side. Its callout, if it has one, points at it on the stage and
+      // off the cards; a shot's callouts are all shown (a spoken name's callout may hide, when the point
+      // it marks is out of the picture while the part itself is framed).
+      const framing = (names, k, shot) => {
+        const v = window.__viz, fig = document.getElementById("fig");
+        const box = (b) => ({ x: b.left, y: b.top, r: b.right, b: b.bottom });
+        const shown = (e) => e && !e.hidden && getComputedStyle(e).display !== "none" && getComputedStyle(e).visibility !== "hidden" && e.getBoundingClientRect().width > 0;
+        const stage = box(document.querySelector(".vz-stage").getBoundingClientRect());
+        const ctm = fig.getScreenCTM(), c = v.camera().clear;
+        const c0 = new DOMPoint(c.x0, c.y0).matrixTransform(ctm), c1 = new DOMPoint(c.x1, c.y1).matrixTransform(ctm);
+        const clear = { x: c0.x, y: c0.y, r: c1.x, b: c1.y };
+        const head = document.getElementById("heading"), range = document.createRange();
+        range.selectNodeContents(head);
+        const covers = [
+          ...["concept", "predict", "practice", "lab"].map((id) => document.getElementById(id)).filter(shown).map((e) => ({ what: `the #${e.id} card`, ...box(e.getBoundingClientRect()) })),
+          ...(shown(head) && head.textContent.trim() ? [{ what: "the step heading", ...box(range.getBoundingClientRect()) }] : []),
+          ...[...document.querySelectorAll("[data-camera-avoid]")].filter((e) => e.getBoundingClientRect().width > 0).map((e) => ({ what: `#${e.id || e.getAttribute("class")}`, ...box(e.getBoundingClientRect()) })),
+        ];
+        const hit = (a, b) => a.x < b.r - 0.5 && b.x < a.r - 0.5 && a.y < b.b - 0.5 && b.y < a.b - 0.5;
+        const short = Math.min(stage.r - stage.x, stage.b - stage.y);
+        const out = [];
+        for (const n of names) {
+          const r = v.partsOnScreen([n]);
+          if (!r) {
+            out.push(`"${n}" is not in the figure (it has no bounds)`);
+            continue;
+          }
+          if (r.x < clear.x - 1 || r.r > clear.r + 1 || r.y < clear.y - 1 || r.b > clear.b + 1) out.push(`"${n}" (${r.x.toFixed(0)},${r.y.toFixed(0)}..${r.r.toFixed(0)},${r.b.toFixed(0)}) leaves the clear area (${clear.x.toFixed(0)},${clear.y.toFixed(0)}..${clear.r.toFixed(0)},${clear.b.toFixed(0)})`);
+          for (const cv of covers) if (hit(r, cv)) out.push(`"${n}" is under ${cv.what}`);
+          const size = Math.max(r.r - r.x, r.b - r.y);
+          if (size < 0.06 * short - 0.5) out.push(`"${n}" is ${size.toFixed(0)} px, under 6% of the stage's shorter side (${(0.06 * short).toFixed(0)} px)`);
+          const g = [...document.querySelectorAll(`g.label[data-label="${n}"]`)].find((g) => (g.dataset.beats ?? "").split(" ").includes(String(k)) && g.style.display !== "none");
+          if (g) {
+            const dot = g.querySelector(".ldot"), d = dot && new DOMPoint(Number(dot.getAttribute("cx")), Number(dot.getAttribute("cy"))).matrixTransform(ctm);
+            if (g.getAttribute("visibility") === "hidden") shot && out.push(`the callout for "${n}" is hidden`);
+            else if (d && (d.x < stage.x || d.x > stage.r || d.y < stage.y || d.y > stage.b)) out.push(`the callout for "${n}" points off the stage`);
+            else if (d) for (const cv of covers.filter((x) => x.what.endsWith("card"))) if (d.x > cv.x && d.x < cv.r && d.y > cv.y && d.y < cv.b) out.push(`the callout for "${n}" points under ${cv.what}`);
+          }
+        }
+        return out;
+      };
+      // The subject of a shot (a step's shot at its still frame, or a voice-led shot once it arrives):
+      // its centre is in the middle half of the clear area, both ways; it spans at least 15% of the clear
+      // area's shorter side; and the parts lit with it (data-named) take more of the frame than every other
+      // part still in focus (not receded) put together, so nothing else reads as the subject.
+      const subject = (names) => {
+        const v = window.__viz, fig = document.getElementById("fig"), ctm = fig.getScreenCTM(), c = v.camera().clear;
+        const c0 = new DOMPoint(c.x0, c.y0).matrixTransform(ctm), c1 = new DOMPoint(c.x1, c.y1).matrixTransform(ctm);
+        const cl = { x: c0.x, y: c0.y, r: c1.x, b: c1.y }, cw = cl.r - cl.x, ch = cl.b - cl.y;
+        const r = v.partsOnScreen(names);
+        if (!r) return { out: [`"${names.join(", ")}" has no bounds`] };
+        const out = [], cx = (r.x + r.r) / 2, cy = (r.y + r.b) / 2;
+        const fx = (cx - cl.x) / cw, fy = (cy - cl.y) / ch;
+        if (fx < 0.25 || fx > 0.75 || fy < 0.25 || fy > 0.75) out.push(`the subject's centre sits at ${(fx * 100).toFixed(0)}% across and ${(fy * 100).toFixed(0)}% down the clear area, outside its middle half`);
+        const span = Math.max(r.r - r.x, r.b - r.y) / Math.min(cw, ch);
+        if (span < 0.15) out.push(`the subject spans ${(span * 100).toFixed(0)}% of the clear area's shorter side, under 15%`);
+        const inFrame = (e) => {
+          const b = e.getBoundingClientRect(), w = Math.max(0, Math.min(b.right, cl.r) - Math.max(b.left, cl.x)), h = Math.max(0, Math.min(b.bottom, cl.b) - Math.max(b.top, cl.y));
+          return w * h;
+        };
+        let lit = 0, rest = 0, biggest = { a: 0, part: "" }, litBox = null;
+        for (const g of fig.querySelectorAll("[data-camera] .rig-part")) {
+          if (g.style.display === "none" || g.hasAttribute("data-recede")) continue;
+          const a = inFrame(g);
+          if (g.hasAttribute("data-named") && a > 0) {
+            const b = g.getBoundingClientRect();
+            litBox = litBox ? { x: Math.min(litBox.x, b.left), y: Math.min(litBox.y, b.top), r: Math.max(litBox.r, b.right), b: Math.max(litBox.b, b.bottom) } : { x: b.left, y: b.top, r: b.right, b: b.bottom };
+          }
+          if (g.hasAttribute("data-named")) lit += a;
+          else {
+            rest += a;
+            if (a > biggest.a) biggest = { a, part: g.dataset.part };
+          }
+        }
+        // and what is lit is the subject: the lit parts cover most of the subject's box
+        const ov = litBox ? Math.max(0, Math.min(litBox.r, r.r) - Math.max(litBox.x, r.x)) * Math.max(0, Math.min(litBox.b, r.b) - Math.max(litBox.y, r.y)) : 0;
+        if (ov < 0.5 * (r.r - r.x) * (r.b - r.y)) out.push(`what is lit is not the subject (the lit parts cover ${Math.round((100 * ov) / Math.max(1, (r.r - r.x) * (r.b - r.y)))}% of its box)`);
+        if (rest > lit) out.push(`parts in focus but not the subject take more of the frame (${Math.round(rest)} px², the largest "${biggest.part}") than the subject (${Math.round(lit)} px²)`);
+        return { out, fx, fy, span, share: lit / Math.max(1, lit + rest) };
+      };
+      // Nothing clips the camera's figure but the stage: no clip-path or mask on it or between it and the
+      // drawing, and the drawing itself does not clip to its own box inside the stage.
+      const crop = () => {
+        const fig = document.getElementById("fig"), out = [];
+        for (let e = fig.querySelector("[data-camera]"); e && e !== fig.parentElement; e = e.parentElement) {
+          const cs = getComputedStyle(e);
+          if (e.getAttribute("clip-path") || (cs.clipPath && cs.clipPath !== "none")) out.push(`<${e.tagName.toLowerCase()}${e.id ? " #" + e.id : ""}> clips it (clip-path)`);
+          if (e.getAttribute("mask") || (cs.mask && cs.mask !== "none" && e !== fig)) out.push(`<${e.tagName.toLowerCase()}${e.id ? " #" + e.id : ""}> masks it`);
+        }
+        const sb = document.querySelector(".vz-stage").getBoundingClientRect(), fb = fig.getBoundingClientRect(), pad = parseFloat(getComputedStyle(fig).paddingLeft) + parseFloat(getComputedStyle(fig).paddingTop);
+        if (getComputedStyle(fig).overflow !== "visible" && (pad > 0 || fb.left > sb.left + 1 || fb.top > sb.top + 1 || fb.right < sb.right - 1 || fb.bottom < sb.bottom - 1)) out.push("the drawing clips it to a box inside the stage (set overflow: visible on #fig)");
+        return out;
+      };
+      // A name's bounds are smaller than the whole figure and hold the point its callouts mark.
+      const sanity = (names) => {
+        const v = window.__viz, g = document.querySelector("#fig [data-camera]"), F = g.getBBox(), out = [], seen = [];
+        if (!v.boundsOf || !v.anchors) return { out: ["the page has no __viz.boundsOf or __viz.anchors, so its bounds cannot be checked"], seen };
+        const A = v.anchors();
+        for (const n of names) {
+          const b = v.boundsOf([n]);
+          if (!b) {
+            out.push(`"${n}" has no bounds`);
+            continue;
+          }
+          const w = b.x1 - b.x0, h = b.y1 - b.y0;
+          if (w * h > 0.5 * F.width * F.height || w >= F.width || h >= F.height) out.push(`"${n}" has bounds ${w.toFixed(0)}×${h.toFixed(0)}, as big as the whole figure (${F.width.toFixed(0)}×${F.height.toFixed(0)})`);
+          const a = A[n], tol = 0.02 * Math.max(F.width, F.height);
+          if (a && (a[0] < b.x0 - tol || a[0] > b.x1 + tol || a[1] < b.y0 - tol || a[1] > b.y1 + tol)) out.push(`"${n}" has bounds (${b.x0.toFixed(0)},${b.y0.toFixed(0)}..${b.x1.toFixed(0)},${b.y1.toFixed(0)}) that miss its own anchor (${a[0].toFixed(0)},${a[1].toFixed(0)})`);
+          seen.push(`${n} ${w.toFixed(0)}×${h.toFixed(0)}${a ? " ⊃ anchor" : ""}`);
+        }
+        return { out, seen };
+      };
+      let shots = 0, spoken = 0, led = 0, subjects2 = 0;
+      const subjects = [], boundsSeen = new Map();
+      for (const [w, h] of [[1440, 900], [1280, 800]]) {
+        await p.setViewport({ width: w, height: h });
+        await wait(150);
+        for (const v of variants.length ? variants : [null]) {
+          if (v) await p.evaluate((v) => window.__viz.variant(v), v);
+          const cam = await p.evaluate(() => window.__viz.camera());
+          for (let k = 0; k < cam.tracks.length; k++) {
+            const names = cam.shots[k] ?? [];
+            const at = `${w}×${h} ${v} step ${k}`;
+            await p.evaluate((k) => window.__viz.seekStep(k), k);
+            for (const f of await p.evaluate(framing, names, k, true)) fail(`${at}, its shot: ${f}`);
+            for (const f of await p.evaluate(crop)) fail(`${at}: a hard crop: ${f}`);
+            const used = [...new Set([...names, ...(cam.around?.[k] ?? []), ...(cam.links[k] ?? []).flatMap((l) => l.ids)])];
+            const sn = await p.evaluate(sanity, used);
+            for (const f of sn.out) fail(`${at}, bounds: ${f}`);
+            if (w === 1440 && v === variants[0]) for (const s of sn.seen) boundsSeen.set(s.split(" ")[0], s);
+            if (names.length) {
+              const sj = await p.evaluate(subject, names);
+              for (const f of sj.out) fail(`${at}, its shot (${names.join(", ")}): ${f}`);
+              if (w === 1440) subjects.push(`${v} ${k} centre ${(sj.fx * 100).toFixed(0)}%,${(sj.fy * 100).toFixed(0)}% span ${(sj.span * 100).toFixed(0)}% lit ${(sj.share * 100).toFixed(0)}%`);
+            }
+            shots++;
+            // every part the step's heading names (DATA.camera.subject[k]) is in frame at its still
+            // frame and all through the step, not only the shot's own subject
+            const named = cam.subject?.[k];
+            if (named?.length) {
+              for (const f of await p.evaluate(framing, named, k, false)) fail(`${at}, still frame: the heading names it, but ${f}`);
+              for (const frac of [0.1, 0.35, 0.6, 0.85]) {
+                const T = cam.starts[k] + frac * (cam.starts[k + 1] - cam.starts[k]);
+                await p.evaluate((ms) => window.__viz.seek(ms), T * 1000);
+                for (const f of await p.evaluate(framing, named, k, false)) fail(`${at}, at ${T.toFixed(2)} s: the heading names it, but ${f}`);
+              }
+              subjects2++;
+            }
+            // each spoken link, at the moment its words begin
+            for (const l of cam.links[k] ?? []) {
+              const T = cam.starts[k] + cam.lead + l.start;
+              await p.evaluate((ms) => window.__viz.seek(ms), T * 1000 + 1);
+              for (const f of await p.evaluate(framing, l.ids, k, false)) fail(`${at}, the voice at ${T.toFixed(2)} s ("${l.ids.join(", ")}"): ${f}`);
+              spoken++;
+            }
+            // each voice-led shot, once it has arrived and its words are lit
+            for (const mv of cam.tracks[k].moves.filter((m) => m.ids.length)) {
+              const l = (cam.links[k] ?? []).find((l) => mv.ids.some((id) => l.ids.includes(id)) && cam.starts[k] + cam.lead + l.start >= mv.t0 + mv.d - 1e-6);
+              const T = Math.max(mv.t0 + mv.d, l ? cam.starts[k] + cam.lead + l.start : 0) + 0.01;
+              await p.evaluate((ms) => window.__viz.seek(ms), T * 1000);
+              const sj = await p.evaluate(subject, mv.ids);
+              for (const f of sj.out) fail(`${at}, the voice-led shot of "${mv.ids.join(", ")}" at ${T.toFixed(2)} s: ${f}`);
+              led++;
+            }
+          }
+        }
+      }
+      console.log(`camera framing: ${shots} step shots, ${spoken} spoken names, ${led} voice-led shots and ${subjects2} steps whose heading's parts stay in frame through the step, at 1440×900 and 1280×800, every What if`);
+      console.log(`camera subjects (1440×900; centre across, down the clear area; span of its shorter side; lit share of the parts in focus): ${subjects.join(" | ")}`);
+      console.log(`camera bounds (figure units, ${variants[0] ?? ""}): ${[...boundsSeen.values()].join(", ")}`);
+      await p.setViewport({ width: 1440, height: 900 });
+      await wait(150);
+      if (variants.length) await p.evaluate((v) => window.__viz.variant(v), variants[0]);
+
+      // Determinism: a step's camera is the same by seekStep and by its tab, once the tab's move settles;
+      // a time's camera is the same by seek and by playing up to it.
+      const cam = await p.evaluate(() => window.__viz.camera());
+      await p.evaluate(() => document.getElementById("voice").getAttribute("aria-pressed") !== "false" && document.getElementById("voice").click());
+      await p.evaluate(() => window.__viz.answer(0));
+      const settle = async () => {
+        for (let i = 0; i < 60 && (await p.evaluate(() => window.__viz.camera().blending)); i++) await wait(50);
+      };
+      for (let k = 1; k < cam.tracks.length; k++) {
+        const a = await p.evaluate((k) => (window.__viz.seekStep(k), window.__viz.camera().m), k);
+        await p.evaluate((k) => window.__viz.seekStep(k === 1 ? 2 : k - 1), k);
+        await p.evaluate((k) => document.querySelectorAll(".vz-chapters button")[k - 1].click(), k);
+        await settle();
+        const b = await p.evaluate(() => window.__viz.camera().m);
+        if (!near(a, b)) fail(`camera: step ${k} by seekStep is ${show(a)}, by its tab ${show(b)}`);
+      }
+      // play through every move of the camera (into each step, and each voice-led shot) and compare
+      // the camera at each moment with the camera a seek to the same time gives
+      const moves = cam.tracks.flatMap((t) => t.moves);
+      const seen = [];
+      for (const mv of moves) {
+        await p.evaluate((ms) => window.__viz.seek(ms), Math.max(0, mv.t0 - 0.25) * 1000);
+        await p.evaluate(() => document.getElementById("play").click());
+        const end = Date.now() + (mv.d + 0.6) * 1000;
+        while (Date.now() < end) {
+          seen.push(await p.evaluate(() => {
+            const c = window.__viz.camera();
+            return { T: c.T, m: c.m, running: c.running };
+          }));
+          await wait(70);
+        }
+        await p.evaluate(() => window.__viz.state().running && document.getElementById("play").click());
+      }
+      let checked = 0;
+      for (const s of seen.filter((s) => s.running)) {
+        const m = await p.evaluate((ms) => (window.__viz.seek(ms), window.__viz.camera().m), s.T * 1000);
+        checked++;
+        if (!near(m, s.m)) fail(`camera: at ${s.T.toFixed(3)} s, playing gives ${show(s.m)}, a seek ${show(m)}`);
+      }
+      if (!checked) fail("camera: playing never ran, so play and seek could not be compared");
+      console.log(`camera determinism: ${cam.tracks.length - 1} steps by seekStep and by tab, ${checked} moments while playing through ${moves.length} moves against a seek to the same time`);
+
+      // Calm: through the whole story, frame by frame at 60 fps, the picture never moves faster than
+      // 2 clear-area short sides a second, and every shot it stops on is held at least 0.8 s.
+      const SPEED = 2.0, HOLD = 0.8;
+      for (const v of variants.length ? variants : [null]) {
+        if (v) await p.evaluate((v) => window.__viz.variant(v), v);
+        const c = await p.evaluate(() => window.__viz.camera());
+        const total = await p.evaluate(() => Number(document.getElementById("scrub").max));
+        const ms = await p.evaluate((total) => {
+          const out = [];
+          for (let t = 0; t <= total * 1000; t += 1000 / 60) {
+            window.__viz.seek(t);
+            out.push(window.__viz.camera().m);
+          }
+          return out;
+        }, total);
+        let fastest = { v: 0, t: 0 }, still = 0, stillFrom = 0, moving = false, holds = [];
+        for (let i = 1; i < ms.length; i++) {
+          const t = (i * 1000) / 60 / 1000, sp = moved(ms[i - 1], ms[i], c.clear) * 60;
+          if (sp > fastest.v) fastest = { v: sp, t };
+          if (sp > 1e-4) {
+            if (!moving && i > 1 && stillFrom > 0) holds.push({ from: stillFrom, d: still });
+            moving = true;
+            still = 0;
+          } else {
+            if (moving) (stillFrom = t), (moving = false);
+            still += 1 / 60;
+          }
+        }
+        const short = holds.filter((h) => h.d < HOLD - 1 / 60 - 1e-9);
+        console.log(`camera calm ${v ?? ""}: ${c.tracks.flatMap((t) => t.moves).length} moves, fastest ${fastest.v.toFixed(2)} short sides/s at ${fastest.t.toFixed(2)} s (limit ${SPEED}), shortest hold ${holds.length ? Math.min(...holds.map((h) => h.d)).toFixed(2) : "-"} s (at least ${HOLD})`);
+        if (fastest.v > SPEED) fail(`camera ${v}: at ${fastest.t.toFixed(2)} s the picture moves ${fastest.v.toFixed(2)} short sides a second, over ${SPEED}`);
+        for (const h of short) fail(`camera ${v}: the shot reached at ${h.from.toFixed(2)} s is held ${h.d.toFixed(2)} s, under ${HOLD}`);
+      }
+      if (variants.length) await p.evaluate((v) => window.__viz.variant(v), variants[0]);
+      // and the eased move a tab click makes, timed frame by frame in the page
+      let tabTop = 0;
+      for (let k = 1; k < cam.tracks.length; k++) {
+        await p.evaluate((k) => window.__viz.seekStep(k - 1), k);
+        const fr = await p.evaluate(
+          (k) =>
+            new Promise((done) => {
+              const out = [];
+              document.querySelectorAll(".vz-chapters button")[k - 1].click();
+              const t0 = performance.now();
+              const step = (now) => {
+                out.push({ t: now, m: window.__viz.camera().m });
+                if (now - t0 < 2500 && (window.__viz.camera().blending || now - t0 < 200)) requestAnimationFrame(step);
+                else done(out);
+              };
+              requestAnimationFrame(step);
+            }),
+          k,
+        );
+        let top = 0;
+        for (let i = 1; i < fr.length; i++) {
+          const dt = (fr[i].t - fr[i - 1].t) / 1000;
+          if (dt > 0.004) top = Math.max(top, moved(fr[i - 1].m, fr[i].m, cam.clear) / dt);
+        }
+        // a frame's clock is coarse, so a tenth over the limit is allowed here
+        if (top > SPEED * 1.1) fail(`camera: the move to step ${k} by its tab reaches ${top.toFixed(2)} short sides a second, over ${SPEED}`);
+        tabTop = Math.max(tabTop, top);
+      }
+      console.log(`camera calm by tab: the fastest of ${cam.tracks.length - 1} tab moves reaches ${tabTop.toFixed(2)} short sides/s`);
+      if (errors.length) fail(`camera: console errors: ${[...new Set(errors)].join(" | ")}`);
+    }
+    await p.close();
+  }
   // Playback: every frame of the story, for every variant, at 1440 x 900.
-  {
+  if (!ONLY_CAMERA) {
     // The machine: the same kind of work as a frame of the rig (set a transform on a few hundred <g>
     // holding a <use>, read the layout), timed here, in a blank page of the same browser and size.
     const cal = await browser.newPage();
