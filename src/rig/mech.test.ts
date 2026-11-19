@@ -78,6 +78,18 @@ const onMesh = (m: Mesh, p: V3, tol = 1e-6): boolean => m.faces.some((f) => {
   };
   return inside(outer) && f.loops.slice(1).every((h) => !inside(h));
 });
+test("mech: the on-the-part check refuses points off the part (planted faults)", () => {
+  const w = spokedWheel(60, 12, 0.8);
+  const on = (p: V3) => w.pieces.some((pc) => onMesh(pc.mesh, p));
+  assert.ok(on(w.anchors.top!) && on(w.anchors.pitch!));
+  const t = w.anchors.top!;
+  assert.ok(!on([t[0], t[1], t[2] + 5]), "lifted off the part");
+  assert.ok(!on([8.6 * Math.cos(Math.PI / 5), 8.6 * Math.sin(Math.PI / 5), 0.8]), "in a spoke window, level with the top");
+  assert.ok(!on([0, 13.5, 0.8]), "between two teeth, beyond the root");
+  const b = bridge({ outline: [[-8, -5], [8, -5], [8, 5], [-8, 5]] }, 2, { screwHoles: [[4, 0]], fill: false });
+  assert.ok(!b.pieces.some((pc) => onMesh(pc.mesh, [4, 0, 2])), "in an empty hole's mouth");
+});
+
 const checkAnchors = (name: string, p: MechPart) => {
   const names = Object.keys(p.anchors);
   assert.ok(names.length > 0, `${name} names its anchors`);
@@ -97,6 +109,7 @@ const pointIn = (loop: readonly P2[], x: number, y: number) => {
 const PARTS: [string, () => MechPart][] = [
   ["spokedWheel clock", () => spokedWheel(60, 12, 0.8, { at: [3, -2, 1], rot: 0.3 })],
   ["spokedWheel involute, solid web", () => spokedWheel(24, 6, 2, { form: "involute", spokes: 0 })],
+  ["spokedWheel, fine module (default spokes fit any size)", () => spokedWheel(130, 4, 0.4)],
   ["spokedWheel on a tilted axis, no collet", () => spokedWheel(40, 10, 1, { axis: [1, 1, 0.3], colletR: 0, spokes: 4 })],
   ["pinion clock", () => pinion(10, 2, 1.6, { at: [1, 1, 0] })],
   ["pinion involute", () => pinion(12, 3, 2, { form: "involute", axis: [0, 1, 0] })],
@@ -173,8 +186,9 @@ for (const form of ["clock", "involute"] as const) {
 
 test("mech: the readability rule refuses a wheel too dense for its size on screen", () => {
   assert.equal(readableTeeth(10, 3, 6), Math.floor((2 * Math.PI * 10 * 3) / 6));
+  assert.equal(readableTeeth(10, 3), Math.floor((2 * Math.PI * 10 * 3) / 8), "8 px by default");
   assert.throws(() => spokedWheel(80, 4, 0.5, { pxPerUnit: 8 }), RangeError);
-  assert.doesNotThrow(() => spokedWheel(30, 4, 0.5, { pxPerUnit: 8 }));
+  assert.doesNotThrow(() => spokedWheel(24, 4, 0.5, { pxPerUnit: 8 }));
   assert.throws(() => pinion(14, 1, 1, { pxPerUnit: 4 }), RangeError);
   assert.equal(moduleOf(60, 12), 0.4);
 });

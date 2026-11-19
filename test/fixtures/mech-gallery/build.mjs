@@ -101,6 +101,21 @@ const pxNote = (R, teeth) => (cam) => `${teeth} teeth · ${(2 * Math.PI * R * ca
 
 cell("spokedWheel · clock", pxNote(12, 60), [spokedWheel(60, 12, 0.8)]);
 cell("spokedWheel · involute, solid web", pxNote(6, 24), [spokedWheel(24, 6, 1.0, { form: "involute", spokes: 0, material: "steel" })]);
+{
+  // the readability rule, tested by eye: a small wheel at the limit, and one at 1.5× the limit
+  const R = 4, probe = spokedWheel(24, R, 0.4);
+  const both = [shifted(probe, [0, -5.5, 0]), shifted(probe, [0, 5.5, 0])];
+  cell("readableTeeth · at the limit, and 1.5× over", (cam) => `left ${readableTeeth(R, cam.scale)} teeth (8 px pitch) · right ${Math.round(1.5 * readableTeeth(R, cam.scale))}`, [], {
+    points: partPoints(...both),
+    draw: (cam) => {
+      const n = readableTeeth(R, cam.scale);
+      return drawAssembly([
+        spokedWheel(n, R, 0.4, { at: [0, -5.5, 0], pxPerUnit: cam.scale }),
+        spokedWheel(Math.round(1.5 * n), R, 0.4, { at: [0, 5.5, 0] }),
+      ], cam, { shadow: true });
+    },
+  });
+}
 cell("pinion on its arbor", "10 leaves, clock form", [pinion(10, 2, 1.8, { at: [0, 0, 1.6] }), arbor(0.42, 6, { inside: [[1.6, 3.4]] })]);
 {
   const s = [{ driver: { teeth: 40, pitchR: 8 }, driven: { teeth: 10, pitchR: 2 }, angle: 0.3 }];
@@ -182,9 +197,9 @@ if (shootDir) {
     await page.setViewport({ width: 980, height: fullH, deviceScaleFactor: 3 });
     for (const theme of ["light", "dark"]) {
       const figs = await page.$$(`section[data-theme="${theme}"] figure`);
-      const pick = { wheel: 0, involute: 1, pinion: 2, pair: 3, bridge: 4, jewel: 5, screw: 6, shell: 7, spring: 8, exploded: 9, assembled: 10 };
+      const pick = { wheel: 0, involute: 1, readable: 2, pinion: 3, pair: 4, bridge: 5, jewel: 6, screw: 7, shell: 8, spring: 9, exploded: 10, assembled: 11 };
       for (const [name, i] of Object.entries(pick)) {
-        if (theme === "dark" && !["exploded", "wheel", "shell"].includes(name)) continue;
+        if (theme === "dark" && !["exploded", "wheel", "shell", "readable"].includes(name)) continue;
         await figs[i].screenshot({ path: join(shootDir, `mech-${theme}-3x-${name}.png`) });
       }
     }

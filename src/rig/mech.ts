@@ -33,8 +33,8 @@ export interface Piece {
   stage?: -1 | 0 | 1;
   /** lay a contact shadow under it when the assembly asks for shadows */
   shadow?: boolean;
-  /** draw face by face, each with its own edges (`drawOrdered`): for toothed and holed plates,
-   *  whose hidden edges drawMesh would lay over their own top */
+  /** false: draw with drawMesh (one path per shade, every line last; lighter, but hidden edges
+   *  show through the part's own top). Default: face by face with `drawOrdered` */
   ordered?: boolean;
   /** lines drawn on one of its flat faces (section hatching), shown only while that face is seen */
   marks?: { segs: [V3, V3][]; normal: V3; cls?: string }[];
@@ -154,11 +154,12 @@ export function tipRadius(teeth: number, pitchR: number, o: ProfileOptions = {})
 
 /**
  * The readability rule: at `pxPerUnit` screen pixels per world unit, a gear of pitch radius
- * `pitchR` shows at most this many teeth with a tooth pitch of at least `minPitchPx` (6 px: a
- * tooth and a gap of 3 px each, the least that reads as teeth rather than a grey fringe at 1×).
+ * `pitchR` shows at most this many teeth with a tooth pitch of at least `minPitchPx` (8 px: a
+ * tooth and a gap of 4 px each; at 6 px a wheel seen at 30° already turns to a grey fringe where
+ * the ellipse squeezes its sides, as the mech gallery shows).
  * Choose the module for the whole train from the smallest wheel, so mating gears stay legal.
  */
-export function readableTeeth(pitchR: number, pxPerUnit: number, minPitchPx = 6): number {
+export function readableTeeth(pitchR: number, pxPerUnit: number, minPitchPx = 8): number {
   positive(pitchR, "pitchR");
   positive(pxPerUnit, "pxPerUnit");
   positive(minPitchPx, "minPitchPx");
@@ -329,7 +330,7 @@ export function spokedWheel(teeth: number, pitchR: number, thickness: number, o:
   if (colR > 0) holes.push(circlePoints(boreR, 20));
   if (spokes > 0) {
     need(room > 2 * m, `no room for spokes between hub ${hubR} and rim ${rimIn.toFixed(3)}: use spokes: 0`);
-    const hw = Math.min(0.06 * pitchR + 0.35 * m, 0.45 * hubR); // half the spoke's width, even along it
+    const hw = Math.min(0.06 * pitchR + 0.35 * m, 0.3 * hubR); // half the spoke's width, even along it (≤ 0.3 hub: five spokes always fit)
     const seg = TAU / spokes;
     need(2 * Math.asin(hw / hubR) < seg * 0.6, `${spokes} spokes are too many for this hub`);
     const fr = Math.min(0.35 * hw + 0.25 * m, 0.2 * room);
@@ -1075,7 +1076,7 @@ export function drawAssembly(parts: readonly MechPart[], cam: Camera, o: Assembl
     for (const k of key) if (k.p.shadow) out += contactShadow(k.p.mesh, cam, away);
   }
   for (const k of key) {
-    out += k.p.ordered ? drawOrdered(k.p.mesh, cam, k.p.look) : drawMesh(k.p.mesh, cam, k.p.look);
+    out += k.p.ordered !== false ? drawOrdered(k.p.mesh, cam, k.p.look) : drawMesh(k.p.mesh, cam, k.p.look);
     for (const mk of k.p.marks ?? []) if (dot(mk.normal, ax.toward) > 1e-6) out += `<g class="rig-solid rig-m-${k.p.look.material}">${linesOn(cam, mk.segs, mk.cls ?? "rig-crease")}</g>`;
   }
   return out;
