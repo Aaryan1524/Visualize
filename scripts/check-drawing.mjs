@@ -212,7 +212,7 @@ try {
       const fns = ["seekStep", "seek", "state", "variant", "answer", "practice", "question", "lab", "labInputs", "closeLab"];
       return {
         missingFns: v ? fns.filter((f) => typeof v[f] !== "function") : fns,
-        steps: v?.steps, pred: v?.predictStep, variants: v?.variants,
+        steps: v?.steps, pred: v?.predictStep, preds: v?.predictSteps ?? [v?.predictStep], variants: v?.variants,
         ids: ["scrub", "play", "voice", "try", "labBtn", "lab", "predict"].filter((id) => !document.getElementById(id)),
         voice: document.documentElement.innerHTML.includes("audio/"),
       };
@@ -240,9 +240,11 @@ try {
     const afterKey = await p.evaluate(() => window.__viz.state().step);
     if (afterKey !== 1) fail(`${at}: on a fresh page the right arrow did not reach step 1 (it is on ${afterKey})`);
 
-    const { steps, pred } = contract;
+    const { steps, pred, preds } = contract;
     const variants = contract.variants ?? (await p.evaluate(() => [...document.querySelectorAll(".vz-whatif button")].map((b) => b.dataset.variant)));
-    if (!(pred >= 1 && pred < steps - 1)) fail(`${at}: the prediction step (${pred}) must sit before the step that answers it`);
+    for (const q of preds) if (!(q >= 1 && q < steps - 1)) fail(`${at}: the prediction step (${q}) must sit before the step that answers it`);
+    // A deep page (12 steps or more) asks again in every chapter; one question for a long story leaves most of it untested.
+    if (steps - 1 >= 12 && preds.length < Math.floor((steps - 1) / 8)) fail(`${at}: ${steps - 1} steps with ${preds.length} prediction(s); a long page asks one a chapter (at least one every 8 steps)`);
     if (variants.length < 2) fail(`${at}: What if needs at least two real variants, found ${variants.length}`);
 
     // Every step of every variant.
@@ -262,21 +264,23 @@ try {
         for (const f of await p.evaluate(litOutOfView)) fail(`${s}: ${f}; frame it (the step's shot or subject), or light less`);
       }
       if (!has("answer") || !has("labInputs") || !has("lab")) continue;
-      // The prediction, answered, on the step that reveals it.
-      await p.evaluate((pred) => {
-        window.__viz.seekStep(pred);
-        window.__viz.answer(0);
-        window.__viz.seekStep(pred + 1);
-      }, pred);
-      await wait(120);
-      const r = await p.evaluate(measure);
-      const reveal = await p.evaluate(() => {
-        const c = document.getElementById("predict");
-        return !c.hidden && /^(Right|Not quite)\./.test(c.querySelector(".vz-predict-feedback")?.textContent ?? "");
-      });
-      if (!reveal) fail(`${at} ${v}: the answered prediction is not revealed with its explanation on step ${pred + 1}`);
-      judge(`${at} ${v} answered prediction`, r);
-      await p.evaluate(() => window.__viz.answer(null));
+      // Every prediction, answered, on the step that reveals it.
+      for (const q of preds) {
+        await p.evaluate((q) => {
+          window.__viz.seekStep(q);
+          window.__viz.answer(0, q);
+          window.__viz.seekStep(q + 1);
+        }, q);
+        await wait(120);
+        const r = await p.evaluate(measure);
+        const reveal = await p.evaluate(() => {
+          const c = document.getElementById("predict");
+          return !c.hidden && /^(Right|Not quite)\./.test(c.querySelector(".vz-predict-feedback")?.textContent ?? "");
+        });
+        if (!reveal) fail(`${at} ${v}: the answered prediction is not revealed with its explanation on step ${q + 1}`);
+        judge(`${at} ${v} answered prediction${preds.length > 1 ? ` ${q}` : ""}`, r);
+        await p.evaluate((q) => window.__viz.answer(null, q), q);
+      }
 
       // The lab, every input at its minimum and at its maximum (a typed input: each of its samples, and
       // an empty entry, which must still get a verdict).

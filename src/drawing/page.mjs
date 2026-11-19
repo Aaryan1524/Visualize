@@ -72,6 +72,22 @@ function labPanel(lab) {
  *                                optionally lab: { button, title, heading, intro, inputs: [{ id, label, min, max, step, value, format }] }
  */
 /** Run the correctness audit over everything the page says. */
+/**
+ * The header's tabs. A page whose steps name a `chapter` (a deep page) gets one tab a chapter,
+ * spanning its steps; any other page, one tab a step. Step 0 (the concept) has no tab.
+ */
+export function tabsOf(steps) {
+  if (!steps.slice(1).some((s) => s.chapter)) return steps.slice(1).map((s, i) => ({ label: s.tab, first: i + 1, last: i + 1 }));
+  const out = [];
+  steps.forEach((s, k) => {
+    if (k === 0) return;
+    const name = s.chapter ?? out.at(-1)?.label ?? s.tab;
+    if (out.at(-1)?.label === name) out.at(-1).last = k;
+    else out.push({ label: name, first: k, last: k });
+  });
+  return out;
+}
+
 export function auditPage(o) {
   const strip = (h) => String(h).replace(/<[^>]+>/g, " ");
   const texts = [
@@ -116,7 +132,7 @@ ${o.css}</style>
   <header class="vz-head">
     <div class="vz-heading"><h1 class="vz-title">${esc(o.title)}</h1><p class="vz-about">${esc(o.about)}</p></div>
     <nav class="vz-chapters" aria-label="Chapters">
-${o.steps.slice(1).map((s, i) => `      <button type="button"><span>${String(i + 1).padStart(2, "0")}</span> ${esc(s.tab)}</button>`).join("\n")}
+${tabsOf(o.steps).map((t, i) => `      <button type="button" data-first="${t.first}" data-last="${t.last}"><span>${String(i + 1).padStart(2, "0")}</span> ${esc(t.label)}</button>`).join("\n")}
     </nav>
     <div class="vz-utilities"><button class="vz-info" type="button" data-details aria-haspopup="dialog" aria-controls="details">Details</button><button class="vz-theme" id="theme" type="button">Dark</button></div>
   </header>

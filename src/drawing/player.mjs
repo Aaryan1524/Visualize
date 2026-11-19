@@ -41,11 +41,15 @@ export function player(DATA, machine, kit) {
   const fx = (v) => v.toFixed(1);
   const pad2 = (n) => String(n).padStart(2, "0");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const STEPS = DATA.steps, LAST = STEPS.length - 1, PRED = DATA.predict.step;
+  const STEPS = DATA.steps, LAST = STEPS.length - 1;
+  // One prediction, or (a deep page) one per chapter: each asked on its step and revealed on the next.
+  const PREDS = (Array.isArray(DATA.predict) ? DATA.predict : [DATA.predict]).slice().sort((a, b) => a.step - b.step);
+  const PRED = PREDS[0].step;
+  const predOn = (k) => PREDS.find((p) => p.step === k) ?? null;
   // The camera's own data (DATA.camera: names it may light, and each step's parts to keep in view) is
   // not reader text, so it stays out of the audit's stamp.
   const ALIAS = { ...(DATA.alias || {}), ...(DATA.camera?.alias || {}) }, AROUND = DATA.camera?.around || {}, SUBJECT = DATA.camera?.subject || {};
-  const S = { variant: null, step: -1, T: 0, pinPose: true, state: null, running: false, touring: false, voiceOn: true, armed: false, answer: null, last: 0, lit: [], heard: -1 };
+  const S = { variant: null, step: -1, T: 0, pinPose: true, state: null, running: false, touring: false, voiceOn: true, armed: false, answers: {}, last: 0, lit: [], heard: -1 };
   let V = null, E = null;
 
   // ------------------------------------------------ one drawing per variant
@@ -299,7 +303,8 @@ export function player(DATA, machine, kit) {
     root.toggleAttribute("data-opening", k === 0);
     heading.textContent = headOf(k);
     count.textContent = `${pad2(k)} / ${pad2(LAST)}`;
-    tabs.forEach((t, i) => (i + 1 === k ? t.setAttribute("aria-current", "step") : t.removeAttribute("aria-current")));
+    tabs.forEach((t) => (k >= Number(t.dataset.first) && k <= Number(t.dataset.last) ? t.setAttribute("aria-current", "step") : t.removeAttribute("aria-current")));
+    saveResume(k);
     for (const g of E.beats) g.style.display = g.dataset.beats.split(" ").includes(String(k)) ? "" : "none";
     for (const g of E.details) {
       const full = g.dataset.full.split(" ").includes(String(k)), dim = g.dataset.dim.split(" ").includes(String(k));
@@ -338,7 +343,8 @@ export function player(DATA, machine, kit) {
     draw();
     if (how.speak !== false) speakNav(k);
   }
-  const unanswered = () => S.step === PRED && S.answer === null;
+  const answered = (k) => S.answers[k] !== undefined;
+  const unanswered = () => !!predOn(S.step) && !answered(S.step);
 
   // ------------------------------------------------ time
   let stillTimer = 0;
@@ -373,8 +379,10 @@ export function player(DATA, machine, kit) {
       S.T += dt;
       const k = segOf(S.T);
       // The prediction holds the story: stop where the answer would begin.
-      if (S.step <= PRED && k > PRED && S.answer === null) {
-        S.T = SEG.s[PRED + 1] - 1e-3;
+      // The first unanswered prediction at or after this step holds the story there.
+      const held = PREDS.find((p) => p.step >= S.step && p.step < k && !answered(p.step));
+      if (held) {
+        S.T = SEG.s[held.step + 1] - 1e-3;
         draw();
         return stop(true);
       }
@@ -467,7 +475,7 @@ export function player(DATA, machine, kit) {
     tourTimer = setTimeout(() => {
       const ok = playClip(k, () => {
         if (!S.touring) return;
-        if (k === PRED && S.answer === null) return stop(true);
+        if (predOn(k) && !answered(k)) return stop(true);
         tourTimer = setTimeout(() => (k < LAST ? tourAt(k + 1) : stopTour(true)), GAP * 1000);
       });
       if (!ok) tourTimer = setTimeout(() => (k < LAST && S.touring ? tourAt(k + 1) : stopTour(true)), PLAIN * 1000);
@@ -519,10 +527,10 @@ export function player(DATA, machine, kit) {
   $("restart").addEventListener("click", () => {
     if (labOpen) closeLab();
     stop(false);
-    S.answer = null;
+    S.answers = {};
     goTo(0, { speak: false });
   });
-  tabs.forEach((t, i) => t.addEventListener("click", () => nav(i + 1)));
+  tabs.forEach((t) => t.addEventListener("click", () => nav(Number(t.dataset.first))));
   scrub.addEventListener("input", () => {
     if (labOpen) closeLab();
     S.armed = true;
@@ -536,19 +544,22 @@ export function player(DATA, machine, kit) {
   });
 
   // ------------------------------------------------ predict, just before the causal moment
-  const PR = DATA.predict;
-  const answerOf = () => (typeof PR.answer === "number" ? PR.answer : PR.answer[S.variant]);
+  const pick = (v) => (v !== null && typeof v === "object" && !Array.isArray(v) ? v[S.variant] : v);
   function showPredict() {
     const k = S.step;
-    const show = !practiceOpen && !labOpen && (k === PRED || (k === PRED + 1 && S.answer !== null));
+    // The card for this step's prediction, or the reveal of the one asked on the step before.
+    const asked = predOn(k), revealed = !asked && predOn(k - 1) && answered(k - 1) ? predOn(k - 1) : null;
+    const PR = asked ?? revealed;
+    const show = !practiceOpen && !labOpen && !!PR;
     predict.hidden = !show;
     concept.hidden = !(k === 0 && !practiceOpen && !labOpen);
     syncCards();
     if (!show) return;
-    const reveal = k === PRED + 1;
+    const reveal = !!revealed, at = PR.step, mine = S.answers[at] ?? null;
+    const answerOf = () => pick(PR.answer);
     predict.replaceChildren();
     const kicker = Object.assign(document.createElement("span"), { className: "vz-predict-kicker", textContent: reveal ? "Your prediction" : "Predict" });
-    const q = Object.assign(document.createElement("p"), { textContent: typeof PR.question === "string" ? PR.question : PR.question[S.variant] });
+    const q = Object.assign(document.createElement("p"), { textContent: pick(PR.question) });
     const opts = Object.assign(document.createElement("div"), { className: "vz-predict-options" });
     const fb = Object.assign(document.createElement("p"), { className: "vz-predict-feedback" });
     fb.setAttribute("aria-live", "polite");
@@ -556,20 +567,19 @@ export function player(DATA, machine, kit) {
       const b = document.createElement("button");
       b.type = "button";
       b.textContent = c;
-      b.setAttribute("aria-pressed", String(S.answer === i));
+      b.setAttribute("aria-pressed", String(mine === i));
       if (reveal) b.dataset.correct = String(i === answerOf());
       b.addEventListener("click", () => {
         if (reveal) return;
-        S.answer = i;
+        S.answers[at] = i;
         S.armed = true;
         for (const o of opts.children) o.setAttribute("aria-pressed", String(o === b));
         fb.textContent = PR.locked;
       });
       opts.append(b);
     });
-    const explanation = typeof PR.explanation === "string" ? PR.explanation : PR.explanation[S.variant];
-    if (reveal) fb.textContent = (S.answer === answerOf() ? "Right. " : "Not quite. ") + explanation;
-    else if (S.answer !== null) fb.textContent = PR.locked;
+    if (reveal) fb.textContent = (mine === answerOf() ? "Right. " : "Not quite. ") + pick(PR.explanation);
+    else if (mine !== null) fb.textContent = PR.locked;
     predict.append(kicker, q, opts, fb);
   }
   // A card sits over the title block's corner; while one is up, the title block steps aside.
@@ -758,17 +768,44 @@ export function player(DATA, machine, kit) {
     e.preventDefault();
   });
 
+  // ------------------------------------------------ resume: a long page remembers where the reader stopped
+  // Kept in this browser only. A link with #step= always wins; the concept step offers the way back.
+  const RESUME = `vz:resume:${document.title}`;
+  function saveResume(k) {
+    try {
+      if (k > 0) localStorage.setItem(RESUME, String(k));
+    } catch {
+      /* storage blocked */
+    }
+  }
+  function resumeStep() {
+    try {
+      const k = Number(localStorage.getItem(RESUME));
+      return Number.isInteger(k) && k > 0 && k <= LAST ? k : 0;
+    } catch {
+      return 0;
+    }
+  }
+
   // ------------------------------------------------ start
   const hash = new URLSearchParams(location.hash.slice(1));
   const what = DATA.variants[hash.get("what")] ? hash.get("what") : DATA.base;
   const first = Math.max(0, Math.min(LAST, Number(hash.get("step") ?? 0) || 0));
+  const back = !hash.has("step") && LAST >= 12 ? resumeStep() : 0;
   mount(what);
   goTo(first, { pose: true, speak: false });
+  if (back) {
+    // Only long pages offer it: a short page is quicker to replay than to resume.
+    const b = Object.assign(document.createElement("button"), { type: "button", className: "vz-resume", textContent: `Resume at step ${back}` });
+    b.addEventListener("click", () => { b.remove(); nav(back); });
+    concept.append(b);
+  }
   setRunning(false);
   window.__viz = {
     setTheme: (th) => applyTheme(th),
     steps: LAST + 1,
     predictStep: PRED,
+    predictSteps: PREDS.map((p) => p.step),
     seekStep(k) {
       root.classList.add("instant");
       C.instant = true;
@@ -809,8 +846,10 @@ export function player(DATA, machine, kit) {
       document.querySelector(`.vz-whatif button[data-variant="${name}"]`)?.click();
     },
     variants: Object.keys(DATA.variants),
-    answer(i) {
-      S.answer = i;
+    answer(i, step) {
+      const at = step ?? (predOn(S.step) ? S.step : PRED);
+      if (i === null || i === undefined) delete S.answers[at];
+      else S.answers[at] = i;
       showPredict();
     },
     practice(n) {
@@ -833,6 +872,6 @@ export function player(DATA, machine, kit) {
     labInputs: () => DATA.lab?.inputs ?? [],
     audit: DATA.audit ?? null,
     closeLab: () => labOpen && closeLab(),
-    state: () => ({ step: S.step, ...(machine.info?.(S.state) ?? {}), ...(labOpen ? { lab: true } : {}), running: S.running, touring: S.touring, voiceOn: S.voiceOn, answer: S.answer, variant: S.variant, lit: S.lit.slice() }),
+    state: () => ({ step: S.step, ...(machine.info?.(S.state) ?? {}), ...(labOpen ? { lab: true } : {}), running: S.running, touring: S.touring, voiceOn: S.voiceOn, answer: S.answers[PRED] ?? null, answers: { ...S.answers }, variant: S.variant, lit: S.lit.slice() }),
   };
 }

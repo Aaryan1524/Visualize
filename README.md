@@ -175,6 +175,14 @@ You don't have to name the skill. It also loads when you ask for an algorithm, d
 
 </details>
 
+Want the long version? Add `--deep`, or just ask for it in words ("in depth", "deep dive"):
+
+```text
+/visualize --deep explain multi-agent orchestration
+```
+
+A deep explanation is 4–6 chapters, about 10–15 minutes: the core idea, then how it fails, the trade-offs, the variants used in practice and the edge cases. Each chapter has its own prediction, the header shows one tab a chapter, and the page remembers where you stopped. Every step is still checked against the model.
+
 Three habits get the best pages:
 
 1. **Give the real numbers.** Capacities, rates, sizes and inputs. The model runs on them, and the reader sees them.

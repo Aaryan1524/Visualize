@@ -60,7 +60,7 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask o
 | **What to contrast with** **ask** when "versus what?" is ambiguous | The naive alternative the concept fixes, as a step or a What if | A contrast makes the mechanism visible |
 | Representation | The shape the field draws (write the one line), built from rig parts | A reader recognises the shape they were taught |
 | Pointers and indices | A `markerDrawing` standing on its slot; indices printed on the board in front of each cell | A pointer on a separate lane read as being on the wrong slot |
-| Size | 5–9 steps after the concept. Narration of about 3 minutes at most; a short concept can be one minute. Larger: refuse and propose a split | Past that, readers lose the thread |
+| Size | **Standard** (the default): 5–9 steps after the concept, narration of about 3 minutes at most; a short concept can be one minute. **Deep**, only when the request has `--deep` or asks for it in words ("in depth", "deep dive", "everything about", "thoroughly"): see *Deep explanations* below. Larger than deep: propose a short series of linked pages | Past 9 steps a single story loses the reader; the reader who asks for depth gets it in chapters, each a lesson of its own |
 | Depth | **The problem first:** step 0, the concept (no tab), says what the idea must achieve and what makes it hard, before anything moves; a topic it teaches is placed at `"step:0"`. **The second idea:** one step for what the field teaches right after the core (picking for a lock; the deletion trap and counting filters for a Bloom filter). **Hands-on:** every page has a lab (`DATA.lab`), where the reader sets a number or types a word or key and the model answers | In blind evals a plain agent beat the skill on depth by doing exactly these three |
 | Number of systems | One; a contrast goes in What if (the same story with one input changed) or in one step | Two figures halve the size of everything |
 | Prediction | Exactly one, asked on `PRED_STEP` about what the next step shows, the step before the causal moment | Predicting forces the reader to hold the rule; asked on the step itself, the heading gives it away |
@@ -72,6 +72,17 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask o
 | Letters | Text on a face is printed on it (a decal), never floated above it | Floating labels read as detached from what they name |
 | Theme | Light on every system by default; the reader switches with the Dark button or a `#theme=dark` link. Review light first, then dark; both are checked | The builder found dark ugly as a first impression; a value that reads in one theme can vanish in the other |
 | Where files go | In the user's project: the page's folder (model, figure, story, build, voice, tests), the built page in its public folder, shots beside the folder | Keeps the skill folder clean |
+
+## Deep explanations (`--deep`)
+
+Off by default. Turn it on only when the request says `--deep` or asks in words for depth ("in depth", "deep dive", "explain everything about", "thoroughly"); never because a topic seems big. Then:
+
+- **Chapters, each a lesson.** 4 to 6 chapters of 3 to 6 steps: the core idea, then what the field teaches next, typically how it fails (a crash, a slow part, a bad input), the trade-offs (when more of something stops helping, with the number where it turns), the variants used in practice, and the edge cases. Give every step after the concept a `chapter` name; the header shows one tab a chapter.
+- **A prediction in every chapter.** `DATA.predict` is a list, one entry a chapter, each asked on the step before its causal moment and revealed on the next. `check-drawing` fails a page of 12 steps or more with fewer than one prediction every 8 steps.
+- **Practice and What if across the chapters.** Now you try draws questions from every chapter, and What if covers the input each chapter turns on.
+- **Length.** 15 to 30 steps and about 10 to 15 minutes of narration. Step 0 still explains the concept in two or three sentences before anything moves; each chapter's first step says in one sentence what this chapter adds. Past about 6 chapters, make a series: one page a part, each linking to the next.
+- **The same checks on every step.** Depth never relaxes a check: every number still comes from the model, every claim is audited and reviewed, every step is framed.
+- **Long pages remember where the reader stopped.** A page of 12 steps or more offers "Resume at step k" on its opening (kept in the reader's browser only).
 
 ## Correctness: what the page says is checked too
 

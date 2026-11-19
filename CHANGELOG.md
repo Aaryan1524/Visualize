@@ -4,6 +4,8 @@ One version covers the kit and the skill (`package.json` `version` and `SKILL.md
 
 ## Unreleased
 
+- **Deep explanations, on request.** A reader who asks with `--deep` (or "in depth", "deep dive") gets 4–6 chapters and about 10–15 minutes instead of one short story. The header shows one tab a chapter (`chapter` on each step), `DATA.predict` may be a list with one prediction a chapter (play and the tour stop at each, each answer kept and revealed on its own), and a page of 12 steps or more offers "Resume at step k". `check-drawing` checks every prediction and fails a long page with fewer than one every 8 steps. Single-prediction pages are unchanged.
+
 - **Pages open light on every system.** They followed the reader's system theme, so a reader in dark mode met a black page first; the builder found it ugly. The Dark button switches, and a `#theme=dark` link opens dark. The checks set the theme on the page as a link does, so the dark checks still test dark (49 of 49 planted faults caught).
 - **Ready for contributors:** a contribution guide with the rules behind the checks, a code of conduct, a security policy, issue forms (a figure problem, a bug, a feature), a pull-request checklist, code owners and weekly dependency updates.
 - **The README opens with the rear derailleur playing**, and links the full narrated tour (MP4 with sound) on the release.

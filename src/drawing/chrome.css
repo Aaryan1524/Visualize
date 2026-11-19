@@ -108,3 +108,4 @@ body[data-theme="dark"]{background:#090909}body[data-theme="light"]{background:#
 .vz-lab .vz-lab-verdict{font-weight:600;margin:0 0 6px}
 .vz-lab-verdict[data-ok="true"]{color:var(--t-good)}.vz-lab-verdict[data-ok="false"]{color:var(--t-bad)}
 .vz-lab-rows{margin:0;padding:0;list-style:none;font:400 12px/1.6 var(--sans);color:var(--ink-2)}
+.vz-resume{display:block;margin-top:12px;appearance:none;border:1px solid var(--hair);background:var(--card);color:var(--ink);font:500 13px var(--sans);padding:7px 12px;border-radius:8px;cursor:pointer}.vz-resume:hover{border-color:var(--ink)}
