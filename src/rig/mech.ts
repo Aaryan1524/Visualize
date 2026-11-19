@@ -1017,7 +1017,7 @@ export function centreLines(cam: Camera, segs: readonly (readonly [V3, V3])[]): 
   if (!segs.length) return "";
   const ax = axesOf(cam.azimuth, cam.elevation);
   const d = segs.map(([a, b]) => pathThrough([screenOf(cam, a, ax), screenOf(cam, b, ax)], false)).join("");
-  return `<path class="mech-axis" style="fill:none;stroke:var(--rig-ink,var(--ink));stroke-width:.9px;stroke-opacity:.8;stroke-dasharray:9 3 2 3;stroke-linecap:butt;vector-effect:non-scaling-stroke" d="${d}"/>`;
+  return `<path class="rig-axis mech-axis" d="${d}"/>`;
 }
 
 // ---------------------------------------------------------------- moving and drawing

@@ -215,7 +215,7 @@ test("mech: explodedStack is assembled at 0 and pulls layers apart monotonically
       assert.ok(Math.abs(a[2] - (s.bases[0]! + 2)) < 1e-12 && Math.abs(b[2] - s.bases[1]!) < 1e-12, "a guide spans exactly the gap");
     }
   }
-  assert.match(centreLines(CAM, explodedStack(layers, 0.6).guides[1]!), /stroke-dasharray/);
+  assert.match(centreLines(CAM, explodedStack(layers, 0.6).guides[1]!), /class="rig-axis /);
 });
 
 // ---------------------------------------------------------------- bad input

@@ -128,8 +128,8 @@
 }
 .rig-face{stroke:none}
 .rig-sil,.rig-crease,.rig-shine{fill:none;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.rig-sil{stroke:var(--rig-line);stroke-width:var(--rig-sil-w)}
-.rig-crease{stroke:var(--rig-line);stroke-width:var(--rig-crease-w);stroke-opacity:.7}
+.rig-sil{stroke:var(--rig-line,color-mix(in oklab,var(--rig-ink,var(--ink)) calc(100% - var(--recede,0%)),var(--stage)));stroke-width:var(--rig-sil-w)}
+.rig-crease{stroke:var(--rig-line,color-mix(in oklab,var(--rig-ink,var(--ink)) calc(100% - var(--recede,0%)),var(--stage)));stroke-width:var(--rig-crease-w);stroke-opacity:.7}
 .rig-shine{stroke:var(--rig-shine);stroke-width:var(--rig-shine-w);stroke-opacity:calc(.85 - var(--recede) / 100%)}
 .rig-contact{fill:var(--rig-contact);fill-opacity:.16;stroke:var(--rig-contact);stroke-opacity:.07;stroke-width:6px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 .rig-part[data-recede]{--recede:42%}
@@ -170,3 +170,6 @@
 .lens-cap-line{fill:none;stroke:var(--t-bad);stroke-width:1.4px;stroke-dasharray:5 4;vector-effect:non-scaling-stroke}
 .lens-cap-label{font:600 102px var(--mono);fill:var(--t-bad)}
 @media (prefers-reduced-motion:reduce){.rig-part{transition:none}}
+
+/* a centre line through an axle or screw in an exploded view (mech.ts centreLines): dash-dot, as a drawing marks an axis */
+.rig-axis{fill:none;stroke:color-mix(in oklab,var(--rig-ink,var(--ink)) calc(100% - var(--recede,0%)),var(--stage));stroke-width:.9px;stroke-opacity:.8;stroke-dasharray:9 3 2 3;stroke-linecap:butt;vector-effect:non-scaling-stroke}
