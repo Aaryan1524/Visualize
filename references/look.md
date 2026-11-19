@@ -20,7 +20,7 @@ Pick the material the real part is made of. If the subject is abstract, pick the
 | `slate` | painted or anodized bodies: knuckles, housings | blue-grey, a body colour that isn't the signal |
 | `frame` | context the subject is mounted on: bike frame, mainplate, deck | neutral and recessive, but still with a real top-to-side step |
 | `brass` / `gilt` | watch train wheels, barrels, gilt plates | warm gold, the honest material of a movement |
-| `ruby` | jewels, pallet stones | deep, saturated red that reads as a stone, never a pink sticker |
+| `ruby` | jewels, pallet stones | deep, saturated red (`#ec4f74` to `#6e0a24`) that reads as a cut stone, not a pink sticker |
 | `blued` | heat-blued screws and hands | the real finish; use it sparingly, as an accent |
 | `rhodium` | rhodium-plated bridges and plates | a cooler, brighter silver than `alloy` |
 | `graphite` | dark coated parts, rubber, carbon | darker than `chain`, with a visible lit side |
@@ -35,7 +35,7 @@ Pick the material the real part is made of. If the subject is abstract, pick the
 - **The lit end stays off the stage white.** Metal lit ends sit at L ≤ 0.98 (steel is at 0.92), and `frame` at 0.93. Only `card` is pure white, because it carries printed values. *Why:* if a top face matches the ground, only its outline separates it, which is the cream-on-cream failure.
 - **Dark mode keeps the same step.** Lift the lit end and keep the dark end near the stage. Don't invert the materials.
 - **Don't force caps lighter than walls.** Use `rig-cap` and `rig-wall` to measure faces, not to reshade them. *Why:* a side-on figure such as the derailleur has caps that face away from the light, and its walls are correctly the lighter faces.
-- **Measure it.** Read `getComputedStyle(face).fill` for `.rig-cap` and `.rig-wall` faces and convert to OKLab L. A material whose median cap and median wall differ by less than 0.08 needs a wider pair.
+- **Measure it.** Read `getComputedStyle(face).fill` for the `.rig-cap` and `.rig-wall` faces, convert each fill to OKLab L, and take the median per material. On a top-down or three-quarter view, a large flat part needs its cap and wall medians at least 0.08 apart (the watch steel is 0.26, the brass 0.19, the frame 0.09). Small domed or turned parts such as jewels, and side-on views where the gap is correctly negative, are exempt. For those, judge the pair by its span instead.
 
 ## Receding and shadows
 
