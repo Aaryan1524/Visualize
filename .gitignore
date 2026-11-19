@@ -3,3 +3,20 @@ dist/
 shots/
 *.log
 .DS_Store
+
+# Local working material: kept on disk for building and testing, never published.
+# Planning, research and handover notes
+Plan.md
+ARCHITECTURE.md
+HANDOVER.md
+research/
+# Development-only review tools
+scripts/probe-anatomy.mjs
+scripts/review-rail.mjs
+scripts/review-standard.mjs
+# Skill-building workspace, evals, agent worktrees and scratch scenes
+.skill-forge/
+.claude/
+test/escalator/
+.brooks-lint-history.json
+*.audit.json

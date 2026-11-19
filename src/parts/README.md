@@ -40,9 +40,6 @@ Use `presentation: "editorial"` for the desktop figure shell and shared material
 ```sh
 node scripts/build.mjs test/fixtures/rail --out dist/rail
 node scripts/verify.mjs test/fixtures/rail --quick
-node scripts/review-rail.mjs
 ```
-
-The last command writes a local gallery, full desktop captures, 4× close-ups and a step/motion sheet to `shots/rail-review/`. It retains `before.html` if a previous checkpoint has been saved there. No files are uploaded.
 
 This is the first reusable assembly under visual review. It does not yet establish an approved general-purpose parts library, an installable skill, or standalone SVG/React exports.
