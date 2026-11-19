@@ -1,7 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { axesOf, nearness, fitCamera, insetCamera, screenOf, type Camera } from "./camera.ts";
-import { plate, planeOf, pointOn, circlePoints, rod, sprocket, turned, type Mesh } from "./shapes.ts";
+import {
+  arcOutline, chamferPlate, circlePoints, escapeWheelOutline, gearOutline, planeOf, plate, pointOn,
+  regularPolygon, rod, roundedRect, spiralPoints, spokedHoles, sprocket, tube, turned, type Mesh,
+} from "./shapes.ts";
+import {
+  agentBlade, budgetMetersSvg, conduitSvg, deckTier, ganttTraceSvg, hubChassis, inspectorFrame,
+  portValve, samplePath, shuttleSvg, vaultCore, waferStack,
+} from "./concept.ts";
 import { drawMesh, keyLight, shadeOf } from "./draw.ts";
 import { applyAffine, moveInPlane, planeKey, slotKey } from "./motion.ts";
 import { keepInPlace } from "./stage.ts";
@@ -237,4 +244,62 @@ test("parts: an arrow routed through points passes them and ends at its end; the
   assert.equal((s.svg.match(/<text/g) ?? []).length, 2);
   assert.ok(s.w >= 28 * 100 * 0.6 && s.h > 2 * 100, "wide enough for its longest row, tall enough for both");
   assert.match(s.svg, /translate\(10 20\)/);
+});
+
+// ---------------------------------------------------------------- extended shapes & concept instruments
+test("shapes: chamferPlate is closed, every edge shared by two faces, with outward bevel normals", () => {
+  const pl = planeOf([0, 0, 0], [0, 0, 1], [1, 0, 0]);
+  for (const outer of [roundedRect(30, 20, 3), regularPolygon(8, 16, 0, 0, Math.PI / 8)]) {
+    const m = chamferPlate(pl, outer, 0, 8, 1.5);
+    for (const [k, n] of edgeUse(m)) assert.equal(n, 2, `chamferPlate edge ${k} used ${n} times`);
+    const walls = m.faces.filter((f) => f.role === "wall");
+    assert.ok(walls.some((f) => f.normal[2] > 0.4), "top bevel faces upward");
+    assert.ok(walls.some((f) => f.normal[2] < -0.4), "bottom bevel faces downward");
+    for (const f of walls) {
+      const c = centroid(m, f.loops[0]!);
+      assert.ok(dot(f.normal, [c[0], c[1], 0]) > 0, "wall and bevel normals point outward radially");
+    }
+  }
+});
+
+test("shapes: horological gear, spoked holes, escape wheel and rotor arc form closed plates", () => {
+  const pl = planeOf([0, 0, 0], [0, 0, 1], [1, 0, 0]);
+  const gear = plate(pl, { outer: gearOutline(48, 24), holes: [circlePoints(3, 16), ...spokedHoles(6, 18, 5)] }, 0, 1.4);
+  for (const [k, n] of edgeUse(gear)) assert.equal(n, 2, `gear edge ${k}`);
+  const escWheel = plate(pl, { outer: escapeWheelOutline(15, 14, 9.5), holes: [circlePoints(2.2, 16), ...spokedHoles(3.4, 8.2, 3)] }, 0, 1.0);
+  for (const [k, n] of edgeUse(escWheel)) assert.equal(n, 2, `escape wheel edge ${k}`);
+  const rotor = plate(pl, { outer: arcOutline(8, 24, -Math.PI / 2, Math.PI / 2, 24) }, 0, 2.0);
+  for (const [k, n] of edgeUse(rotor)) assert.equal(n, 2, `rotor arc edge ${k}`);
+});
+
+test("shapes: 3D tube along a spiral is closed, watertight, with outward normals", () => {
+  const pl = planeOf([0, 0, 0], [0, 0, 1], [1, 0, 0]);
+  const pts = spiralPoints(pl, 3, 14, 3, 60, 0, 2);
+  const m = tube(pts, 0.5, 10);
+  for (const [k, n] of edgeUse(m)) assert.equal(n, 2, `tube edge ${k} used ${n} times`);
+  assert.equal(m.faces.filter((f) => f.role === "end").length, 2);
+});
+
+test("concept: sculpted architectural instruments and synchronized View A render valid SVG", () => {
+  const cam: Camera = { azimuth: 225, elevation: 28, scale: 30, origin: [4000, 3000] };
+  const parts = [
+    deckTier(cam, { center: [0, 0, 0], w: 120, d: 80, gridStep: 20, standoffs: true }),
+    hubChassis(cam, [0, 0, 0], { phase: 0.8 }),
+    agentBlade(cam, [30, 10, 0], { beaconMaterial: "teal" }),
+    waferStack(cam, [45, 10, 0], { count: 6, capCount: 4 }),
+    portValve(cam, [-30, 20, 0], { capMaterial: "amber" }),
+    vaultCore(cam, [0, -30, 0]),
+    conduitSvg(cam, [[0, 0, 4], [15, 0, 4], [15, 20, 4]], { active: true, tone: "cobalt" }),
+    shuttleSvg(cam, [15, 10, 4], { material: "subject" }),
+  ];
+  for (const svg of parts) {
+    assert.ok(svg.length > 50);
+    assert.ok(!svg.includes("NaN") && !svg.includes("undefined"));
+  }
+  const mid = samplePath([[0, 0, 0], [10, 0, 0], [10, 10, 0]], 0.5);
+  assert.ok(Math.hypot(mid.point[0] - 10, mid.point[1] - 0, mid.point[2] - 0) < 1e-6);
+  const lens = inspectorFrame({ x: 9000, y: 400, w: 4800, h: 4200 }, "VIEW A", "TRACE")
+    + ganttTraceSvg({ x: 9000, y: 760, w: 4800, h: 2000 }, { lanes: [{ name: "Orch", segments: [{ t0: 0, t1: 1000, kind: "think" }] }], tNow: 600, tMax: 4000 })
+    + budgetMetersSvg({ x: 9000, y: 2800, w: 4800, h: 1600 }, { rows: [{ label: "Orch", value: 11 }, { label: "Mono", value: 52.4 }], cap: 32, maxScale: 60, unit: "k" });
+  assert.ok(!lens.includes("NaN") && lens.includes("lens-playhead") && lens.includes("is-over"));
 });

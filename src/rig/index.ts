@@ -16,3 +16,4 @@ export * from "./motion.ts";
 export * from "./stage.ts";
 export * from "./contacts.ts";
 export * from "./parts.ts";
+export * from "./concept.ts";

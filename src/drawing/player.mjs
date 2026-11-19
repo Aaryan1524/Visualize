@@ -92,6 +92,7 @@ export function player(DATA, machine, kit) {
       const ax = right ? bb.x + bb.width + 45 : bb.x - 45, ex = ax + (right ? 110 : -110);
       lead.setAttribute("d", `M${fx(ax)},${fx(cy)}L${fx(ex)},${fx(cy)}L${fx(tx)},${fx(ty)}`);
     }
+    followLeaders();
     const key = fig.querySelector("#tbkey");
     if (!key) return;
     let x = +key.dataset.x0;

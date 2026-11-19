@@ -25,13 +25,13 @@ const FLOOR_AXES = { origin: [0, 0, 0] as V3, u: FLOOR.u, v: FLOOR.v, n: FLOOR.n
 const f1 = (v: number) => (Math.round(v * 10) / 10).toString();
 
 /** A rounded rectangle's outline in the floor plane, centred on the origin. */
-export function roundedRect(w: number, d: number, r: number): P2[] {
+function footprint(w: number, d: number, r: number): P2[] {
   const x = w / 2 - r, y = d / 2 - r;
   return roundedHull([[-x, -y, r], [x, -y, r], [x, y, r], [-x, y, r]], 10);
 }
 
 /** A slab standing on the floor, centred on the origin: footprint w by d, height h. */
-export const slab = (w: number, d: number, h: number, r = Math.min(w, d) * 0.14): Mesh => plate(FLOOR, { outer: roundedRect(w, d, r) }, 0, h);
+export const slab = (w: number, d: number, h: number, r = Math.min(w, d) * 0.14): Mesh => plate(FLOOR, { outer: footprint(w, d, r) }, 0, h);
 
 /**
  * A cell or slot, drawn once at the origin: a rounded block with a shallow well on top, in the
@@ -40,7 +40,7 @@ export const slab = (w: number, d: number, h: number, r = Math.min(w, d) * 0.14)
 export function cellDrawing(cam: Camera, o: { w: number; d: number; h: number; material?: string }): string {
   const lip = Math.min(o.w, o.d) * 0.12;
   return drawMesh(slab(o.w, o.d, o.h), cam, { material: o.material ?? "cell", shine: true }) +
-    drawMesh(plate(planeOf([0, 0, o.h - 0.01], UP, [1, 0, 0]), { outer: roundedRect(o.w - 2 * lip, o.d - 2 * lip, Math.min(o.w, o.d) * 0.08) }, -0.6, 0), cam, { material: o.material ?? "cell" });
+    drawMesh(plate(planeOf([0, 0, o.h - 0.01], UP, [1, 0, 0]), { outer: footprint(o.w - 2 * lip, o.d - 2 * lip, Math.min(o.w, o.d) * 0.08) }, -0.6, 0), cam, { material: o.material ?? "cell" });
 }
 
 /** A token or key card, drawn once at the origin: a thin raised card in the `card` material. */
@@ -56,7 +56,7 @@ export function markerDrawing(cam: Camera, o: { h: number; r?: number; material?
 
 /** A floor plate under a group of parts: quiet context. */
 export const boardDrawing = (cam: Camera, o: { w: number; d: number; h?: number }): string =>
-  drawMesh(plate(planeOf([0, 0, -(o.h ?? 3)], UP, [1, 0, 0]), { outer: roundedRect(o.w, o.d, 4) }, 0, o.h ?? 3), cam, { material: "frame" });
+  drawMesh(plate(planeOf([0, 0, -(o.h ?? 3)], UP, [1, 0, 0]), { outer: footprint(o.w, o.d, 4) }, 0, o.h ?? 3), cam, { material: "frame" });
 
 /** Where a part drawn at the origin goes: a world translation is a screen translation (the camera is linear). */
 export function placeAt(cam: Camera, at: V3): string {

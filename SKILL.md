@@ -25,6 +25,7 @@ node <skill>/scripts/new-figure.mjs <name> --kind machine --dir <folder>   # a g
 Open the closest example before starting:
 - `examples/bloom/`: **the bar for a concept.** Sixteen bit cells in two rows, a word card, one arrow a hash function, the camera on each word's bits, a lab where the reader types any word, and the deletion trap.
 - `examples/derailleur/`: **the bar for a machine.** Bold shaded solids, each drawn once and then moved, so it reads as 3D and plays at 60 fps.
+- `examples/multi-agent/` and `examples/automatic-watch/`: newer rig pages (a concept on sculpted instruments with a trace lens; a watch movement). Useful for their parts (`src/rig/concept.ts`), not yet the bar.
 - `examples/lock/` and `examples/escalator/`: machines that work in one plane, drawn as flat technical cutaways to scale (`references/drawing.md`) on the same page and player. The lock opens with the problem, ends with the second idea (picking) and lets the reader cut their own key.
 
 **Legacy, not for new pages:** `examples/lru/`, `retries/`, `attention/`, `lru-3d/` and `test/fixtures/gallery-*` are scene.ts pages on the older Unfold stage, checked by `scripts/verify.mjs`. They still build. Their references (`authoring.md`, `kit.md`, `verify.md`) are marked legacy, and the Drawing checks refuse their pages with a message saying so.
@@ -149,4 +150,5 @@ The legacy scene.ts pages have their own gates (`verify.mjs`, `pnpm verify:contr
 - `references/drawing.md`: the Drawing page for real machines: what every page has, the page contract, the flat cutaway for one-plane machines, and the rig's reference.
 - `references/craft.md`: the visual rules, each with the defect that taught it.
 - Legacy (scene.ts pages only): `references/authoring.md`, `references/kit.md`, `references/verify.md`.
+- `references/concept-rig.md`: the concept instruments in `src/rig/concept.ts` (tiers, hubs, conduits, the trace and budget lenses).
 - `evals/evals.json`: held-out prompts for testing the skill on unfamiliar concepts.
