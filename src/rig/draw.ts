@@ -57,7 +57,7 @@ export function drawMesh(mesh: Mesh, cam: Camera, look: Look): string {
     const s = Math.round(shadeOf(f.normal, light) * 32) / 32;
     const loops = f.loops.map((l) => l.map((k) => pts[k]!));
     if (f.role === "cap" || f.role === "end" || loops.length > 1) {
-      tail.push(`<path class="rig-face" fill-rule="evenodd" style="${fill(s)}" d="${loops.map((l) => pathThrough(l)).join("")}"/>`);
+      tail.push(`<path class="rig-face rig-${f.role === "end" ? "cap" : f.role === "cap" ? "cap" : "wall"}" fill-rule="evenodd" style="${fill(s)}" d="${loops.map((l) => pathThrough(l)).join("")}"/>`);
       continue;
     }
     const l = loops[0]!;
@@ -69,7 +69,7 @@ export function drawMesh(mesh: Mesh, cam: Camera, look: Look): string {
     bk.n++;
     buckets.set(s, bk);
   }
-  for (const [s, bk] of [...buckets].sort((x, y) => x[1].depth / x[1].n - y[1].depth / y[1].n)) body += `<path class="rig-face" style="${fill(s)}" d="${bk.d}"/>`;
+  for (const [s, bk] of [...buckets].sort((x, y) => x[1].depth / x[1].n - y[1].depth / y[1].n)) body += `<path class="rig-face rig-wall" style="${fill(s)}" d="${bk.d}"/>`;
   body += tail.join("");
 
   // edges: silhouette where a face turned toward meets one turned away, creases between two seen faces

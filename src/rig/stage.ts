@@ -16,6 +16,21 @@ export interface Placed {
   hidden?: boolean;
   /** data-* flags on the part's group, for the look to answer (a lit cog, a touched screw) */
   flags?: Record<string, boolean>;
+  /**
+   * For a thick part turned by its transform: the worst screen error this placement leaves
+   * (thickness × the turn left after its nearest drawn angle, in px). Recorded per part in
+   * `globalThis.__rig.turns` so check-drawing can hold every turning part under its budget.
+   */
+  turnErrPx?: number;
+}
+
+/** What the page's rig records for the checks: per part id, the worst turn error seen and how often it was placed. */
+export interface RigRecord {
+  turns: Map<string, { maxErrPx: number; n: number }>;
+}
+export function rigRecord(): RigRecord {
+  const g = globalThis as { __rig?: RigRecord };
+  return (g.__rig ??= { turns: new Map() });
 }
 
 interface Slot extends SVGGElement {
@@ -119,6 +134,12 @@ export class RigStage {
         g._op = op;
       }
       if (it.flags) for (const [k, on] of Object.entries(it.flags)) if (g.hasAttribute(`data-${k}`) !== on) g.toggleAttribute(`data-${k}`, on);
+      if (it.turnErrPx !== undefined) {
+        if (!g.hasAttribute("data-rig-turn")) g.setAttribute("data-rig-turn", "");
+        const r = rigRecord().turns, was = r.get(it.id);
+        if (!was) r.set(it.id, { maxErrPx: it.turnErrPx, n: 1 });
+        else (was.n++, it.turnErrPx > was.maxErrPx && (was.maxErrPx = it.turnErrPx));
+      }
       g._key = it.key;
       order.push(g);
     }

@@ -108,12 +108,12 @@ test("drawing: a plate seen face-on draws its near cap last and outlines its sil
   const cam: Camera = { azimuth: 90, elevation: 10, scale: 10, origin: [500, 500] };
   const pl = planeOf([0, 0, 0], [0, 1, 0], [1, 0, 0]);
   const svg = drawMesh(plate(pl, { outer: circlePoints(20, 24) }, 0, 2), cam, { material: "steel" });
-  const faces = [...svg.matchAll(/<path class="rig-face"[^>]*>/g)].map((m) => m[0]);
+  const faces = [...svg.matchAll(/<path class="rig-face[^"]*"[^>]*>/g)].map((m) => m[0]);
   assert.ok(faces.at(-1)!.includes("evenodd"), "the cap comes last");
   assert.match(svg, /class="rig-sil"/);
   // seen exactly edge-on, the plate still draws: its rim is its walls
   const edge = drawMesh(plate(pl, { outer: circlePoints(20, 24) }, 0, 2), { ...cam, azimuth: 0, elevation: 0 }, { material: "steel" });
-  assert.match(edge, /class="rig-face"/);
+  assert.match(edge, /class="rig-face[^"]*"/);
 });
 
 // ---------------------------------------------------------------- draw once, then move
