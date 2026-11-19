@@ -134,15 +134,15 @@ function machine(DATA) {
     let beats = tt * visBeatsPerSec * slowFactor + (k === 5 ? 0.5 : 0.15);
     if (still && k === 5) beats = 1.50; // capture the live IMPULSE kick right in View A!
 
-    let rotorDeg = 95; // parked clear of escapement/balance by default
+    let rotorDeg = 55; // parked gracefully along upper-back rim clear of barrel, train & balance
     let revDir = 1;
     let windPct = 76;
     let wristMotion = 40;
     let regRate = 0;
 
     if (k === 0 || k === 1) {
-      // On still frame, park rotor cleanly to the right (18 deg) so reversing wheels & barrel on the left are 100% uncovered!
-      rotorDeg = still ? 18 : 18 + 95 * Math.sin(tt * 1.1);
+      // On still frame, park rotor cleanly to upper-right (22 deg) so reversing wheels & barrel on left are 100% uncovered!
+      rotorDeg = still ? 22 : 22 + 95 * Math.sin(tt * 1.1);
       revDir = still ? 1 : (Math.cos(tt * 1.1) >= 0 ? 1 : -1);
       if (still && k === 1) beats = 0.12; // crisp LOCK pose matching impulse jewel clearly outside fork notch
     } else if (k === 2) {
@@ -153,20 +153,20 @@ function machine(DATA) {
       wristMotion = 75;
     } else if (k === 3) {
       // Winding up to 100% -> slipping bridle lights up; ends on upper-right so barrel stays 100% clear!
-      rotorDeg = -180 + u * 260;
+      rotorDeg = -180 + u * 235;
       revDir = 1;
       windPct = 62 + 38 * ease(clamp(u / 0.78));
       wristMotion = 85;
     } else if (k === 4) {
-      rotorDeg = 95; // parked over upper-back so full 4-wheel going train shines!
+      rotorDeg = 55; // parked over upper-back so full 4-wheel going train shines!
       windPct = 82;
       wristMotion = 0;
     } else if (k === 5) {
-      rotorDeg = 95;
+      rotorDeg = 55;
       windPct = 85;
       wristMotion = 0;
     } else if (k === 6) {
-      rotorDeg = 95;
+      rotorDeg = 55;
       windPct = 85;
       wristMotion = 0;
       regRate = Math.round(20 * Math.sin(u * Math.PI * 1.5));
@@ -418,13 +418,17 @@ text{font-family:var(--sans);fill:var(--ink)}
 .inset-ring{fill:none;stroke:var(--ink);stroke-width:1.25}
 .inset-title{font-size:${FS * 0.8}px;letter-spacing:.08em;font-weight:600}
 /* View A Swiss Lever Escapement Loupe styles */
-.loupe-axis{fill:none;stroke:var(--ink);stroke-width:.55;stroke-opacity:.18;stroke-dasharray:4 5}
-.loupe-roller{fill:color-mix(in oklab,var(--rig-brass-lit) 58%,var(--stage));stroke:var(--ink);stroke-width:1.3}
-.loupe-brass{fill:color-mix(in oklab,var(--rig-brass-lit) 78%,var(--rig-brass-dark));stroke:var(--ink);stroke-width:1.4;stroke-linejoin:round}
-.loupe-hole{fill:color-mix(in oklab,var(--stage) 95%,var(--ink));stroke:var(--ink);stroke-width:1.0}
-.loupe-steel{fill:color-mix(in oklab,var(--rig-alloy-lit) 72%,var(--rig-steel-dark));stroke:var(--ink);stroke-width:1.4;stroke-linejoin:round}
-.loupe-ruby{fill:color-mix(in oklab,var(--rig-ruby-lit) 55%,var(--rig-ruby-dark));stroke:var(--ink);stroke-width:1.2}
+.loupe-axis{fill:none;stroke:var(--ink);stroke-width:.55;stroke-opacity:.2;stroke-dasharray:4 5}
+.loupe-sh{fill:var(--ink);opacity:.10;stroke:none}
+.loupe-roller{fill:color-mix(in oklab,var(--rig-brass-lit) 68%,var(--stage));stroke:var(--ink);stroke-width:1.4}
+.loupe-bevel{fill:none;stroke:var(--rig-shine);stroke-width:1.0;stroke-opacity:.65}
+.loupe-chaton{fill:color-mix(in oklab,var(--rig-brass-lit) 75%,var(--rig-brass-dark));stroke:var(--ink);stroke-width:.9}
+.loupe-brass{fill:color-mix(in oklab,var(--rig-brass-lit) 76%,var(--rig-brass-dark));stroke:var(--ink);stroke-width:1.4;stroke-linejoin:round}
+.loupe-hole{fill:color-mix(in oklab,var(--stage) 94%,var(--ink));stroke:var(--ink);stroke-width:1.0}
+.loupe-steel{fill:color-mix(in oklab,var(--rig-alloy-lit) 74%,var(--rig-steel-dark));stroke:var(--ink);stroke-width:1.4;stroke-linejoin:round}
+.loupe-ruby{fill:color-mix(in oklab,var(--rig-ruby-lit) 58%,var(--rig-ruby-dark));stroke:var(--ink);stroke-width:1.2}
 .loupe-ruby.is-hot{fill:var(--orange);stroke:var(--ink);stroke-width:1.5}
+.loupe-spec{fill:#fff;opacity:.65;stroke:none}
 .loupe-pivot{fill:var(--rig-steel-dark);stroke:var(--ink);stroke-width:1.0}
 .loupe-pin{fill:var(--ink-2);stroke:var(--ink);stroke-width:1.0}
 .loupe-badge{fill:var(--card);stroke:var(--ink);stroke-width:1.0}
