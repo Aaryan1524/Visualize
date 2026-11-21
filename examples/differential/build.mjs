@@ -120,9 +120,17 @@ function machine(DATA) {
   };
   const stillAt = (k, SEG) => SEG.lead + POSE[k] * anim(k);
 
+  const R = {};
+  const setText = (id, v) => {
+    if (R[id] !== v) ((R[id] = v), ($(id).textContent = v));
+  };
+  let lastFocusKey = "";
+
   function mount(v, m) {
     V = v;
     model = m;
+    lastFocusKey = "";
+    for (const k of Object.keys(R)) delete R[k];
     F = FIG.figure(model, FIG.cameraFor(model, DATA.box));
     defsEl = $("rigDefs");
     defsEl.replaceChildren();
@@ -140,14 +148,17 @@ function machine(DATA) {
     focusParts();
     const st = state.st ?? model.straight;
     const sp = exactSpeedStrings(st.leftRpm, st.rightRpm, st.carrierRpm);
-    $("r-left").textContent = sp.left;
-    $("r-right").textContent = sp.right;
-    $("r-spider").textContent = st.spiderRpm.toFixed(1);
-    $("r-torque").textContent = String(Math.round(st.wheelTorque));
+    setText("r-left", sp.left);
+    setText("r-right", sp.right);
+    setText("r-spider", st.spiderRpm.toFixed(1));
+    setText("r-torque", String(Math.round(st.wheelTorque)));
   }
 
   function focusParts() {
     const { focus, lit } = lastFocus, lab = root.hasAttribute("data-lab");
+    const key = `${lab ? 1 : 0}|${(focus ?? []).join(",")}|${lit.join(",")}|${$("scene")?.childElementCount ?? 0}`;
+    if (key === lastFocusKey) return;
+    lastFocusKey = key;
     stage?.focus((part) => ({
       recede: lit.length ? !lit.includes(part) : !lab && focus ? !focus.includes(part) : false,
       named: lit.includes(part),

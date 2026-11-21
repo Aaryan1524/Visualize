@@ -138,35 +138,31 @@ export function cameraFor(M, box) {
   return fitCamera(pts, box, VIEW.azimuth, VIEW.elevation);
 }
 
-/** Build one bevel spider gear in true 3D at carrier angle `carrierRad`, spin `spiderRad`, side `sign` (+1/-1). */
-function spiderSvg(cam, carrierRad, spiderRad, sign = 1) {
-  const p = pinDir(carrierRad);
-  const axis = [sign * p[0], sign * p[1], sign * p[2]];
-  // Tangential basis perpendicular to `axis`: x_hat = [1, 0, 0], t_hat = cross(axis, x_hat)
-  // At sign = +1: axis = +p, cross(+p, +x) = +t (matches model.mjs positive spiderRad!).
-  // At sign = -1: axis = -p, cross(-p, +x) = -t (matches Spider 2 spinning by +spiderRad about -p!).
-  const center = scale(axis, GEO.rSun);
-  const pl = planeOf(center, axis, [1, 0, 0]);
+/** Build one bevel spider gear's body + boss centred at the world origin (for pure-translate <use> placement). */
+function spiderBodyLocalSvg(cam, ax, orbitRad, spinRad) {
+  const p = pinDir(orbitRad);
+  const pl = planeOf([0, 0, 0], p, [1, 0, 0]);
   const halfT = GEO.spiderThick / 2;
+  const toothOuter = gearProfile(10, GEO.rSpider, { form: "involute", kind: "pinion", rot: spinRad });
+  const body = plate(pl, { outer: toothOuter }, -halfT, halfT);
+  const boss = turned(pointOn(pl, 0, 0, halfT - 0.1), pl.n, [[0, 4.1], [0.75, 4.1], [1.05, 3.6]], 10, pl.u);
+  const bodySvg = drawMesh(body, cam, { material: "subject", shine: true, crease: 45 });
+  const bossSvg = drawMesh(boss, cam, { material: "alloy", shine: true });
+  return dot(p, ax.toward) >= 0 ? bodySvg + bossSvg : bossSvg + bodySvg;
+}
 
-  // 10-tooth involute spider pinion in the single signal colour (subject orange)
-  const toothOuter = gearProfile(10, GEO.rSpider, { form: "involute", kind: "pinion", rot: spiderRad });
-  const body = plate(pl, { outer: toothOuter, holes: [circlePoints(2.2, 14)] }, -halfT, halfT);
-
-  // Raised machined steel/alloy boss + bold radial timing bar on the outer cap so spin reads at a glance
-  const boss = turned(pointOn(pl, 0, 0, halfT - 0.1), pl.n, [[0, 4.1], [0.75, 4.1], [1.05, 3.6]], 18, pl.u);
-  const c = Math.cos(spiderRad), s = Math.sin(spiderRad);
+/** Build one spider gear's radial timing bar centred at the world origin (for pure-translate <use> placement). */
+function spiderPtrLocalSvg(cam, orbitRad, spinRad) {
+  const p = pinDir(orbitRad);
+  const pl = planeOf([0, 0, 0], p, [1, 0, 0]);
+  const halfT = GEO.spiderThick / 2;
+  const c = Math.cos(spinRad), s = Math.sin(spinRad);
   const rot2 = ([x, y]) => [x * c - y * s, x * s + y * c];
   const barPoly = [
     [-3.7, -0.78], [4.3, -0.78], [4.3, 0.78], [-3.7, 0.78],
   ].map(rot2);
   const pointer = plate(pl, { outer: barPoly }, halfT + 0.65, halfT + 1.35);
-
-  return (
-    drawMesh(body, cam, { material: "subject", shine: true, crease: 45, sort: "face" }) +
-    drawMesh(boss, cam, { material: "alloy", shine: true }) +
-    drawMesh(pointer, cam, { material: "steel", shine: true })
-  );
+  return drawMesh(pointer, cam, { material: "steel", shine: true });
 }
 
 /** Build the rotating cross-pin connecting the two spider gears inside the carrier. */
@@ -374,33 +370,31 @@ export function figure(M, cam, opts = {}) {
       for (let i = 0; i < 6; i++) {
         const a = rot + (TAU * i) / 6;
         const at = pointOn(AXLE_PL, 19.6 * Math.cos(a), 19.6 * Math.sin(a), -GEO.xRing + ringHalf);
-        const sc = screw(1.75, { at, axis: [-1, 0, 0], uHint: [0, 0, 1], height: 1.15, slotAngle: a + 0.4, material: "blued" });
-        svg += drawPart(sc, cam);
+        const head = turned(at, AXLE_PL.n, [[0, 1.75], [0.95, 1.75], [1.15, 1.35]], 10, AXLE_PL.u);
+        const sa = a + 0.4;
+        const p0 = pointOn(AXLE_PL, 19.6 * Math.cos(a) - 1.1 * Math.cos(sa), 19.6 * Math.sin(a) - 1.1 * Math.sin(sa), -GEO.xRing + ringHalf + 1.18);
+        const p1 = pointOn(AXLE_PL, 19.6 * Math.cos(a) + 1.1 * Math.cos(sa), 19.6 * Math.sin(a) + 1.1 * Math.sin(sa), -GEO.xRing + ringHalf + 1.18);
+        svg += drawMesh(head, cam, { material: "blued", shine: true }) + linesOn(cam, [[p0, p1]], "rig-crease");
       }
       return svg;
     },
   });
   ringBoltsTurn.drawAll();
 
-  // ---- 4. Rotating Carrier / Cage (left & right flanges via turningPart + 2 translating tie-bars!)
-  const carrierFlange = (name, xCenter) => {
-    const half = 1.6;
-    const t = turningAxle(name, {
-      period: TAU / 2,
-      n0: -xCenter - half,
-      n1: -xCenter + half,
-      minBins: 8,
-      draw: (rot) => {
-        const holes = [circlePoints(4.5, 20), ...spokedHoles(6.4, 12.2, 2, 0.35, rot + Math.PI / 2, 10)];
-        const m = plate(AXLE_PL, { outer: circlePoints(GEO.rCarrier, 32), holes }, -xCenter - half, -xCenter + half);
-        return drawMesh(m, cam, { material: "alloy", shine: true, sort: "face" });
-      },
-    });
-    t.drawAll();
-    return t;
-  };
-  const carrierRightTurn = carrierFlange("carrierR", GEO.xCarrierR);
-  const carrierLeftTurn = carrierFlange("carrierL", GEO.xCarrierL);
+  // ---- 4. Rotating Carrier / Cage (shared flange drawn once at x=0 and shifted to ±xCarrier, plus 2 translating tie-bars!)
+  const carrierHalf = 1.6;
+  const carrierTurn = turningAxle("carrier", {
+    period: TAU / 2,
+    n0: -carrierHalf,
+    n1: +carrierHalf,
+    minBins: 8,
+    draw: (rot) => {
+      const holes = [circlePoints(4.5, 12), ...spokedHoles(6.4, 12.2, 2, 0.35, rot + Math.PI / 2, 5)];
+      const m = plate(AXLE_PL, { outer: circlePoints(GEO.rCarrier, 20), holes }, -carrierHalf, +carrierHalf);
+      return drawMesh(m, cam, { material: "alloy", shine: true, sort: "face" });
+    },
+  });
+  carrierTurn.drawAll();
 
   // Cylindrical cage tie-bar parallel to X: invariant under YZ orbit, so pure translate (0.00 px error!)
   const tieBarSvg = drawMesh(
@@ -415,54 +409,45 @@ export function figure(M, cam, opts = {}) {
     return `translate(${(p2[0] - originScreen[0]).toFixed(2)} ${(p2[1] - originScreen[1]).toFixed(2)})`;
   };
 
-  // ---- 5. 16-Tooth Left & Right Sun Gears (mech.ts: spokedWheel + turningPart, warm brass!)
-  // Split into 16-tooth bevel sun gear (period = TAU/16 -> 2 bins!) + thin rotating timing stripe (period = TAU -> 10 bins!)
-  const sunPart = (name, xCenter, faceDir) => {
-    const half = GEO.sunThick / 2;
-    const teeth = turningAxle(`${name}Teeth`, {
-      period: TAU / M.D.zSun,
-      n0: -xCenter - half,
-      n1: -xCenter + half,
-      minBins: 2,
-      draw: (rot) => {
-        const w = spokedWheel(M.D.zSun, GEO.rSun, GEO.sunThick, {
-          at: [xCenter + half, 0, 0],
-          axis: [-1, 0, 0],
-          uHint: [0, 0, 1],
-          form: "involute",
-          spokes: 0,
-          hubR: 5.0,
-          colletR: 0,
-          rot,
-          material: "brass",
-          pxPerUnit,
-        });
-        return drawPart(w, cam);
-      },
-    });
-    teeth.drawAll();
+  // ---- 5. 16-Tooth Left & Right Sun Gears (mech.ts: spokedWheel + turningPart, shared geometry shifted to ±xSun!)
+  const sunHalf = GEO.sunThick / 2;
+  const sunOffset = GEO.rSpider + sunHalf;
+  const sunTeethTurn = turningAxle("sunTeeth", {
+    period: TAU / M.D.zSun,
+    n0: -sunHalf,
+    n1: +sunHalf,
+    minBins: 2,
+    draw: (rot) => {
+      const w = spokedWheel(M.D.zSun, GEO.rSun, GEO.sunThick, {
+        at: [sunHalf, 0, 0],
+        axis: [-1, 0, 0],
+        uHint: [0, 0, 1],
+        form: "involute",
+        spokes: 0,
+        hubR: 5.0,
+        colletR: 0,
+        rot,
+        material: "brass",
+        pxPerUnit,
+      });
+      return drawPart(w, cam);
+    },
+  });
+  sunTeethTurn.drawAll();
 
-    // Crisp radial index bar on the camera-facing side (-X side, t = -xCenter + half)
-    const markT0 = -xCenter + (faceDir > 0 ? half : -half - 0.9);
-    const markT1 = markT0 + 0.9;
-    const mark = turningAxle(`${name}Mark`, {
-      period: TAU,
-      n0: markT0,
-      n1: markT1,
-      minBins: 10,
-      draw: (rot) => {
-        const c = Math.cos(rot), s = Math.sin(rot);
-        const rot2 = ([x, y]) => [x * c - y * s, x * s + y * c];
-        const bar = [[4.2, -1.05], [9.2, -1.05], [9.2, 1.05], [4.2, 1.05]].map(rot2);
-        return drawMesh(plate(AXLE_PL, { outer: bar }, markT0, markT1), cam, { material: "steel", shine: true });
-      },
-    });
-    mark.drawAll();
-    return { teeth, mark };
-  };
-  // Both sun gears span x = ±(rSpider .. rSpider + sunThick) so their inner faces meet the spider pitch circles at x = ±7.0!
-  const sunL = sunPart("sunL", -(GEO.rSpider + GEO.sunThick / 2), 1);
-  const sunR = sunPart("sunR", +(GEO.rSpider + GEO.sunThick / 2), 1);
+  const sunMarkTurn = turningAxle("sunMark", {
+    period: TAU,
+    n0: sunHalf,
+    n1: sunHalf + 0.9,
+    minBins: 10,
+    draw: (rot) => {
+      const c = Math.cos(rot), s = Math.sin(rot);
+      const rot2 = ([x, y]) => [x * c - y * s, x * s + y * c];
+      const bar = [[4.2, -1.05], [9.2, -1.05], [9.2, 1.05], [4.2, 1.05]].map(rot2);
+      return drawMesh(plate(AXLE_PL, { outer: bar }, sunHalf, sunHalf + 0.9), cam, { material: "steel", shine: true });
+    },
+  });
+  sunMarkTurn.drawAll();
 
   // ---- 6. Left & Right Half-Shafts (mech.ts: arbor with `inside` cutouts where flanges/gears sit!)
   const axleL = arbor(3.1, 41.5, {
@@ -488,60 +473,54 @@ export function figure(M, cam, opts = {}) {
   once("axleLInner", "axleL", drawPart({ ...axleL, pieces: [axleL.pieces[0]] }, cam));
   once("axleLOuter", "axleL", drawPart({ ...axleL, pieces: [axleL.pieces[1]] }, cam));
 
-  // ---- 7. Left & Right Wheels / Hubs (graphite tire + alloy 5-spoke rim + brass timing spoke lug via turningPart)
-  const makeWheel = (name, xCenter) => {
-    const half = GEO.wheelThick / 2;
-    const rim = turningAxle(`${name}Rim`, {
-      period: TAU / 5,
-      n0: -xCenter - half,
-      n1: -xCenter + half,
-      minBins: 6,
-      draw: (rot) => {
-        const tire = plate(
-          AXLE_PL,
-          { outer: circlePoints(GEO.rWheel, 36), holes: [circlePoints(16.2, 32)] },
-          -xCenter - half,
-          -xCenter + half,
-        );
-        const spokes = plate(
-          AXLE_PL,
-          { outer: circlePoints(16.4, 32), holes: [circlePoints(4.2, 16), ...spokedHoles(5.6, 14.5, 5, 0.24, rot, 8)] },
-          -xCenter - half + 0.7,
-          -xCenter + half - 0.7,
-        );
-        return (
-          plateShadow(tire, cam, shadowAway) +
-          drawMesh(tire, cam, { material: "graphite", shine: true, crease: 42, sort: "face" }) +
-          drawMesh(spokes, cam, { material: "alloy", shine: true, crease: 40, sort: "face" })
-        );
-      },
-    });
-    rim.drawAll();
+  // ---- 7. Left & Right Wheels / Hubs (shared geometry drawn once at x=0 and shifted to xWheelL / xWheelR!)
+  const wheelHalf = GEO.wheelThick / 2;
+  const wheelRimTurn = turningAxle("wheelRim", {
+    period: TAU / 5,
+    n0: -wheelHalf,
+    n1: +wheelHalf,
+    minBins: 6,
+    draw: (rot) => {
+      const tire = plate(
+        AXLE_PL,
+        { outer: circlePoints(GEO.rWheel, 24), holes: [circlePoints(16.2, 20)] },
+        -wheelHalf,
+        +wheelHalf,
+      );
+      const spokes = plate(
+        AXLE_PL,
+        { outer: circlePoints(16.4, 20), holes: [circlePoints(4.2, 12), ...spokedHoles(5.6, 14.5, 5, 0.24, rot, 4)] },
+        -wheelHalf + 0.7,
+        +wheelHalf - 0.7,
+      );
+      return (
+        plateShadow(tire, cam, shadowAway) +
+        drawMesh(tire, cam, { material: "graphite", shine: true, crease: 42 }) +
+        drawMesh(spokes, cam, { material: "alloy", shine: true, crease: 40, sort: "face" })
+      );
+    },
+  });
+  wheelRimTurn.drawAll();
 
-    // Bold brass index spoke marker (period = TAU) so revolution count & wheelspin read instantly!
-    const lugT0 = -xCenter + half - 0.75;
-    const lugT1 = -xCenter + half + 0.55;
-    const lug = turningAxle(`${name}Lug`, {
-      period: TAU,
-      n0: lugT0,
-      n1: lugT1,
-      minBins: 10,
-      draw: (rot) => {
-        const c = Math.cos(rot), s = Math.sin(rot);
-        const rot2 = ([x, y]) => [x * c - y * s, x * s + y * c];
-        const bar = [[5.2, -1.65], [15.4, -1.65], [15.4, 1.65], [5.2, 1.65]].map(rot2);
-        const cap = turned(pointOn(AXLE_PL, 0, 0, lugT0), AXLE_PL.n, [[0, 4.4], [1.2, 4.4], [1.45, 3.8]], 16, AXLE_PL.u);
-        return (
-          drawMesh(plate(AXLE_PL, { outer: bar }, lugT0, lugT1), cam, { material: "brass", shine: true }) +
-          drawMesh(cap, cam, { material: "steel", shine: true })
-        );
-      },
-    });
-    lug.drawAll();
-    return { rim, lug };
-  };
-  const wheelL = makeWheel("wheelL", GEO.xWheelL);
-  const wheelR = makeWheel("wheelR", GEO.xWheelR);
+  const lugT0 = wheelHalf - 0.75;
+  const lugT1 = wheelHalf + 0.55;
+  const wheelLugTurn = turningAxle("wheelLug", {
+    period: TAU,
+    n0: lugT0,
+    n1: lugT1,
+    minBins: 10,
+    draw: (rot) => {
+      const c = Math.cos(rot), s = Math.sin(rot);
+      const rot2 = ([x, y]) => [x * c - y * s, x * s + y * c];
+      const bar = [[5.2, -1.65], [15.4, -1.65], [15.4, 1.65], [5.2, 1.65]].map(rot2);
+      const cap = turned(pointOn(AXLE_PL, 0, 0, lugT0), AXLE_PL.n, [[0, 4.4], [1.2, 4.4], [1.45, 3.8]], 12, AXLE_PL.u);
+      return (
+        drawMesh(plate(AXLE_PL, { outer: bar }, lugT0, lugT1), cam, { material: "brass", shine: true }) +
+        drawMesh(cap, cam, { material: "steel", shine: true })
+      );
+    },
+  });
+  wheelLugTurn.drawAll();
 
   // ---- 8. Glare Ice Patch under Left Wheel (Step 6 & low-grip Lab!)
   const iceSlab = chamferPlate(FLOOR, roundedRect(20.0, 34.0, 3.8, GEO.xWheelL, 0), -26.2, -23.0, 0.55);
@@ -552,7 +531,37 @@ export function figure(M, cam, opts = {}) {
   ];
   once("icePatch", "ice", drawMesh(iceSlab, cam, { material: "cobalt", shine: true, crease: 38 }) + linesOn(cam, iceGlints, "rig-shine"));
 
-  // ---- 9. Engineering Centre Lines (mech.ts: centreLines)
+  // ---- 9. Engineering Centre Lines (mech.ts: centreLines), Pre-drawn Cross-Pin & Orbiting Spiders
+  const crossPinTurn = turningAxle("crossPin", {
+    period: Math.PI, // flipping p -> -p produces the identical cross-pin rod
+    n0: -2.05,
+    n1: 2.05,
+    draw: (rot) => crossPinSvg(cam, rot),
+  });
+  crossPinTurn.drawAll();
+
+  // Pre-draw orbiting spider bodies (36 orbit angles × 4 tooth phases across 36° pitch) and radial
+  // pointers (36 orbit angles × 16 spin angles) centred at origin, placed every frame by exact pure
+  // translation (<use> + translate) so 60 fps playback allocates zero SVG DOM garbage (zero GC spikes).
+  const SP_ORB = 36;
+  const SP_TOOTH_PH = 4;
+  const SP_PTR_PH = 16;
+  const SP_PITCH = TAU / 10;
+  const modBin = (a, period, n) => {
+    const m = ((a % period) + period) % period;
+    return Math.round((m / period) * n) % n;
+  };
+  const spBodyHrefs = Array.from({ length: SP_ORB }, (_, o) =>
+    Array.from({ length: SP_TOOTH_PH }, (_, p) =>
+      tpl(`spB-${o}-${p}`, () => spiderBodyLocalSvg(cam, ax, (o * TAU) / SP_ORB, (p * SP_PITCH) / SP_TOOTH_PH)),
+    ),
+  );
+  const spPtrHrefs = Array.from({ length: SP_ORB }, (_, o) =>
+    Array.from({ length: SP_PTR_PH }, (_, p) =>
+      tpl(`spP-${o}-${p}`, () => spiderPtrLocalSvg(cam, (o * TAU) / SP_ORB, (p * TAU) / SP_PTR_PH)),
+    ),
+  );
+
   once(
     "centreLines",
     "axes",
@@ -568,16 +577,17 @@ export function figure(M, cam, opts = {}) {
     shaftMark: shaftMarkTurn,
     ringTeeth: ringTeethTurn,
     ringBolts: ringBoltsTurn,
-    carrierR: carrierRightTurn,
-    carrierL: carrierLeftTurn,
-    sunLTeeth: sunL.teeth,
-    sunLMark: sunL.mark,
-    sunRTeeth: sunR.teeth,
-    sunRMark: sunR.mark,
-    wheelLRim: wheelL.rim,
-    wheelLLug: wheelL.lug,
-    wheelRRim: wheelR.rim,
-    wheelRLug: wheelR.lug,
+    carrierR: carrierTurn,
+    carrierL: carrierTurn,
+    crossPin: crossPinTurn,
+    sunLTeeth: sunTeethTurn,
+    sunLMark: sunMarkTurn,
+    sunRTeeth: sunTeethTurn,
+    sunRMark: sunMarkTurn,
+    wheelLRim: wheelRimTurn,
+    wheelLLug: wheelLugTurn,
+    wheelRRim: wheelRimTurn,
+    wheelRLug: wheelLugTurn,
   };
 
   /** Pose one 60 fps frame from the model's exact kinematic angles and flags. */
@@ -595,15 +605,21 @@ export function figure(M, cam, opts = {}) {
     const p = pinDir(carrierRad);
     const s1Pos = scale(p, GEO.rSun);
     const s2Pos = scale(p, -GEO.rSun);
+    const s1PtrPos = scale(p, GEO.rSun + GEO.spiderThick / 2 + 1.0);
+    const s2PtrPos = scale(p, -(GEO.rSun + GEO.spiderThick / 2 + 1.0));
+    const ob1 = modBin(carrierRad, TAU, SP_ORB);
+    const ob2 = (ob1 + SP_ORB / 2) % SP_ORB;
+    const tph = modBin(spiderRad, SP_PITCH, SP_TOOTH_PH);
+    const pph = modBin(spiderRad, TAU, SP_PTR_PH);
     // Cage tie-bars sit ±90° away from the cross-pin in YZ
     const strutDir = [0, Math.cos(carrierRad), -Math.sin(carrierRad)];
     const st1Pos = scale(strutDir, GEO.rStrut);
     const st2Pos = scale(strutDir, -GEO.rStrut);
 
     const items = [
-      // Background right side (farther along +X)
-      { id: `${px}-wheelRRim`, part: "wheelR", key: 1, ...placedTurn(wheelR.rim, rightRad) },
-      { id: `${px}-wheelRLug`, part: "wheelR", key: 2, ...placedTurn(wheelR.lug, rightRad) },
+      // Background right side (farther along +X; AXLE_AXES.n = [-1, 0, 0] so shift = -xCenter)
+      { id: `${px}-wheelRRim`, part: "wheelR", key: 1, ...placedTurn(wheelRimTurn, rightRad, -GEO.xWheelR) },
+      { id: `${px}-wheelRLug`, part: "wheelR", key: 2, ...placedTurn(wheelLugTurn, rightRad, -GEO.xWheelR) },
       { id: `${px}-axleROuter`, part: "axleR", key: 4 },
       { id: `${px}-housingRight`, part: "housing", key: 6 },
       { id: `${px}-housingBack`, part: "housing", key: 8 },
@@ -612,28 +628,30 @@ export function figure(M, cam, opts = {}) {
       { id: `${px}-pinion`, part: "pinion", key: 12, ...placedTurn(pinionTurn, pinionRad) },
       { id: `${px}-ringTeeth`, part: "ring", key: 15, ...placedTurn(ringTeethTurn, carrierRad) },
       { id: `${px}-ringBolts`, part: "ring", key: 16, ...placedTurn(ringBoltsTurn, carrierRad) },
-      { id: `${px}-carrierR`, part: "carrier", key: 18, ...placedTurn(carrierRightTurn, carrierRad) },
+      { id: `${px}-carrierR`, part: "carrier", key: 18, ...placedTurn(carrierTurn, carrierRad, -GEO.xCarrierR) },
       { id: `${px}-axleRInner`, part: "axleR", key: 19 },
 
       // Center bevel gearset (depth-sorted live by nearness so orbiting parts pass smoothly behind & in front!)
-      { id: `${px}-sunRTeeth`, part: "sunR", key: depthKey([GEO.rSpider + 1.9, 0, 0]), ...placedTurn(sunR.teeth, rightRad) },
-      { id: `${px}-sunRMark`, part: "sunR", key: depthKey([GEO.rSpider + 1.9, 0, 0]) + 0.05, ...placedTurn(sunR.mark, rightRad) },
-      { id: `${px}-crossPin`, part: "carrier", key: 28, svg: crossPinSvg(cam, carrierRad), transform: null },
-      { id: `${px}-spider1`, part: "spider", key: depthKey(s1Pos), svg: spiderSvg(cam, carrierRad, spiderRad, 1), transform: null },
-      { id: `${px}-spider2`, part: "spider", key: depthKey(s2Pos), svg: spiderSvg(cam, carrierRad, spiderRad, -1), transform: null },
+      { id: `${px}-sunRTeeth`, part: "sunR", key: depthKey([sunOffset, 0, 0]), ...placedTurn(sunTeethTurn, rightRad, -sunOffset) },
+      { id: `${px}-sunRMark`, part: "sunR", key: depthKey([sunOffset, 0, 0]) + 0.05, ...placedTurn(sunMarkTurn, rightRad, -sunOffset) },
+      { id: `${px}-crossPin`, part: "carrier", key: 28, ...placedTurn(crossPinTurn, carrierRad) },
+      { id: `${px}-spider1`, part: "spider", key: depthKey(s1Pos), href: spBodyHrefs[ob1][tph], transform: translateFromOrigin(s1Pos) },
+      { id: `${px}-spider1Ptr`, part: "spider", key: depthKey(s1PtrPos), href: spPtrHrefs[ob1][pph], transform: translateFromOrigin(s1Pos) },
+      { id: `${px}-spider2`, part: "spider", key: depthKey(s2Pos), href: spBodyHrefs[ob2][tph], transform: translateFromOrigin(s2Pos) },
+      { id: `${px}-spider2Ptr`, part: "spider", key: depthKey(s2PtrPos), href: spPtrHrefs[ob2][pph], transform: translateFromOrigin(s2Pos) },
       { id: `${px}-strut1`, part: "carrier", key: depthKey(st1Pos), href: tieBarTpl, transform: translateFromOrigin(st1Pos) },
       { id: `${px}-strut2`, part: "carrier", key: depthKey(st2Pos), href: tieBarTpl, transform: translateFromOrigin(st2Pos) },
-      { id: `${px}-sunLTeeth`, part: "sunL", key: depthKey([-(GEO.rSpider + 1.9), 0, 0]), ...placedTurn(sunL.teeth, leftRad) },
-      { id: `${px}-sunLMark`, part: "sunL", key: depthKey([-(GEO.rSpider + 1.9), 0, 0]) + 0.05, ...placedTurn(sunL.mark, leftRad) },
+      { id: `${px}-sunLTeeth`, part: "sunL", key: depthKey([-sunOffset, 0, 0]), ...placedTurn(sunTeethTurn, leftRad, +sunOffset) },
+      { id: `${px}-sunLMark`, part: "sunL", key: depthKey([-sunOffset, 0, 0]) + 0.05, ...placedTurn(sunMarkTurn, leftRad, +sunOffset) },
 
       // Foreground left side (nearer along -X)
       { id: `${px}-axleLInner`, part: "axleL", key: 40 },
-      { id: `${px}-carrierL`, part: "carrier", key: 42, ...placedTurn(carrierLeftTurn, carrierRad) },
+      { id: `${px}-carrierL`, part: "carrier", key: 42, ...placedTurn(carrierTurn, carrierRad, -GEO.xCarrierL) },
       { id: `${px}-housingLeft`, part: "housing", key: 44 },
       { id: `${px}-axleLOuter`, part: "axleL", key: 46 },
       { id: `${px}-icePatch`, part: "ice", key: 49, hidden: !show.ice },
-      { id: `${px}-wheelLRim`, part: "wheelL", key: 52, flags: { slip: !!show.slip }, ...placedTurn(wheelL.rim, leftRad) },
-      { id: `${px}-wheelLLug`, part: "wheelL", key: 53, flags: { slip: !!show.slip }, ...placedTurn(wheelL.lug, leftRad) },
+      { id: `${px}-wheelLRim`, part: "wheelL", key: 52, flags: { slip: !!show.slip }, ...placedTurn(wheelRimTurn, leftRad, -GEO.xWheelL) },
+      { id: `${px}-wheelLLug`, part: "wheelL", key: 53, flags: { slip: !!show.slip }, ...placedTurn(wheelLugTurn, leftRad, -GEO.xWheelL) },
       { id: `${px}-centreLines`, part: "axes", key: 58 },
     ];
 
