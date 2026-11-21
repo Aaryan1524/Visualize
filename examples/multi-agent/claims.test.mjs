@@ -5,6 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -60,7 +61,8 @@ test("multi-agent claims: narration scripts carry distinct variant wording witho
 });
 
 test("multi-agent claims: built audit report has zero problems and current review stamp", () => {
-  assert.ok(existsSync(AUDIT_PATH), "dist/multi-agent.audit.json must exist (run build.mjs first)");
+  if (!existsSync(AUDIT_PATH)) execFileSync(process.execPath, [join(HERE, "build.mjs")], { cwd: ROOT, stdio: "pipe" });
+  assert.ok(existsSync(AUDIT_PATH), "dist/multi-agent.audit.json must exist after build.mjs");
   const audit = JSON.parse(readFileSync(AUDIT_PATH, "utf8"));
   const review = JSON.parse(readFileSync(REVIEW_PATH, "utf8"));
   assert.deepEqual(audit.problems, []);
