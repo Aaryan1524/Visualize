@@ -1,21 +1,21 @@
-# Concept Rig: Elevating Abstract Concepts & Theories to Machine-Grade Craft
+# Concept Rig: Instruments for Layered Systems & Abstract Concepts
 
-Why this guide exists: the mechanical flagships (`examples/derailleur/`, `examples/escalator/`, `examples/lock/`, `examples/automatic-watch/`) read like plates from a master engineering monograph because they combine sculpted directional-shaded vector geometry (`src/rig/`), a synchronized magnified lens (`View A`), continuous 60 fps dynamics, real `What if` contrasts and an interactive Lab. Earlier concept scenes (`examples/lru-3d/`, `examples/retries/`, `examples/attention/`) reduced theories to rounded boxes and cylinders on flat slabs with no lab and no micro-lens.
+`src/rig/concept.ts` provides sculpted architectural instruments for multi-tier systems, distributed protocols, ML architectures, and theoretical processes on the shared Drawing page (`src/drawing/page.mjs`), complementing the flat-board parts in `src/rig/parts.ts` (`examples/bloom/`).
 
-`examples/multi-agent/` is the new bar for abstract concepts and theories. Build every systems architecture, distributed protocol, ML mechanism, algorithm or theoretical process to its standard using `src/rig/` + `src/rig/concept.ts` on the shared Drawing page (`src/drawing/`).
+`examples/multi-agent/` demonstrates this route: a 3-tier Concept Plate with per-step camera shots (`src/drawing/camera.mjs`), a synchronized trace lens, studio materials (`references/look.md`), a `What if` architecture contrast, an interactive Lab, and Now you try.
 
 ## The six principles
 
-1. **Sculpted architectural instruments, never bare slabs.**
-   Use `src/rig/concept.ts` (`deckTier`, `hubChassis`, `agentBlade`, `waferStack`, `portValve`, `vaultCore`, `conduitSvg`, `shuttleSvg`) and `src/rig/shapes.ts` (`chamferPlate`, `turned`, `rod`, `tube`, `gearOutline`, `arcOutline`). Every solid carries true outward normals, continuous `oklab` key-light shading, heavy silhouettes (`1.5 px`), finer creases (`0.7 px`), metallic specular lines and grounded contact shadows in razor-sharp vector SVG.
+1. **Sculpted instruments in studio materials (`references/look.md`).**
+   Use `src/rig/concept.ts` (`deckTier`, `hubChassis`, `agentBlade`, `waferStack`, `portValve`, `vaultCore`, `conduitSvg`, `shuttleSvg`) and `src/rig/shapes.ts` (`chamferPlate`, `turned`, `rod`, `tube`, `gearOutline`, `arcOutline`). Every solid carries true outward normals, continuous `oklab` key-light shading with wide cap-vs-wall contrast, heavy silhouettes (`1.5 px`), finer creases (`0.7 px`), specular lines on lit edges, and soft contact shadows (`plateShadow` for concave or holed parts, `contactShadow` for convex slabs).
 2. **Spatial hierarchy by plane or depth.**
-   Separate distinct conceptual responsibilities in 3D space (for example Control Plane → Execution Plane → Tools & Memory Plane on chamfered decks with steel standoffs), rather than flattening everything onto one tray.
-3. **Dual-lens storytelling (Macro 3D Topology + Synchronized `View A` Inspector).**
-   Pair the 3D rig on the left/centre with a live synchronized `View A` technical frame on the top-right (`inspectorFrame`, `ganttTraceSvg`, `budgetMetersSvg`, or a domain-native state/math/loupe view). Every packet or state change on the 3D rig must match the live cursor, gauge or phase badge in `View A` at the exact millisecond.
+   Separate distinct conceptual responsibilities in 3D space (for example Control Plane → Execution Plane → Tools & Memory Plane on chamfered decks with steel standoffs), rather than flattening everything onto one tray. Choose the camera azimuth and elevation from the assembly's shape rather than a fixed angle.
+3. **Per-step camera shots (`src/drawing/camera.mjs`) and optional `View A` trace lens.**
+   Give every focused step its own `shot`, `subject`, and `around` in `DATA.camera` (at most `2×` zoom, centred in the clear area) so the camera frames what the step teaches instead of staying fixed on the overview; `check-drawing.mjs` fails pages that hold the same framing for more than four steps in a row. When the subject also needs a synchronized timeline or budget readout, pair the 3D rig with a `View A` frame (`inspectorFrame`, `ganttTraceSvg`, `budgetMetersSvg`) marked `data-camera-avoid` so zoomed shots never slide under it.
 4. **Physical evidence of limits and failure modes.**
-   Never bury limits in captions. Draw a calibrated capacity collar (`waferStack` with a red cliff ring where overflow slices turn `ruby`), dashed fault conduits, bouncing retry shuttles or slipping clutches so the causal failure reads at a single glance.
+   Never bury limits in captions. Draw a calibrated capacity collar (`waferStack` with a `ruby` cliff ring where overflow slices turn `ruby`), dashed fault conduits, or bouncing retry shuttles so the causal failure reads at a glance.
 5. **Continuous 60 fps motion, draw once then move.**
-   Pre-render every solid template into `<defs>` once; each animation frame only swaps `<use>` hrefs and applies lightweight 2D transforms (`translate` or `moveInPlane`). Keep `check-drawing.mjs` playback p95 well under 8 ms (typically 1–3 ms).
+   Pre-render every solid template into `<defs>` once; each animation frame only swaps `<use>` hrefs and applies lightweight 2D transforms (`translate`, `moveInPlane`, or `turningPart()` for any turning thick solid so screen skew stays under `1 px`). Keep `check-drawing.mjs` playback p95 under 8 ms.
 6. **Full interactive depth on concepts too.**
    Every Concept Plate ships on `src/drawing/page.mjs` with:
    - **Problem first** (Step 0 states the concrete bottleneck and number that makes the idea necessary);
@@ -32,22 +32,21 @@ Why this guide exists: the mechanical flagships (`examples/derailleur/`, `exampl
 | `deckTier` | Architectural layers / planes (Control, Compute, Storage, Network) | Chamfered slab, projected blueprint grid (`rig-deck-grid`), steel corner standoffs |
 | `hubChassis` | Orchestrators, routers, schedulers, consensus leaders, load balancers | Octagonal beveled housing, alloy bezel ring, telemetry dome, live phase needle |
 | `agentBlade` | Specialist workers, microservices, model experts, compute nodes | Chamfered plinth + ceramic hood, machined cooling fins, live status beacon |
-| `waferStack` | Context windows, memory buffers, queues, token budgets, ledgers | Counted beveled wafers beside a calibrated post with red `ruby` cliff collar |
+| `waferStack` | Context windows, memory buffers, queues, token budgets, ledgers | Counted beveled wafers beside a calibrated post with `ruby` cliff collar |
 | `portValve` | External tools, APIs, semaphores, rate-limit gates, circuit breakers | Turned flanged cylinder, brass/alloy collar, semantic status cap |
 | `vaultCore` | Shared artifact stores, databases, checkpoints, vector stores | Stepped grooved cylinder with sealed commit ring |
 | `conduitSvg` + `shuttleSvg` | Multi-tier data buses, RPC channels, token streams, event pipes | Routed 3D casing + active semantic inner stroke + gliding 3D hexagonal shuttles |
-| `inspectorFrame` + `ganttTraceSvg` + `budgetMetersSvg` | Synchronized `View A` trace, critical-path timeline & capacity gauges | Editorial monograph frame, live orange playhead, dashed threshold cliff line |
+| `inspectorFrame` + `ganttTraceSvg` + `budgetMetersSvg` | Synchronized `View A` trace, critical-path timeline & capacity gauges | Technical frame (`data-camera-avoid`), live orange playhead, dashed threshold cliff line |
 
-## Material semantics (`src/rig/rig.css`)
+## Material semantics (`src/rig/rig.css`, `references/look.md`)
 
-Keep structural parts neutral (`frame`, `ceramic`, `steel`, `alloy`, `obsidian`, `slate`) and reserve semantic materials for at most three to four meanings listed in the title block legend:
+Follow the studio restraint and OKLab contrast rules in `references/look.md`. Keep structural bodies neutral (`frame`, `ceramic`, `cell`, `steel`, `alloy`, `obsidian`, `slate`) so tops stay off the stage white and caps separate cleanly from walls in both themes; let out-of-focus parts recede by tone (`--recede`), never by opacity. Reserve semantic materials for one signal colour (`subject`) plus at most three functional meanings listed in the title block legend:
 
-- `cobalt`: primary compute / planning / active safe state / springs
+- `subject` (orange): the single followed moving part, playhead, or primary highlight
+- `cobalt`: primary compute / planning / active safe state
 - `amber`: external I/O / tool calls / waiting / queues
 - `teal`: verified / compressed / committed / healthy completion
-- `subject` (vermilion): the single followed moving part, playhead, or primary highlight
-- `ruby`: faults, timeouts, retries, jewel bearings, or tokens past a hard cliff
-- `brass`: precision horological gears, collars, and mechanical drums
+- `ruby`: faults, timeouts, retries, or tokens past a hard cliff
 
 ## Verification gate
 
@@ -58,4 +57,4 @@ node --test examples/<name>/model.test.mjs
 node scripts/check-drawing.mjs dist/<name>.html   # must print: drawing: passed
 ```
 
-Then shoot every step in both light and dark themes and visually inspect callout clearance, View A alignment, leader lines after switching `What if`, and detail sharpness.
+`check-drawing.mjs` runs the camera checks and the look checks (`scripts/lib/look.mjs`: OKLab cap-vs-wall and subject-vs-stage contrast, framing variety, subject span, leader length/crossing, and visibility). Shoot every step in both light and dark themes (`scripts/shoot-steps.mjs`) and inspect callout clearance, `View A` alignment, leader lines after switching `What if`, and detail sharpness.

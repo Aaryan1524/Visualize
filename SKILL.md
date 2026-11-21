@@ -23,9 +23,11 @@ node <skill>/scripts/new-figure.mjs <name> --kind machine --dir <folder>   # a g
 ```
 
 Open the closest example before starting:
-- `examples/bloom/`: **the bar for a concept.** Sixteen bit cells in two rows, a word card, one arrow a hash function, the camera on each word's bits, a lab where the reader types any word, and the deletion trap.
-- `examples/derailleur/`: **the bar for a machine.** Bold shaded solids, each drawn once and then moved, so it reads as 3D and plays at 60 fps.
-- `examples/multi-agent/` and `examples/automatic-watch/`: newer rig pages (a concept on sculpted instruments with a trace lens; a watch movement). Useful for their parts (`src/rig/concept.ts`), not yet the bar.
+- `examples/bloom/`: concept page on `src/rig/parts.ts`. Sixteen bit cells in two rows, a word card, one arrow a hash function, the camera on each word's bits, a lab where the reader types any word, and the deletion trap.
+- `examples/derailleur/`: machine page on `src/rig/`. Bold shaded solids, each drawn once and then moved, so it reads as 3D and plays at 60 fps.
+- `examples/automatic-watch/`: 14-step `--deep` exploded horological calibre built on `src/rig/mech.ts` (`explodedStack` and `centreLines`).
+- `examples/differential/`: open differential built from `src/rig/mech.ts` (meshed gears, cutaway housing, and turning shafts).
+- `examples/multi-agent/`: 3-tier Concept Plate (`src/rig/concept.ts`) with per-step camera shots and a synchronized trace lens.
 - `examples/lock/` and `examples/escalator/`: machines that work in one plane, drawn as flat technical cutaways to scale (`references/drawing.md`) on the same page and player. The lock opens with the problem, ends with the second idea (picking) and lets the reader cut their own key.
 
 **Legacy, not for new pages:** `examples/lru/`, `retries/`, `attention/`, `lru-3d/` and `test/fixtures/gallery-*` are scene.ts pages on the older Unfold stage, checked by `scripts/verify.mjs`. They still build. Their references (`authoring.md`, `kit.md`, `verify.md`) are marked legacy, and the Drawing checks refuse their pages with a message saying so.
@@ -44,7 +46,7 @@ The evals taught this. Without it, four of five subjects came out as a straight 
 
 The parts (`src/rig/`, `references/figures.md`):
 - **Concepts:** `cellDrawing` (a cell or slot, with a printed value by `decalAt` and `valueText`, and a tone by flag), `railCentres` (a row with indices), `cardDrawing` (a token or key card), `ringSlots` and `turnAt` (a ring of slots), `markerDrawing` (a pointer), `arrow` (a link drawn in the figure's projection, routed with `via`), `workingStrip` (the working beside a part), `boardDrawing` (the floor).
-- **Machines:** `plate`, `turned`, `rod`, `sprocket` and `roundedHull` meshes, `moveInPlane` and `angleBin` for motion, `checkContacts` for what drives what.
+- **Machines:** `src/rig/mech.ts` (`spokedWheel`, `pinion`, `arbor`, `meshCentres`, `assertMeshed`, `bridge`, `jewelSetting`, `screw`, `cutawayShell`, plus `explodedStack` and `centreLines` for flat layered machines), low-level meshes (`plate`, `turned`, `rod`, `sprocket`, `roundedHull`), `turningPart()` (auto-binned turning solids checked for `< 1 px` skew), `moveInPlane` for flat motion, and `checkContacts` for what drives what.
 
 One part per real element, counted true. Draw the cause, not only the states. Do not draw boxes-and-arrows diagrams, and do not invent a decorative machine whose parts mean nothing. A part the subject needs and the rig lacks is a kit gap: build it in `src/rig/`, drawn once and moved, and record it.
 
@@ -65,7 +67,7 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask o
 | Depth | **The problem first:** step 0, the concept (no tab), says what the idea must achieve and what makes it hard, before anything moves; a topic it teaches is placed at `"step:0"`. **The second idea:** one step for what the field teaches right after the core (picking for a lock; the deletion trap and counting filters for a Bloom filter). **Hands-on:** every page has a lab (`DATA.lab`), where the reader sets a number or types a word or key and the model answers | In blind evals a plain agent beat the skill on depth by doing exactly these three |
 | Number of systems | One; a contrast goes in What if (the same story with one input changed) or in one step | Two figures halve the size of everything |
 | Prediction | Exactly one, asked on `PRED_STEP` about what the next step shows, the step before the causal moment | Predicting forces the reader to hold the rule; asked on the step itself, the heading gives it away |
-| Camera | A `shot` per step: the parts it is about, centred, lit, at most 2×; every part the heading names stays in frame (`subject`). It zooms and pans from one fixed angle and never turns. A step whose subject spans the whole figure has no shot | The reader keeps their bearings while each step is framed |
+| Camera | A `shot` per step: the parts it is about, centred, lit, at most 2×; every part the heading names stays in frame (`subject`). Choose the viewing angle and elevation from the object's shape (or use an exploded vertical stack for flat layered machines); once chosen, the camera zooms and pans without turning. A step whose subject spans the whole figure has no shot | The reader keeps their bearings while each step is framed |
 | Colour | Neutral parts; one followed part or tone in orange; at most three meanings (set, good, bad), each in the legend | Colour that means everything means nothing |
 | Words | Title of 1–4 words (the concept's name) with `about` as one line under it; one heading a step; callouts of 1–3 words, on the overview only where the camera zooms | Paragraphs get read instead of the figure |
 | Learning | Always `question(n, r)` from the model (three choices or more, answer computed); `whatIf` when one input changes the outcome (k, a size, a fault); the lab | A reader who answers a new case has understood |
@@ -107,7 +109,7 @@ A model checks the picture; nothing checked the words, and that is where the ski
 7. **Voice and build:** `node <folder>/voice.mjs`, then `node <folder>/build.mjs`.
 8. **Check and look**, until each passes:
    - `node --test <folder>/*.test.mjs`
-   - `node <skill>/scripts/check-drawing.mjs <page>`: framing, subjects, the camera's calm and determinism, playback timing, the lab, the prediction, practice, the rig's material colours, and the audit;
+   - `node <skill>/scripts/check-drawing.mjs <page>`: framing, subjects, the camera's calm and determinism, playback timing, the lab, the prediction, practice, the studio look checks (`references/look.md`: turn error, OKLab contrast, framing variety, subject span, leader length/crossing, and visibility), and the audit;
    - `node <skill>/scripts/check-arithmetic.mjs <page>`: every printed sum, product, quotient and remainder, redone;
    - `node <skill>/scripts/shoot-steps.mjs <page> --out <folder>/shots`, then open every image, then `--check-fresh`. A passing check proves the page is correct and tidy, not that it is beautiful: compare the shots with the derailleur's and the Bloom filter's.
 9. **Review:** the brief (Correctness, 4) to a fresh reviewer; fix or answer every finding, rebuild, and review again if the words changed.
@@ -124,7 +126,7 @@ A model checks the picture; nothing checked the words, and that is where the ski
 ## Craft rules (short form)
 
 `references/figures.md` gives the reasons, and its failure table the defect behind each.
-- **Bold shaded solids** in the rig's materials (`src/rig/rig.css`, included before the page's own CSS), with a heavier silhouette than creases and a shine on lit edges. Out-of-focus parts recede by tone, never by opacity.
+- **Bold shaded solids** in the studio materials (`src/rig/rig.css`, `references/look.md`, included before the page's own CSS), with a heavier silhouette than creases and a shine on lit edges. Out-of-focus parts recede by tone, never by opacity.
 - **Draw once, then move.** A figure rebuilt every frame stutters; `check-drawing` times every frame.
 - **Values are printed on parts** and read in both themes; a toned cell prints in its tone's dark ink.
 - **Arrows end on a face and never cross a printed value or index** (route them over a gap with `via`); `check-drawing` checks it.
@@ -146,7 +148,8 @@ The legacy scene.ts pages have their own gates (`verify.mjs`, `pnpm verify:contr
 
 ## References
 
-- `references/figures.md`: **the recipe, for machines and concepts**: the scaffold, the concept parts, the look, draw once and move, the camera, the page's prediction, lab and step 0, insets, and every failure with its check.
+- `references/figures.md`: **the recipe, for machines and concepts**: the scaffold, the concept and machine parts, the look, draw once and move, the camera, the page's prediction, lab and step 0, insets, and every failure with its check.
+- `references/look.md`: studio materials, OKLab value contrast, shadows, type, and the look checks enforced by `check-drawing.mjs`.
 - `references/drawing.md`: the Drawing page for real machines: what every page has, the page contract, the flat cutaway for one-plane machines, and the rig's reference.
 - `references/craft.md`: the visual rules, each with the defect that taught it.
 - Legacy (scene.ts pages only): `references/authoring.md`, `references/kit.md`, `references/verify.md`.

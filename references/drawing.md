@@ -1,9 +1,9 @@
 # The Drawing look: technical cutaways for mechanisms
 
-The bar for a real machine or physical system is set by two examples on one shared page and player (`src/drawing/`):
+Two flat cutaway examples share the same page and player (`src/drawing/`):
 
-- `examples/escalator/`: the flagship. A side elevation of a continuous loop.
-- `examples/lock/`: smaller, and the one to copy. A long section plus a cross-section, a story told in states rather than one continuous motion, the second idea (picking) and a lab.
+- `examples/escalator/`: a side elevation of a continuous loop.
+- `examples/lock/`: smaller, and the one to copy for a cutaway. A long section plus a cross-section, a story told in states rather than one continuous motion, the second idea (picking) and a lab.
 
 Build both (`node examples/escalator/build.mjs`, `node examples/lock/build.mjs`) and open `dist/escalator.html` and `dist/lock.html`. A mechanism page ships only when it reads as well as they do.
 
@@ -145,7 +145,8 @@ node scripts/check-drawing.mjs dist/<name>.html     # must print: drawing: passe
   - a figure clipped by anything but the stage, or bounds bigger than the figure or missing their part's anchor;
   - a camera that differs by how a step or time was reached;
   - a camera that moves too fast or holds a shot under 0.8 s;
-- playback: the 95th-percentile frame over 8 ms, or any frame outside a step change over one 60 fps frame (16.7 ms), both scaled to the machine (see "Check it plays"). Every frame of the whole story is timed, for every variant, from its start to its layout being done.
+- playback: the 95th-percentile frame over 8 ms, or any frame outside a step change over one 60 fps frame (16.7 ms), both scaled to the machine (see "Check it plays"). Every frame of the whole story is timed, for every variant, from its start to its layout being done;
+- the look checks (`scripts/lib/look.mjs`, `references/look.md`): turn error (`< 1 px` via `turningPart()`), OKLab cap-vs-wall and subject-vs-stage contrast, framing variety across steps, subject span, leader length and crossing, and covered-focus visibility (`VIZ_ONLY_LOOK=1` runs these alone).
 
 It is proven against faults: the old looping escalator, the round-4 eval lock (no lab, an incomplete contract) and the eval's clipped "Plug turns anyway" label planted back into the new lock.
 
@@ -160,32 +161,34 @@ Two drawings serve a machine. Pick by what the reader must see.
 | Use | When | Example |
 |---|---|---|
 | **The flat cutaway** (the rest of this page) | The mechanism works in one plane, and a section shows it: tracks and steps, pins and a shear line | `examples/escalator/`, `examples/lock/` |
-| **An isometric figure** on `src/rig/` | The mechanism works in depth as well: parts move sideways and in the side plane at once, or stack in layers a section would cut away | `examples/derailleur/`: the cage swings in the side plane while the parallelogram carries it across eleven cogs |
+| **An isometric figure** on `src/rig/` | The mechanism works in depth as well: parts move sideways and in the side plane at once, or stack in layers a section would cut away (flat layered machines such as watches, gearboxes and clutches use `explodedStack()` + `centreLines()` instead of squashing into a shallow disc) | `examples/derailleur/`, `examples/automatic-watch/`, `examples/differential/` |
 
 An isometric figure keeps everything else on this page: the model and its tests, the steps, the voice, the prediction, What if, the lab, Now you try, the audit and `check-drawing`.
 
 ### Build one with `src/rig/`
 
-- **Camera** (`camera.ts`): `fitCamera(points, box, azimuth, elevation)` fits an orthographic view to the figure's bounds; fit it to every pose the story reaches, so nothing leaves the stage. `insetCamera` makes a second, magnified view. Insets are optional and off by default: the main figure carries the explanation. If you add one, make it a true elevation (`references/figures.md`, "Insets").
+- **Camera** (`camera.ts`): `fitCamera(points, box, azimuth, elevation)` fits an orthographic view to the figure's bounds; fit it to every pose the story reaches, so nothing leaves the stage. Choose azimuth and elevation from the object's shape (or use an exploded vertical stack for flat layered machines) rather than a fixed angle. `insetCamera` makes a second, magnified view. Insets are optional and off by default: the main figure carries the explanation. If you add one, make it a true elevation (`references/figures.md`, "Insets").
+- **Mechanical kit** (`mech.ts`): `spokedWheel`, `pinion`, `arbor`, `meshCentres`, `assertMeshed`, `bridge`, `jewelSetting`, `screw`, `cutawayShell`, `explodedStack`, and `centreLines`. Use these for gear trains, housings, and layered assemblies instead of hand-rolling outlines per figure.
 - **Shapes** (`shapes.ts`): every part is a closed mesh whose faces carry their outward normals.
   - `plate(plane, { outer, holes }, t0, t1)` extrudes any outline: teeth, windows and slots included.
   - `turned(origin, axis, profile)` makes pulleys, bolts and barrels.
   - `rod(a, b, r)` makes pins.
   - A plate seen edge-on still draws: its walls are its rim.
-- **The look** (`draw.ts`, `rig.css`):
-  - `drawMesh(mesh, camera, { material, shine })` shades each face continuously from its normal under one key light fixed to the camera.
+- **The look** (`draw.ts`, `rig.css`, `references/look.md`):
+  - `drawMesh(mesh, camera, { material, shine })` shades each face continuously from its normal under one key light fixed to the camera. For self-occluding coils, pass `{ sort: "face" }` or use `drawSpiralRibbon` for flat springs (mainsprings, hairsprings).
   - The silhouette is drawn heavier than the creases.
   - Metal edges that catch the light get a specular line.
-  - `contactShadow` lays a soft shadow toward the part behind.
-  - Materials are token pairs (steel, alloy, chain, slate, subject, frame) in both themes.
+  - Use `plateShadow` (the part's true outline, keeping holes open) for concave or holed parts such as rotors, levers and bridges; use `contactShadow` (convex hull) only for convex slabs.
+  - Materials are token pairs (`steel`, `alloy`, `chain`, `slate`, `subject`, `frame`, `brass`, `ruby`, `blued`, `rhodium`, `graphite`, etc.) in both themes, with OKLab value-contrast spans enforced by `check-drawing.mjs`.
   - Make the subject the strongest material, keep context (frame, wheel) in `frame`, and let out-of-focus parts recede by tone (`--recede`), never by opacity: a see-through solid shows what it should hide.
 
 ### Draw once, then move
 
 A page that redraws its figure every frame stutters: the derailleur's first isometric version rebuilt about 2,800 elements a frame and ran near 25 fps. The rule:
 
-- **Build each part once**, at rest, and place it each frame with one SVG transform (`moveInPlane`). A flat part turning or sliding in its own plane is redrawn exactly by one 2D transform, because the camera is linear.
-- **A thick part that turns** is exact on the face it is placed by, and off by its thickness times the angle elsewhere. Draw it ahead at a few angles across its symmetry (`angleBin`), and turn only the small rest, placing it by the plane in the middle of what it draws. The derailleur draws one drawing a cog (half a tooth left over), two a pulley, a cage plate every 4° and a chain piece at 12 angles (`BINS` in `examples/derailleur/figure.mjs`). Hold every part under a pixel, and test it, as `examples/derailleur/figure.test.mjs` does (its worst is an inner link's rollers, 0.8 px).
+- **Prefer `turningPart()` for any turning thick solid.** A thick part placed by a raw 2D transform is exact only on one plane and skews elsewhere by its thickness times the angle. `turningPart()` chooses the fewest angle bins across the part's symmetry to keep screen skew under `1 px` (default `0.5 px`), places on the part's mid-plane, and records `turnErrPx` on `RigStage` for `check-drawing.mjs`.
+- **Keep stationary shafts and arbors unrotated:** draw fixed pins and arbors once as static parts rather than rotating them with their wheel.
+- **Use raw `moveInPlane` for pure translations or flat parts** turning in their own plane, where a single 2D affine transform is exact.
 - **Repeated parts are `<use>` instances** of one drawing, such as the chain's links. Selectors that name an ancestor do not reach inside a `<use>`, so style through tokens and classes without ancestors.
 - **Order with fixed slots.** Parts that are slabs between parallel planes (cogs, chain plates, pulleys, cage plates) are keyed by the gap they sit in (`slotKey`), so the order changes only when a part really crosses a plane.
 - **Rebuild only parts whose shape changes**, and only when their state does. In the derailleur those are the links on tilted pins, the spring, the inner cable and the force arrows.

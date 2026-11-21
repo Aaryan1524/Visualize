@@ -24,8 +24,8 @@ Each builds and passes `check-drawing` as generated, all but the review (which o
 
 | Subject | Figure | Example |
 |---|---|---|
-| A machine whose parts move in depth (sideways and in the side plane at once, or in layers) | **Rig solids** from `src/rig/` meshes (`plate`, `turned`, `rod`, `sprocket`) | `examples/derailleur/`: the cage swings in one plane while the parallelogram carries it across eleven cogs, and only solids show both |
-| An abstract concept: a data structure, an algorithm, a protocol, a mechanism in a paper | **Rig solids** from the concept parts (below), in the shape the field already draws | `examples/bloom/`: two rows of bit cells, a word card and one arrow a hash function |
+| A machine whose parts move in depth (sideways and in the side plane at once, or in layers) | **Rig solids** from `src/rig/mech.ts` and `src/rig/` meshes (`plate`, `turned`, `rod`, `sprocket`) | `examples/derailleur/` (cage and parallelogram), `examples/automatic-watch/` (exploded layered calibre), `examples/differential/` (meshed bevel and spur train) |
+| An abstract concept: a data structure, an algorithm, a protocol, a mechanism in a paper | **Rig solids** from `src/rig/parts.ts` or `src/rig/concept.ts`, in the shape the field already draws | `examples/bloom/` (bit cells, word card, hash arrows), `examples/multi-agent/` (3-tier Concept Plate with trace lens) |
 | A machine that works in one plane, where a section shows the cause | **The flat cutaway** (`references/drawing.md`): a Drawing page too, with the same page, player and checks | `examples/escalator/`, `examples/lock/` |
 
 The scene.ts route (the Unfold stage, `look: "drawing"` or `"clay"`, `verify.mjs`) is **legacy**: it is kept so `examples/lru/`, `retries/`, `attention/` and `lru-3d/` still build, and it is not chosen for a new page. The Drawing checks refuse its pages with a message saying so.
@@ -46,7 +46,7 @@ The scene.ts route (the Unfold stage, `look: "drawing"` or `"clay"`, `verify.mjs
 | The working | `workingStrip(rows, at, size)` | A small card-coloured tag of rows of text beside a part, upright on screen so long numbers read: `h1  2,668,802,083 mod 16 = 3`. A row appears as its step happens |
 | A floor | `boardDrawing(cam, { w, d })` | Quiet context, in `frame` |
 
-Put the camera at `CONCEPT_VIEW` (azimuth 247°, elevation 32°), a three-quarter view from the front left, so tops, fronts and printed values all read.
+`CONCEPT_VIEW` is a three-quarter default for flat-board concepts so tops, fronts and printed values all read; in general, pick the camera azimuth and elevation from the object's shape (or use an exploded vertical stack for flat layered assemblies) rather than forcing one angle on every subject.
 
 **How the concept parts are used well** (each learned on the Bloom filter):
 - **An arrow ends on the front face of its cell**, beside the index printed in front of it, never on its top: a head on the top covers the value printed there. An arrow to a back row goes over the gap between two front cells (`via`), never across one; a lift alone still crossed the front row's values. `check-drawing` fails any arrow that runs across a printed value or index at a still frame.
@@ -56,6 +56,14 @@ Put the camera at `CONCEPT_VIEW` (azimuth 247°, elevation 32°), a three-quarte
 - **Frame the overview to the figure.** Fit the camera to the cells and the card's place, not the board's rim, and fill the clear area with it; keep the clear area itself above the cards that open at the stage's lower right (`CLEAR.y1`), since the camera centres a subject in it at every size and nothing else keeps the subject from under a card.
 
 The rest of this page applies to both kinds: one followed part, a camera shot per step, contact tests where one part drives another.
+
+## Machine parts (`src/rig/mech.ts`)
+
+Use the reusable mechanical kit in `src/rig/mech.ts` instead of hand-rolling gear outlines or bridge slabs per figure:
+
+- **Gear train:** `spokedWheel` and `pinion` (clock or involute profiles), `arbor` for shafts, `meshCentres` to lay out a train from pitch radii and angles, and `assertMeshed` to verify centre distances and modules in tests.
+- **Structure and hardware:** `bridge` (with automatic screw and jewel hole records), `jewelSetting`, `screw`, and `cutawayShell` (opened toward `facingCamera(cam)`).
+- **Flat layered machines:** watches, gearboxes and clutches stack thin wheels on parallel planes. Separate their layers with `explodedStack()` and connect shared axes with dashed `centreLines()` instead of squashing the assembly into a shallow disc.
 
 ## The page
 
@@ -70,19 +78,24 @@ The rest of this page applies to both kinds: one followed part, a camera shot pe
 
 ## The look
 
-- **Materials** are token pairs in `src/rig/rig.css` (steel, alloy, chain, slate, subject, frame), in both themes.
-  - Put the page's CSS after `rig.css`. Without it every solid draws black, yet every other check still passes. `check-drawing` now fails a figure whose solids have no colours.
-- **One followed part, in orange** (`subject`): the part the story is about, such as the derailleur's cage and pulleys, or the scaffold's driving gear. Everything else is steel, alloy, slate or chain. Context (frame, wheel, base plate) is `frame`, quiet.
-- **Weights:** the silhouette is drawn heavier than the creases, and metal edges that catch the key light get a specular line (`drawMesh(…, { shine: true })`). A soft `contactShadow` falls toward the part behind.
+`references/look.md` defines the studio palette, OKLab value-contrast spans, and line/type rules.
+
+- **Materials** are token pairs in `src/rig/rig.css` (steel, alloy, chain, slate, subject, frame, brass, ruby, blued, rhodium, graphite, ceramic, cell, card, etc.), in both themes.
+  - Put the page's CSS after `rig.css`. Without it every solid draws black, yet every other check still passes. `check-drawing` fails a figure whose solids have no colours.
+- **One followed part, in orange** (`subject`): the part the story is about, such as the derailleur's cage and pulleys, or the scaffold's driving gear. Everything else is neutral metal or the material the real part is made of. Context (frame, wheel, base plate) is `frame`, quiet.
+- **Weights and shadows:** the silhouette is drawn heavier than the creases, and metal edges that catch the key light get a specular line (`drawMesh(…, { shine: true })`). For shadows laid toward the part behind, use `plateShadow` (the part's true outline with holes kept open) on concave or holed parts such as rotors, levers and bridges, and `contactShadow` only on convex slabs.
+- **Self-occluding coils:** pass `{ sort: "face" }` to `drawMesh`—or use `drawSpiralRibbon` for flat springs (mainsprings, hairsprings)—so nearer turns paint cleanly over farther ones.
 - **Detail:** enough to name every part a step names: teeth, bolts, a slot. Nothing the story never mentions.
 - **Receding:** out-of-focus parts recede by tone (`--recede`), never by opacity. A see-through solid shows what it should hide.
+- **Look checks:** `check-drawing.mjs` runs `scripts/lib/look.mjs` automatically and enforces turn error (`< 1 px`), OKLab cap-vs-wall and subject-vs-stage contrast, framing variety across steps, subject span, leader length and crossing, and covered-focus visibility (`VIZ_ONLY_LOOK=1` runs these alone).
 
 ## Draw once, then move
 
 A page that redraws its figure each frame stutters. The derailleur's first version rebuilt 2,800 elements a frame and ran near 25 fps.
 
-- **`moveInPlane`:** a flat part turning or sliding in its own plane moves by one exact 2D transform.
-- **Angle bins:** a thick part is exact only on the plane it is placed by. Draw it at a few angles across its symmetry with `angleBin` (one tooth for a gear), and turn only by what is left over. A test holds every part under a pixel (`examples/derailleur/figure.test.mjs`).
+- **`turningPart()` (preferred for turning thick solids):** a thick solid turned by a raw 2D transform skews by its thickness times the turn angle. Wrap every turning thick part in `turningPart()`, which computes the fewest angle bins across the part's symmetry to keep screen error under `1 px` (default `0.5 px`), places on the part's mid-plane, and reports `turnErrPx` to `RigStage` for `check-drawing.mjs`.
+- **Keep stationary shafts and arbors unrotated:** draw fixed pins and arbors once without turning them with the wheel.
+- **`moveInPlane`:** use raw `moveInPlane` for pure translations or flat parts turning in their own plane.
 - **`<use>` instances:** repeated parts, such as chain links, are instances of one drawing.
 - **Fixed slots:** parts that are slabs between parallel planes are ordered by the gap they sit in (`slotKey`). The order changes only when a part really crosses a plane.
 - **Rebuild only what changes shape:** in the derailleur, the links on tilted pins, the spring, the inner cable and the force arrows. Everything else is placed.
