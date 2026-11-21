@@ -5,7 +5,7 @@
 // Grounded in:
 //  - George Daniels, "Watchmaking" (going train ratios, Swiss lever escapement phases:
 //    lock, unlock, impulse, drop; slipping mainspring bridle; balance & hairspring regulation)
-//  - Standard 11.5-ligne (25.6 mm) Swiss automatic calibre architecture
+//  - Standard 11.5-ligne (25.6 mm) Swiss automatic calibre architecture (ETA 2824-2 class)
 
 export const WATCH = {
   calibreMm: 25.6, // standard 11.5-ligne movement diameter (mm)
@@ -48,7 +48,9 @@ export function barrelAt(windPct, windingActive = false) {
   const torque = r2(Math.min(WATCH.slipTorque, rawTorque));
   const slipping = w >= 99.5 && windingActive;
   const reserveHours = r1(frac * WATCH.barrelTurns * 6);
-  const ampDeg = Math.round(165 + (WATCH.nominalAmp - 165) * Math.pow(clamp((torque - WATCH.minTorque) / (WATCH.slipTorque - WATCH.minTorque), 0, 1), 0.8));
+  const ampDeg = Math.round(
+    165 + (WATCH.nominalAmp - 165) * Math.pow(clamp((torque - WATCH.minTorque) / (WATCH.slipTorque - WATCH.minTorque), 0, 1), 0.8),
+  );
   return { windPct: w, torque, slipping, reserveHours, ampDeg };
 }
 
@@ -157,6 +159,7 @@ export function makeModel(over = {}) {
   const reserveHours = D.barrelTurns * hoursPerBarrelTurn; // 42 hours
   const rotorRevsFull = D.barrelTurns * D.rotorRatio; // 840 revolutions
   const reg20 = regulatorAt(20);
+  const escapeTorqueIdealMNmm = r2((D.slipTorque * 1000) / totalRatio); // 1.25 or 2.00 mN·mm (= µN·m)
 
   return {
     D,
@@ -182,11 +185,22 @@ export function makeModel(over = {}) {
       reserveHours,
       rotorRevsFull,
       slipTorque: D.slipTorque,
+      minTorque: D.minTorque,
       nominalAmp: D.nominalAmp,
       lowAmp: D.lowAmp,
       liftAngle: D.liftAngle,
+      halfLiftDeg: D.liftAngle / 2,
       reg20Um: Math.abs(reg20.deltaUm),
+      regMaxRate: 20,
       toothStepDeg: 360 / beatsPerRev, // 12 deg
+      wheelToothStepDeg: 360 / D.escapeTeeth, // 24 deg
+      escapeTorqueIdealMNmm,
+      deskWear: windingRate(40),
+      sedentaryWear: windingRate(10),
+      fullWear: windingRate(100),
+      midWind: barrelAt(50, false),
+      lowWind: barrelAt(5, false),
+      fullWind: barrelAt(100, true),
     },
   };
 }

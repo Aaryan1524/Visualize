@@ -7,6 +7,9 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MODELS } from "./model.mjs";
+import { script, words } from "./story.mjs";
+
+export { script, words };
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -15,29 +18,6 @@ const opt = (name, fallback) => {
   return i >= 0 ? args[i + 1] : fallback;
 };
 const VOICE = opt("voice", "af_heart"), SPEED = Number(opt("speed", "0.96"));
-
-const ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
-const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
-export function words(n) {
-  n = Math.round(n);
-  if (n < 20) return ONES[n];
-  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? "-" + ONES[n % 10] : "");
-  if (n < 1000) return ONES[Math.floor(n / 100)] + " hundred" + (n % 100 ? " and " + words(n % 100) : "");
-  return words(Math.floor(n / 1000)) + " thousand" + (n % 1000 ? (n % 1000 < 100 ? " and " : " ") + words(n % 1000) : "");
-}
-
-export function script(M) {
-  const N = M.N, D = M.D;
-  return [
-    `An automatic watch has no battery, yet it must turn random wrist shakes into ${words(N.beatsPerSec)} exact beats every second — ${words(N.vph)} beats an hour — and keep running for ${words(N.reserveHours)} hours off the wrist.`,
-    `Four subsystems share one ${N.calibreMm} millimetre plate. On top sits [the oscillating rotor|rotor] and [two reversing wheels|reversing]. Beneath them sit [the mainspring barrel|barrel], [the geared going train|train], and [the escapement|escapement] coupled to [the balance wheel|balance].`,
-    `Whenever your wrist tilts, gravity swings [the heavy semicircular rotor|rotor]. [Two reversing click wheels|reversing] catch both clockwise and counter-clockwise swings and mesh with the barrel ratchet to wind one way only through a ${words(D.rotorRatio)} to one reduction.`,
-    `The winding train coils [the alloy mainspring|barrel] inside its toothed barrel. ${words(D.barrelTurns)} usable turns store ${words(N.reserveHours)} hours of power. At full wind, [a slipping bridle|bridle] lets the outer coil slide safely against the smooth barrel wall at ${D.slipTorque} newton millimetres so the rotor can never snap the spring.`,
-    `Four geared stages connect the barrel to the escape wheel with a ${words(N.totalRatio)} to one ratio. The balance rate and the ${words(N.centerToEscape)} to one train between center and escape wheels fix [the center wheel|train] at one turn an hour for the minute hand and the fourth wheel at one turn a minute for the second hand, while the ${words(N.barrelToCenter)} to one barrel stage paces the barrel at one turn every six hours.`,
-    `Without an escapement, the mainspring would unwind in seconds. View A magnifies [the fifteen-tooth escape wheel and ruby pallet fork|escapement]. Every ${words(N.beatMs)} milliseconds, the balance impulse jewel enters the fork notch to unlock a ruby stone; a club tooth then slides across that stone to swing the fork, which kicks the balance jewel before another tooth drops and locks on the opposite stone, advancing the wheel ${words(N.toothStepDeg)} degrees per beat.`,
-    `[The poised balance wheel and breathing hairspring|balance] set the watch's rhythm. Even as barrel torque tapers, harmonic oscillation holds the period steady. Moving [the regulator index|regulator] shortens or lengthens the ${words(D.hairspringMm)} millimetre hairspring by just ${words(N.reg20Um)} microns to adjust daily rate by twenty seconds a day.`,
-  ];
-}
 
 const parse = (say) => {
   const out = [], re = /\[([^\]|]+)\|([^\]]+)\]/g;
