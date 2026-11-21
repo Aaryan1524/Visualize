@@ -28,7 +28,7 @@ const VOICE = existsSync(join(HERE, "voice.json")) ? JSON.parse(readFileSync(joi
 // Callouts: text in the columns, a leader drawn live to the part's anchor (figure.mjs `at`).
 const label = (id, text, x, y, to, beats, anchor) => ({ id, text, at: [x, y], to, beats, anchor });
 const LABELS = [
-  label("rail", "Slots", LX, 2600, "rail", [1], "end"),
+  label("slots", "Slots", LX, 2600, "slots", [1], "end"),
   label("card", "Key", LX, 4300, "card", [1], "end"),
 ];
 const labelSvg = (l) => `<g class="label" data-label="${l.id}" data-beats="${l.beats.join(" ")}" data-at="${l.to}" data-to="${l.at[0]},${l.at[1]}"><path class="leader"/><circle class="ldot" r="26"/><text x="${l.at[0]}" y="${l.at[1]}" text-anchor="${l.anchor}">${esc(l.text)}</text></g>`;

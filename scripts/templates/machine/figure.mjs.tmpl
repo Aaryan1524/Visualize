@@ -1,22 +1,40 @@
-// __TITLE__: the figure, on Visualize's rig (src/rig). Every part is a closed solid shaded by one key
-// light, drawn once; each frame only places it (references/figures.md, "Draw once, then move").
+// __TITLE__: the figure, on Visualize's studio rig (src/rig & src/rig/mech.ts). Every part is a closed
+// solid shaded by one key light, drawn once; each frame only places it (references/figures.md, "Draw once,
+// then move").
 //
 //   const F = figure(M, camera)   // once per variant
-//   F.parts                       // drawings put in the page once: { id, part, svg }
-//   F.pose(state)                 // each frame: { items, at } (at: callout anchors on screen)
+//   F.parts                       // stationary drawings put in the page once: { id, part, svg }
+//   F.turning                     // turningPart() instances (each guarantees worstErrPx < 0.5 px)
+//   F.pose(state)                 // each frame: { items, at, defs } (at: callout anchors on screen)
 //
-// A gear turning in its own plane moves by one exact 2D transform (moveInPlane). A thick gear is exact
-// on the plane it is placed by and off elsewhere by its thickness times the turn left over, so each
-// gear is drawn at BINS angles across one tooth and turned only by the rest. The mark on each face
-// breaks that symmetry, so it is a part of its own, turned by the whole angle on the face's plane.
+// Every thick turning solid is wrapped in turningPart(), which computes the fewest pre-drawn angle bins
+// across the part's symmetry to keep screen distortion under 0.5 px and reports turnErrPx to RigStage so
+// check-drawing.mjs can verify the budget across every frame.
 
-import { affineString, angleBin, circlePoints, drawMesh, fitCamera, moveInPlane, planeOf, plate, screenOf, sprocket, turned } from "__ROOT__/src/rig/index.ts";
+import {
+  affineString,
+  arbor,
+  axesOf,
+  contactShadow,
+  drawMesh,
+  drawPart,
+  fitCamera,
+  keyLight,
+  moveInPlane,
+  planeOf,
+  plate,
+  scale,
+  screenOf,
+  spokedWheel,
+  turned,
+  turningPart,
+} from "__ROOT__/src/rig/index.ts";
 export { RigStage, screenOf } from "__ROOT__/src/rig/index.ts";
 
 export const W = (x, y, e) => [x, -e, y]; // the rig's world is [x, y, z] with z up
 export const VIEW = { azimuth: 236, elevation: 22 };
-export const BINS = 4;
 export const THICK = 8; // mm, each gear's face width
+const COLLET_H = 2.2;
 const FRONT = [0, -1, 0]; // toward the viewer's side (+e)
 const SIDE = planeOf([0, 0, 0], FRONT, [1, 0, 0]);
 const AXES = { origin: [0, 0, 0], u: SIDE.u, v: SIDE.v, n: SIDE.n };
@@ -26,48 +44,137 @@ const TAU = Math.PI * 2;
 export function cameraFor(M, box) {
   const pts = [];
   for (const [cx, R] of [[0, M.r1 + M.tip + 16], [M.centre, M.r2 + M.tip + 14]])
-    for (let a = 0; a < 360; a += 20) for (const e of [-14, THICK + 10]) pts.push(W(cx + R * Math.cos((a * Math.PI) / 180), R * Math.sin((a * Math.PI) / 180), e));
+    for (let a = 0; a < 360; a += 20) for (const e of [-14, THICK + 12]) pts.push(W(cx + R * Math.cos((a * Math.PI) / 180), R * Math.sin((a * Math.PI) / 180), e));
   return fitCamera(pts, box, VIEW.azimuth, VIEW.elevation);
 }
 
 export function figure(M, cam) {
   const parts = [];
+  const defs = new Map();
   const once = (id, part, svg) => parts.push({ id, part, svg });
+  const tpl = (id, make) => {
+    if (!defs.has(id)) defs.set(id, { svg: `<g id="${id}">${make()}</g>`, sent: false });
+    return `#${id}`;
+  };
+  const drainDefs = () => {
+    const out = [];
+    for (const d of defs.values()) if (!d.sent) ((d.sent = true), out.push(d.svg));
+    return out;
+  };
   const S = (x, y, e) => screenOf(cam, W(x, y, e));
-  const place = (theta, to, n) => affineString(moveInPlane(cam, AXES, theta, to, n, n));
-  // the plate the shafts stand in, behind the gears: quiet context
-  const R = Math.max(M.r1, M.r2) + M.tip + 12;
-  const plateOutline = [[-M.r1 - M.tip - 14, -R], [M.centre + M.r2 + M.tip + 14, -R], [M.centre + M.r2 + M.tip + 14, R], [-M.r1 - M.tip - 14, R]];
-  once("plate", "plate", drawMesh(plate(SIDE, { outer: plateOutline }, -14, -10), cam, { material: "frame" }));
-  // the two gears, each drawn at BINS angles across one tooth, at the origin, in the plane e = 0..THICK
-  const gear = (z, r, rot, material) => drawMesh(plate(SIDE, { outer: sprocket(z, r, M.tip, rot), holes: [circlePoints(5, 24)] }, 0, THICK), cam, { material, shine: true });
-  for (let b = 0; b < BINS; b++) {
-    once(`driver${b}`, "driver", gear(M.z1, M.r1, (b * TAU) / M.z1 / BINS, "subject"));
-    once(`driven${b}`, "driven", gear(M.z2, M.r2, (b * TAU) / M.z2 / BINS, "steel"));
-  }
-  // a mark on each face, so a reader can count the turns
-  const mark = (r) => drawMesh(turned(W(r * 0.62, 0, THICK), FRONT, [[0, 2.8], [0.6, 2.8]], 16, [1, 0, 0]), cam, { material: "slate" });
-  once("mark1", "driver", mark(M.r1));
-  once("mark2", "driven", mark(M.r2));
-  // the shafts: turned, so they look the same at every angle; drawn once, placed once
-  const shaft = drawMesh(turned(W(0, 0, -10), FRONT, [[0, 5], [THICK + 16, 5]], 24, [1, 0, 0]), cam, { material: "alloy", shine: true });
-  once("shaft1", "driver", shaft);
-  once("shaft2", "driven", shaft);
+  const placeStatic = (to, n) => affineString(moveInPlane(cam, AXES, 0, to, n, n));
+  const ax = axesOf(cam.azimuth, cam.elevation);
+  const shadowOff = scale(keyLight(ax), -2.5);
+
+  // Quiet base plate behind the gears, with soft contact shadows grounding the train
+  const R = Math.max(M.r1, M.r2) + M.tip + 16;
+  const plateOutline = [[-M.r1 - M.tip - 18, -R], [M.centre + M.r2 + M.tip + 18, -R], [M.centre + M.r2 + M.tip + 18, R], [-M.r1 - M.tip - 18, R]];
+  const disc1 = plate(SIDE, { outer: Array.from({ length: 28 }, (_, i) => [M.r1 * Math.cos((i * TAU) / 28), M.r1 * Math.sin((i * TAU) / 28)]) }, -10, -9.8);
+  const disc2 = plate(SIDE, { outer: Array.from({ length: 36 }, (_, i) => [M.centre + M.r2 * Math.cos((i * TAU) / 36), M.r2 * Math.sin((i * TAU) / 36)]) }, -10, -9.8);
+  once(
+    "plate",
+    "plate",
+    drawMesh(plate(SIDE, { outer: plateOutline }, -14, -10), cam, { material: "frame" }) +
+      contactShadow(disc1, cam, shadowOff) +
+      contactShadow(disc2, cam, shadowOff),
+  );
+
+  // Involute gears from src/rig/mech.ts wrapped in turningPart() (screen error < 0.45 px across every turn)
+  const driver = turningPart(cam, AXES, {
+    id: "driver",
+    def: tpl,
+    period: TAU / M.z1,
+    n0: 0,
+    n1: THICK + COLLET_H,
+    maxErrPx: 0.45,
+    unitsPerPx: 10,
+    draw: (rot) =>
+      drawPart(
+        spokedWheel(M.z1, M.r1, THICK, {
+          axis: FRONT,
+          uHint: [1, 0, 0],
+          form: "involute",
+          spokes: 0,
+          hubR: 8.5,
+          colletR: 6.2,
+          colletH: COLLET_H,
+          rot,
+          material: "subject",
+          colletMaterial: "alloy",
+        }),
+        cam,
+      ),
+  });
+  const driven = turningPart(cam, AXES, {
+    id: "driven",
+    def: tpl,
+    period: TAU / 4, // 4 spokes + tooth count divisible by 4 -> exact 4-fold symmetry
+    n0: 0,
+    n1: THICK + COLLET_H,
+    maxErrPx: 0.45,
+    unitsPerPx: 10,
+    draw: (rot) =>
+      drawPart(
+        spokedWheel(M.z2, M.r2, THICK, {
+          axis: FRONT,
+          uHint: [1, 0, 0],
+          form: "involute",
+          spokes: 4,
+          colletR: 9.2,
+          colletH: COLLET_H,
+          rot,
+          material: "steel",
+          colletMaterial: "alloy",
+        }),
+        cam,
+      ),
+  });
+  // Heat-blued index pins on each gear face so the reader can count turns (also budgeted with turningPart)
+  const markPin = (id, r) =>
+    turningPart(cam, AXES, {
+      id,
+      def: tpl,
+      period: TAU,
+      n0: THICK,
+      n1: THICK + 0.8,
+      maxErrPx: 0.45,
+      unitsPerPx: 10,
+      draw: (rot) => drawMesh(turned(W(r * Math.cos(rot), r * Math.sin(rot), THICK), FRONT, [[0, 2.8], [0.8, 2.8]], 16, [1, 0, 0]), cam, { material: "blued", shine: true }),
+    });
+  const mark1 = markPin("mark1", M.r1 * 0.62);
+  const mark2 = markPin("mark2", M.r2 - 1.25 * M.m - 3.2);
+  driver.drawAll();
+  driven.drawAll();
+  mark1.drawAll();
+  mark2.drawAll();
+
+  // Stationary arbors from src/rig/mech.ts: drawn once, placed without turning
+  const shaft = drawPart(arbor(4.8, THICK + 22, { at: W(0, 0, -10), axis: FRONT, uHint: [1, 0, 0], material: "alloy" }), cam);
+  once("shaft1", "shaft", shaft);
+  once("shaft2", "shaft", shaft);
+
+  const turning = { driver, driven, mark1, mark2 };
 
   function pose(st) {
     const p = M.pose(st.turns ?? 0), items = [], at = {};
     items.push({ id: "plate", key: 0, transform: null });
-    for (const [name, a, z, c, k] of [["driver", p.a1, M.z1, [0, 0], 10], ["driven", p.a2, M.z2, [M.centre, 0], 11]]) {
-      const { bin, rest } = angleBin(a, TAU / z, BINS);
-      for (let b = 0; b < BINS; b++) items.push(b === bin ? { id: `${name}${b}`, key: k, transform: place(rest, c, THICK / 2) } : { id: `${name}${b}`, key: k, hidden: true });
-    }
-    items.push({ id: "mark1", key: 15, transform: place(p.a1, [0, 0], THICK) }, { id: "mark2", key: 15, transform: place(p.a2 - Math.PI + Math.PI / M.z2, [M.centre, 0], THICK) });
-    items.push({ id: "shaft1", key: 20, transform: place(0, [0, 0], 0) }, { id: "shaft2", key: 20, transform: place(0, [M.centre, 0], 0) });
+    const d1 = driver.place(p.a1, [0, 0], 0);
+    const d2 = driven.place(p.a2, [M.centre, 0], 0);
+    const m1 = mark1.place(p.a1, [0, 0], 0);
+    const m2 = mark2.place(p.a2 - Math.PI + Math.PI / M.z2, [M.centre, 0], 0);
+    items.push(
+      { id: "driver", part: "driver", key: 10, href: d1.href, transform: d1.transform, turnErrPx: d1.turnErrPx },
+      { id: "driven", part: "driven", key: 11, href: d2.href, transform: d2.transform, turnErrPx: d2.turnErrPx },
+      { id: "mark1", part: "driver", key: 15, href: m1.href, transform: m1.transform, turnErrPx: m1.turnErrPx },
+      { id: "mark2", part: "driven", key: 15, href: m2.href, transform: m2.transform, turnErrPx: m2.turnErrPx },
+      { id: "shaft1", key: 20, transform: placeStatic([0, 0], 0) },
+      { id: "shaft2", key: 20, transform: placeStatic([M.centre, 0], 0) },
+    );
     at.driver = S(-M.r1 * 0.55, M.r1 * 0.5, THICK);
     at.driven = S(M.centre + M.r2 * 0.5, -M.r2 * 0.45, THICK);
     at.mesh = S(M.r1, 0, THICK);
     at.shaft = S(M.centre, 0, THICK + 6);
-    return { items, at };
+    return { items, at, defs: drainDefs() };
   }
-  return { parts, pose };
+  return { parts, turning, pose };
 }

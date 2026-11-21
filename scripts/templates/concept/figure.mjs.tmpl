@@ -81,6 +81,7 @@ export function figure(M, cam) {
     // the slots this key has looked at, the one it is on included: what a step about probing frames
     at.run = [...(st.probed ?? []), ...(st.target === null || st.target === undefined ? [] : [st.target])].map((i) => screenOf(cam, [L.slots[i][0], L.slots[i][1], CELL.h]));
     at.rail = screenOf(cam, [L.slots[0][0] - CELL.w / 2, L.slots[0][1], CELL.h / 2]);
+    at.slots = at.rail;
     at.railEnd = screenOf(cam, [L.slots[M.m - 1][0] + CELL.w / 2, L.slots[0][1], CELL.h / 2]);
     at.card = screenOf(cam, [card[0] - CARD.w / 2, card[1], CARD.h]);
     return { items, at };

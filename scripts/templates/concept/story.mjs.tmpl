@@ -13,7 +13,7 @@ import { insert } from "./model.mjs";
 // marker on the slot looked at).
 export const STEPS = [
   { tab: null, focus: null },
-  { tab: "The table", focus: null },
+  { tab: "The table", focus: null, subject: ["slots", "card"] },
   { tab: "Hash", focus: null, shot: ["card", "target"], subject: ["card", "target"] },
   { tab: "Collide", focus: null, shot: ["target", "probe", "card"], subject: ["target", "card"] },
   { tab: "Cluster", focus: null, shot: ["run", "card"], subject: ["target", "card"] },

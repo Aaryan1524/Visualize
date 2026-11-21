@@ -15,11 +15,11 @@
 // the story; references/figures.md is the recipe.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 const args = process.argv.slice(2);
 const name = args.find((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--") && !["--no-voice", "--force"].includes(args[i - 1])));
 const opt = (k, d) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : d);
@@ -36,8 +36,9 @@ if (existsSync(dir) && readdirSync(dir).length && !args.includes("--force")) {
   process.exit(1);
 }
 mkdirSync(dir, { recursive: true });
+const realDir = realpathSync(dir);
 // imports reach the skill by a relative path, so the folder can sit anywhere on this disk
-let rel = relative(dir, ROOT).split(sep).join("/") || ".";
+let rel = relative(realDir, ROOT).split(sep).join("/") || ".";
 if (!rel.startsWith(".")) rel = `./${rel}`;
 for (const f of readdirSync(TEMPLATES).filter((f) => f.endsWith(".tmpl"))) {
   const text = readFileSync(join(TEMPLATES, f), "utf8").replaceAll("__ROOT__", rel).replaceAll("__NAME__", name).replaceAll("__TITLE__", title);
@@ -49,11 +50,14 @@ if (!args.includes("--no-voice")) {
   execFileSync(process.execPath, [join(dir, "voice.mjs")], { cwd: dir, stdio: "inherit" });
 }
 const page = join(dir, "dist", `${name}.html`);
+const auditFile = join(dir, "dist", `${name}.audit.json`);
+const shotsDir = join(dir, "shots");
 console.log(`
 Next:
   node --test ${join(dir, "model.test.mjs")} ${join(dir, "claims.test.mjs")}
   node ${join(dir, "build.mjs")}
   node ${join(ROOT, "scripts", "check-drawing.mjs")} ${page}       (passes all but the review)
   node ${join(ROOT, "scripts", "check-arithmetic.mjs")} ${page}
-  node ${join(ROOT, "scripts", "shoot-steps.mjs")} ${page}         (then look at every image)
+  node ${join(ROOT, "scripts", "shoot-steps.mjs")} ${page} --out ${shotsDir}   (look at every light & dark image)
+  node ${join(ROOT, "scripts", "review-brief.mjs")} ${auditFile} ${join(dir, "review.json")} ${page} --shots ${shotsDir}   (give to a fresh independent reviewer)
 Replace the model first: model.mjs, then figure.mjs and story.mjs (references/figures.md).`);

@@ -185,13 +185,34 @@ export function audit(a) {
   if (a.reviewFile && existsSync(a.reviewFile)) {
     try {
       const r = JSON.parse(readFileSync(a.reviewFile, "utf8"));
-      // A finding is closed when the reviewer has checked the fix on the current text (fixed: true),
-      // or has accepted the author's answer (resolved: true with a response saying why the text stands).
-      const open = (r.findings ?? []).filter((f) => !(f.fixed === true || (f.resolved && String(f.response ?? "").trim().length > 8)));
-      // One review may cover several variants of a page: "stamps" lists each text it read.
-      const read = [r.stamp, ...(r.stamps ?? [])].filter(Boolean);
-      review = !read.includes(stamp) ? "stale" : open.length ? "open" : "current";
-      if (review === "open") problems.push(...open.map((f) => `review: open finding: ${f.finding}`));
+      if (r.reviewer !== "independent") {
+        review = "invalid";
+        problems.push(`review: reviewer must be "independent" (got ${JSON.stringify(r.reviewer)}); self-review does not count — run review-brief.mjs and give it to a fresh reviewer`);
+      } else {
+        // A finding is closed when the reviewer has checked the fix on the current text (fixed: true),
+        // or has accepted the author's answer (resolved: true with a response saying why the text stands).
+        const open = (r.findings ?? []).filter((f) => !(f.fixed === true || (f.resolved && String(f.response ?? "").trim().length > 8)));
+        // Structured conceptual & visual pass/fail gates (written by the upgraded review brief).
+        const checkProblems = [];
+        if (r.checks !== undefined) {
+          if (!r.checks || typeof r.checks !== "object" || Array.isArray(r.checks)) {
+            checkProblems.push(`review: checks must be an object with { conceptual, visual } ("pass" | "fail")`);
+          } else {
+            for (const k of ["conceptual", "visual"]) {
+              if (r.checks[k] !== undefined && r.checks[k] !== "pass") {
+                checkProblems.push(`review: ${k} check is ${JSON.stringify(r.checks[k])} (must be "pass" after fixing findings)`);
+              }
+            }
+          }
+        }
+        // One review may cover several variants of a page: "stamps" lists each text it read.
+        const read = [r.stamp, ...(r.stamps ?? [])].filter(Boolean);
+        review = !read.includes(stamp) ? "stale" : open.length || checkProblems.length ? "open" : "current";
+        if (review === "open") {
+          problems.push(...open.map((f) => `review: open finding: ${f.finding}`));
+          problems.push(...checkProblems);
+        }
+      }
     } catch (e) {
       problems.push(`review: ${a.reviewFile} is not valid JSON (${e.message})`);
     }

@@ -87,14 +87,24 @@ Off by default. Turn it on only when the request says `--deep` or asks in words 
 - **The same checks on every step.** Depth never relaxes a check: every number still comes from the model, every claim is audited and reviewed, every step is framed.
 - **Long pages remember where the reader stopped.** A page of 12 steps or more offers "Resume at step k" on its opening (kept in the reader's browser only).
 
-## Correctness: what the page says is checked too
+## Correctness & mandatory end-of-`/visualize` review
 
-A model checks the picture; nothing checked the words, and that is where the skill lost round 5 of the evals: a derailleur page said the cage spring swings the cage forward (it pulls it back), and limit screws were never taught. Every page carries four checks, run by `src/claims/audit.mjs` at build time:
+A model checks the picture; `src/claims/audit.mjs` checks the words; and a fresh independent reviewer checks BOTH conceptual soundness and studio visual quality before any page ships. Every page carries four build-time audit checks:
 
 1. **Topics before pictures.** Before any drawing, find what a good reference teaches for the subject (a manual, a textbook, a reference page; search when you can) and write the list with its source: `COVERAGE = { source, topics: [{ topic, where }] }`. Each core topic is placed at a step (`"step:0"` for the concept, `"step:3"`), `"lab"`, `"whatif"` or `"practice"`, or `"deferred"` with a reason that Details also states. At least three in four core topics are taught. The topics decide the number of steps.
 2. **No typed numbers.** Every number in the voice, headings, captions, cards and Details must exist in the model at the precision shown ("about" allows 5%). A number that is not a quantity of the subject (a hash's width in bits) goes in `allow` with a reason.
 3. **Claims.** Each cause-and-effect sentence goes in `CLAIMS` word for word as the page says it, with a test against the model. The audit fails if the sentence is not on the page or the model disagrees.
-4. **A reviewer who did not build it.** `node <skill>/scripts/review-brief.mjs <name>.audit.json <dir>/review.json <page>` prints a brief; give it to a fresh agent (a subagent) or a person. It writes `review.json`, stamped with the text it read. Fix each finding (the edit makes the review stale, so review again) or answer it (`resolved: true` with a `response`). Your own review does not count.
+4. **Mandatory fresh independent reviewer (every `/visualize`, every model).** Run:
+   ```sh
+   node <skill>/scripts/review-brief.mjs <name>.audit.json <dir>/review.json <page> --shots <dir>/shots
+   ```
+   Hand the printed brief (along with `model.mjs` and the fresh light & dark PNGs in `<dir>/shots`) to a **fresh-context reviewer who did NOT build the page**:
+   - **Claude Code:** spawn a fresh subagent with the `Agent` tool (no prior build context).
+   - **Codex:** spawn a fresh reviewer with `spawn_agent` (or a fresh read-only `codex exec` run).
+   - **Gemini / Antigravity:** spawn a fresh subagent with `invoke_subagent` (or a fresh swarm worker).
+   - **No subagent available:** stop and hand the printed brief to the user; **never self-review**.
+
+   The reviewer inspects (a) **conceptual & domain sanity** (`model.mjs` computes real mechanics/math, SI/domain units, physical direction, cause-and-effect, edge/failure cases — not hand-waving), (b) **studio visual consistency** across light & dark shots (`references/look.md`: 3D top-vs-side contrast, clean silhouettes with no bow-tie cutouts or dark-mode CSS bugs, exploded stacks for flat layered machines, one `subject` signal colour, short non-crossing leaders, calm composition), and (c) **cross-consistency** across headings, readouts, captions, voice, lab, practice, and pictures. It writes `review.json` with `"reviewer": "independent"` and `"checks": { "conceptual": "pass"|"fail", "visual": "pass"|"fail" }`. `audit.mjs` rejects missing/self reviews, stale stamps after edits, open findings, or any failing `conceptual`/`visual` check. Fix every finding, rebuild, re-shoot, and re-run the fresh reviewer until both checks pass.
 
 ## Workflow
 
@@ -103,7 +113,7 @@ A model checks the picture; nothing checked the words, and that is where the ski
 1. **Topics first** (Correctness, 1), then the one line: "A textbook draws <concept> as <shape>."
 2. **Scaffold:** `node <skill>/scripts/new-figure.mjs <name> --kind concept|machine --dir <folder>`. Build it and look at it once, so you know what passing looks like.
 3. **The model** (`model.mjs`): pure functions, no imports (the page inlines it). Test it against a separately written reference and the cases the story needs (`model.test.mjs`).
-4. **The figure** (`figure.mjs`): the field's shape from rig parts, each drawn once in `figure()` and placed in `pose(state)`; values and tones by attribute. **Working draft early:** build and open it before any polish; a wrong shape is cheap to change now.
+4. **The figure** (`figure.mjs`): the field's shape from rig parts (`src/rig/mech.ts` + `turningPart()` for machines; `src/rig/parts.ts` or `src/rig/concept.ts` for concepts), each drawn once in `figure()` and placed in `pose(state)`; values and tones by attribute. **Working draft early:** build and open it before any polish; a wrong shape is cheap to change now.
 5. **The story** (`story.mjs`): steps with their `shot` and `subject`, headings, captions and the narration, all written from the model; `CLAIMS` and `COVERAGE`.
 6. **The hooks** (`build.mjs`): the motion through each step (`at`, `stillAt`), `boundsOf` for each camera name, the lab, `question(n, r)`, What if variants and the prediction.
 7. **Voice and build:** `node <folder>/voice.mjs`, then `node <folder>/build.mjs`.
@@ -111,27 +121,29 @@ A model checks the picture; nothing checked the words, and that is where the ski
    - `node --test <folder>/*.test.mjs`
    - `node <skill>/scripts/check-drawing.mjs <page>`: framing, subjects, the camera's calm and determinism, playback timing, the lab, the prediction, practice, the studio look checks (`references/look.md`: turn error, OKLab contrast, framing variety, subject span, leader length/crossing, and visibility), and the audit;
    - `node <skill>/scripts/check-arithmetic.mjs <page>`: every printed sum, product, quotient and remainder, redone;
-   - `node <skill>/scripts/shoot-steps.mjs <page> --out <folder>/shots`, then open every image, then `--check-fresh`. A passing check proves the page is correct and tidy, not that it is beautiful: compare the shots with the derailleur's and the Bloom filter's.
-9. **Review:** the brief (Correctness, 4) to a fresh reviewer; fix or answer every finding, rebuild, and review again if the words changed.
+   - `node <skill>/scripts/shoot-steps.mjs <page> --out <folder>/shots`, then open every light & dark image, then `--check-fresh`. Compare the shots against the studio baseline (`automatic-watch`, `differential`, `multi-agent`, `derailleur`, `bloom`).
+9. **Mandatory independent review:** generate the brief with `review-brief.mjs <audit> <dir>/review.json <page> --shots <folder>/shots` and give it to a fresh reviewer (Correctness, 4). Fix every conceptual or visual finding, rebuild, re-shoot, and re-run the independent reviewer until `review: current` with `checks.conceptual === "pass"` and `checks.visual === "pass"`.
 10. **Deliver** with this report, and nothing vaguer:
 
     ```text
     Built <title>: <n> steps, from <parts>. Model tested against <reference>.
-    check-drawing: passed. audit: clean (<n> claims, <m> topics, review current).
-    arithmetic: <n> equations. shots: <n>, <first> to <last>, looked at.
+    check-drawing: passed. audit: clean (<n> claims, <m> topics, review: independent — conceptual pass, visual pass).
+    arithmetic: <n> equations. shots: <n>, <first> to <last>, light & dark inspected.
     Files: <page>, <folder>. Open: <page>#step=<the key step>. Not verified by machine: <whatever you judged only by eye>.
     ```
     A machine adds `contacts: <n> checked`. Report only checks you ran.
 
-## Craft rules (short form)
+## Craft rules (studio baseline, every model)
 
-`references/figures.md` gives the reasons, and its failure table the defect behind each.
+`references/figures.md` gives the reasons, `references/look.md` the tokens, and the failure table the defect behind each.
 - **Bold shaded solids** in the studio materials (`src/rig/rig.css`, `references/look.md`, included before the page's own CSS), with a heavier silhouette than creases and a shine on lit edges. Out-of-focus parts recede by tone, never by opacity.
+- **Machine studio kit (`src/rig/mech.ts` + `turningPart()`):** wrap every turning thick solid in `turningPart()` (`worstErrPx < 0.5 px`; raw `moveInPlane()` on thick rotating solids fails `check-drawing`). Separate flat layered machines (watches, gearboxes, clutches) with `explodedStack()` + `centreLines()`. Use `plateShadow` on concave/holed parts and `{ sort: "face" }` or `drawSpiralRibbon` on coils and spoked cutouts.
+- **Concept studio kit (`src/rig/parts.ts` or `src/rig/concept.ts`):** draw the field's canonical shape (`parts.ts` for data structures & algorithms; `concept.ts` for tiered architectures & multi-stage systems), with live working on stage.
 - **Draw once, then move.** A figure rebuilt every frame stutters; `check-drawing` times every frame.
 - **Values are printed on parts** and read in both themes; a toned cell prints in its tone's dark ink.
 - **Arrows end on a face and never cross a printed value or index** (route them over a gap with `via`); `check-drawing` checks it.
 - **Motion means something:** a bit turns as its arrow lands; a key walks to the slot it looks at. Nothing moves for decoration.
-- **The figure dominates.** One desktop viewport holds the title, the figure, the heading, the readouts and the controls.
+- **The figure dominates.** One desktop viewport holds the title, the figure, the heading, the readouts and the controls. One signal colour (`subject` orange) on a calm neutral stage; short, non-crossing callout leaders.
 
 ## Review gates
 

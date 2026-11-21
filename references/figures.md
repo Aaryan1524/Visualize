@@ -2,7 +2,7 @@
 
 Every new page is a Drawing page on the rig: a tested model, a figure of shaded solids drawn once and moved, a camera shot per step, a recorded voice, the audit's claims and topics, a lab and Now you try, put together by `drawingPage()` (`src/drawing/page.mjs`) and checked by `check-drawing`, `check-arithmetic` and `shoot-steps`. Machines and concepts take the same route; only the parts differ.
 
-Two pages show the bar: the rear derailleur (`examples/derailleur/`), a machine, and the Bloom filter (`examples/bloom/`), a concept. Their first versions failed in the ways listed at the end. Each failure now has a check, and each check is in the scaffold.
+Five pages show the studio bar: `examples/derailleur/`, `examples/automatic-watch/` (14-step `--deep` exploded calibre on `src/rig/mech.ts`), and `examples/differential/` (cutaway meshed train on `src/rig/mech.ts`) for machines; `examples/bloom/` (`src/rig/parts.ts`) and `examples/multi-agent/` (3-tier Concept Plate on `src/rig/concept.ts`) for concepts. Their earlier versions failed in the ways listed at the end. Each failure now has a check, and each check is in the scaffold and enforced by `check-drawing` + the mandatory independent review.
 
 Start with the scaffold, then replace its parts in order:
 
@@ -160,5 +160,6 @@ An inset at a near angle shows slanted faces, and the reader cannot judge alignm
 | **An estimate called exact:** the page called Bloom's classic formula the exact expected rate, and it ranked the hash counts wrongly at 16 bits | The model computes the true expectation by counting, tested against an exact reference and a seeded simulation; the page names each formula for what it is |
 | **What if variants that lost lessons:** one hash function never showed a false negative, six never a "definitely not" | The model chooses each variant's words so every case happens; a test checks every lesson in every variant |
 | **A heading that gave the answer away:** the prediction was set on the step it asks about, so the heading above it said "A false positive" | The prediction sits on the step before (`PRED_STEP`); `check-drawing` checks it is revealed on the next step |
+| **Subtle domain errors or visual defects past automated checks:** a 1,000× SI torque unit slip (`µN·mm` vs `mN·mm`), a bow-tie spoke cutout, a dark-mode CSS variable cycle, or a hand-waved explanation | Mandatory fresh independent reviewer at the end of every `/visualize` (`scripts/review-brief.mjs` with `--shots`): checks `model.mjs` conceptual soundness AND light/dark rendered PNGs against `references/look.md`. `src/claims/audit.mjs` enforces `"reviewer": "independent"` and passing `checks.conceptual` & `checks.visual` |
 
-The rule under every row is the same: **look at the page as built**. Checks pass frames that read wrong, so open every fresh shot.
+The rule under every row is the same: **look at the page as built, and never ship without a fresh independent review**. Checks catch mechanical regressions; a fresh reviewer catches conceptual nonsense and subtle visual flaws across Claude, Codex and Gemini alike.

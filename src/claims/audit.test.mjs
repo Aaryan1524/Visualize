@@ -64,19 +64,35 @@ test("coverage: a missing source, a topic on no step, and a silent deferral all 
   assert.deepEqual(only(audit({ ...base(["the cage spring pulls the cage back"]), coverage: silent, details: "Not covered: the B-tension screw." }), "coverage"), []);
 });
 
-test("review: missing, stale and open reviews fail; a current one passes", () => {
+test("review: missing, self-reviewed, stale, failed-check and open reviews fail; a current independent one passes", () => {
   const dir = mkdtempSync(join(tmpdir(), "vz-review-"));
   const file = join(dir, "review.json");
   const a = base(["the cage spring pulls the cage back"], { reviewFile: file });
   assert.equal(audit(a).review, "missing");
-  writeFileSync(file, JSON.stringify({ stamp: "old", findings: [] }));
-  assert.equal(audit(a).review, "stale");
   const stamp = stampOf(a.texts, a.claims);
-  writeFileSync(file, JSON.stringify({ stamp, findings: [{ finding: "60° vs 37°", resolved: false }] }));
+  writeFileSync(file, JSON.stringify({ stamp, findings: [] }));
+  assert.equal(audit(a).review, "invalid", "missing reviewer field must fail");
+  writeFileSync(file, JSON.stringify({ stamp, reviewer: "self", findings: [] }));
+  assert.equal(audit(a).review, "invalid", "self-review must fail");
+  writeFileSync(file, JSON.stringify({ stamp: "old", reviewer: "independent", findings: [] }));
+  assert.equal(audit(a).review, "stale");
+  writeFileSync(file, JSON.stringify({ stamp, reviewer: "independent", findings: [{ finding: "60° vs 37°", resolved: false }] }));
   assert.equal(audit(a).review, "open");
-  writeFileSync(file, JSON.stringify({ stamp, findings: [{ finding: "60° vs 37°", resolved: true }] }));
+  writeFileSync(file, JSON.stringify({ stamp, reviewer: "independent", findings: [{ finding: "60° vs 37°", resolved: true }] }));
   assert.equal(audit(a).review, "open", "closing a finding needs a response");
-  writeFileSync(file, JSON.stringify({ stamp, findings: [{ finding: "60° vs 37°", resolved: true, response: "60° is the total swing; the readout is the current angle, now labelled so." }] }));
+  writeFileSync(file, JSON.stringify({ stamp, reviewer: "independent", checks: { conceptual: "fail", visual: "pass" }, findings: [] }));
+  assert.equal(audit(a).review, "open", "failing conceptual check must block approval");
+  writeFileSync(file, JSON.stringify({ stamp, reviewer: "independent", checks: { conceptual: "pass", visual: "fail" }, findings: [] }));
+  assert.equal(audit(a).review, "open", "failing visual check must block approval");
+  writeFileSync(
+    file,
+    JSON.stringify({
+      stamp,
+      reviewer: "independent",
+      checks: { conceptual: "pass", visual: "pass" },
+      findings: [{ finding: "60° vs 37°", resolved: true, response: "60° is the total swing; the readout is the current angle, now labelled so." }],
+    }),
+  );
   const r = audit(a);
   assert.equal(r.review, "current");
   assert.equal(r.ok, true, r.problems.join("\n"));

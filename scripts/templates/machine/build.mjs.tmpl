@@ -66,6 +66,7 @@ function machine(DATA) {
   function mount(v, m) {
     V = v;
     model = m;
+    $("rigDefs").replaceChildren();
     F = FIG.figure(model, FIG.cameraFor(model, DATA.box));
     $("scene").replaceChildren();
     stage = new FIG.RigStage($("scene"));
@@ -74,6 +75,7 @@ function machine(DATA) {
   function render(state, S) {
     cur = state;
     const o = F.pose(state);
+    if (o.defs?.length) $("rigDefs").insertAdjacentHTML("beforeend", o.defs.join(""));
     stage.apply(o.items);
     lastAt = o.at;
     focusParts();

@@ -1,14 +1,15 @@
 // node --test model.test.mjs
 //
-// The model's physics, and the one test every machine with a driving contact needs: where the
-// driving gear meets the driven gear, the two must move together on screen (src/rig/contacts.ts). A
-// sign slip in an angle, a mirrored camera or a gear turned the wrong way fails it.
+// The model's physics, gear-train mesh geometry (assertMeshed), turning-part skew budget (< 0.5 px),
+// and the one test every machine with a driving contact needs: where the driving gear meets the driven
+// gear, the two must move together on screen (src/rig/contacts.ts). A sign slip in an angle, a mirrored
+// camera or a gear turned the wrong way fails it.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MODELS } from "./model.mjs";
 import { cameraFor, figure, W, THICK } from "./figure.mjs";
-import { carry, checkContacts, screenOf } from "__ROOT__/src/rig/index.ts";
+import { assertMeshed, carry, checkContacts, screenOf } from "__ROOT__/src/rig/index.ts";
 
 const BOX = { x: 4400, y: 500, w: 4900, h: 5500 };
 
@@ -19,17 +20,25 @@ for (const [name, M] of Object.entries(MODELS)) {
     assert.ok(Math.abs(M.pose(1).out - M.z1 / M.z2) < 1e-12);
     assert.ok(Math.sign(M.pose(0.1).a2 - M.pose(0).a2) === -1 && Math.sign(M.pose(0.1).a1 - M.pose(0).a1) === 1);
     assert.ok(Math.abs(M.torqueOut(10) * M.speedOut(60) - 10 * 60) < 1e-9, "power in equals power out");
+    assertMeshed({ at: [0, 0], teeth: M.z1, pitchR: M.r1 }, { at: [M.centre, 0], teeth: M.z2, pitchR: M.r2 });
+  });
+
+  test(`${name}: every turning part stays under the 0.5 px skew budget`, () => {
+    const cam = cameraFor(M, BOX), F = figure(M, cam);
+    for (const [k, tp] of Object.entries(F.turning)) {
+      assert.ok(tp.worstErrPx < 0.5, `${k} worst turn error ${tp.worstErrPx.toFixed(3)} px >= 0.5 px`);
+    }
   });
 
   // where the gears mesh, the driving tooth and the driven tooth move together on screen
   const contactsOf = (reverse = false) => {
     const cam = cameraFor(M, BOX), F = figure(M, cam), contacts = [];
-    const shown = (items, name) => items.find((i) => i.id.startsWith(name) && /\d$/.test(i.id) && !i.hidden && !i.id.startsWith("mark"));
+    const byId = (items, id) => items.find((i) => i.id === id);
     for (const t of [0, 0.013, 0.31, 0.77]) {
       const dt = 0.002;
       const a = F.pose({ turns: t }).items, b = F.pose({ turns: t + dt }).items;
-      const da = shown(a, "driver"), db = shown(b, "driver"), ga = shown(a, "driven"), gb = shown(b, "driven");
-      if (da.id !== db.id || ga.id !== gb.id) continue; // a different drawing between the frames
+      const da = byId(a, "driver"), db = byId(b, "driver"), ga = byId(a, "driven"), gb = byId(b, "driven");
+      if (da.href !== db.href || ga.href !== gb.href) continue; // a different bin drawing between frames
       const P = screenOf(cam, W(M.r1, 0, THICK / 2));
       contacts.push({ where: "mesh", chain: [P, carry(da.transform, db.transform, P)], wheel: [P, reverse ? carry(gb.transform, ga.transform, P) : carry(ga.transform, gb.transform, P)] });
     }
