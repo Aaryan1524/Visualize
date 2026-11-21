@@ -211,17 +211,23 @@ export function player(DATA, machine, kit) {
   // Ease from where the camera is to wherever it should be now (navigation, the scrubber, a step change).
   function camBlend() {
     if (!C.el || reduced || C.instant || C.flow || !C.cur) return void (C.blend = null);
-    C.blend = { from: C.cur, t0: performance.now(), d: null }; // its length is set on the first frame, once the target is known
+    C.blend = { from: C.cur, t0: null, d: null }; // anchored on the first rAF frame so blend speed matches frame time
   }
-  function camApply() {
+  function camApply(now) {
     if (!C.el) return;
     const target = camTarget();
     let m = target;
     if (C.blend) {
       if (C.blend.d === null) C.blend.d = CAM.duration(C.blend.from, target, C.clear) * 1000;
-      const u = C.blend.d ? (performance.now() - C.blend.t0) / C.blend.d : 1;
-      if (u >= 1) C.blend = null;
-      else m = CAM.lerp(C.blend.from, target, CAM.ease(u), C.clear);
+      if (now === undefined) {
+        if (C.blend.d > 0) m = C.blend.from;
+        else C.blend = null;
+      } else {
+        if (C.blend.t0 === null) C.blend.t0 = now;
+        const u = C.blend.d ? Math.max(0, (now - C.blend.t0) / C.blend.d) : 1;
+        if (u >= 1) C.blend = null;
+        else m = CAM.lerp(C.blend.from, target, CAM.ease(u), C.clear);
+      }
     }
     C.target = target;
     // a voice-led shot lights what it shows, with or without the voice
@@ -232,9 +238,9 @@ export function player(DATA, machine, kit) {
       C.el.setAttribute("transform", CAM.same(m, CAM.ID) ? "" : `matrix(${m.s.toFixed(5)} 0 0 ${m.s.toFixed(5)} ${m.x.toFixed(2)} ${m.y.toFixed(2)})`);
     }
     if (C.blend && !S.running && !C.raf)
-      C.raf = requestAnimationFrame(() => {
+      C.raf = requestAnimationFrame((ts) => {
         C.raf = 0;
-        camApply();
+        camApply(ts);
         followLeaders();
       });
   }
@@ -324,12 +330,12 @@ export function player(DATA, machine, kit) {
       /* sandboxed frames */
     }
   }
-  function draw() {
+  function draw(now) {
     const k = segOf(S.T);
     const still = reduced || S.pinPose;
     S.state = machine.at(k, still ? poseT(k) - SEG.s[k] : S.T - SEG.s[k], still, SEG);
     machine.render(S.state, S);
-    camApply();
+    camApply(now);
     followLeaders();
     scrub.value = String(S.T);
   }
@@ -384,12 +390,12 @@ export function player(DATA, machine, kit) {
       const held = PREDS.find((p) => p.step >= S.step && p.step < k && !answered(p.step));
       if (held) {
         S.T = SEG.s[held.step + 1] - 1e-3;
-        draw();
+        draw(now);
         return stop(true);
       }
       if (S.T >= SEG.total) {
         S.T = SEG.total - 1e-3;
-        draw();
+        draw(now);
         return setRunning(false);
       }
       if (k !== S.step) {
@@ -398,7 +404,7 @@ export function player(DATA, machine, kit) {
         C.flow = false;
       }
     }
-    draw();
+    draw(now);
     requestAnimationFrame(tick);
   }
   // Continuous play runs the step from its start if the machine is elsewhere (after a tour, say).
