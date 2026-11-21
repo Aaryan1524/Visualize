@@ -840,10 +840,11 @@ try {
       const settle = async () => {
         for (let i = 0; i < 60 && (await p.evaluate(() => window.__viz.camera().blending)); i++) await wait(50);
       };
-      for (let k = 1; k < cam.tracks.length; k++) {
+      const tabSteps = await p.evaluate(() => [...document.querySelectorAll(".vz-chapters button")].map((b, idx) => ({ idx, k: Number(b.dataset.first || idx + 1) })));
+      for (const { idx, k } of tabSteps) {
         const a = await p.evaluate((k) => (window.__viz.seekStep(k), window.__viz.camera().m), k);
         await p.evaluate((k) => window.__viz.seekStep(k === 1 ? 2 : k - 1), k);
-        await p.evaluate((k) => document.querySelectorAll(".vz-chapters button")[k - 1].click(), k);
+        await p.evaluate((idx) => document.querySelectorAll(".vz-chapters button")[idx].click(), idx);
         await settle();
         const b = await p.evaluate(() => window.__viz.camera().m);
         if (!near(a, b)) fail(`camera: step ${k} by seekStep is ${show(a)}, by its tab ${show(b)}`);
@@ -910,13 +911,13 @@ try {
       if (variants.length) await p.evaluate((v) => window.__viz.variant(v), variants[0]);
       // and the eased move a tab click makes, timed frame by frame in the page
       let tabTop = 0;
-      for (let k = 1; k < cam.tracks.length; k++) {
+      for (const { idx, k } of tabSteps) {
         await p.evaluate((k) => window.__viz.seekStep(k - 1), k);
         const fr = await p.evaluate(
-          (k) =>
+          (idx) =>
             new Promise((done) => {
               const out = [];
-              document.querySelectorAll(".vz-chapters button")[k - 1].click();
+              document.querySelectorAll(".vz-chapters button")[idx].click();
               const t0 = performance.now();
               const step = (now) => {
                 out.push({ t: now, m: window.__viz.camera().m });
@@ -925,7 +926,7 @@ try {
               };
               requestAnimationFrame(step);
             }),
-          k,
+          idx,
         );
         let top = 0;
         for (let i = 1; i < fr.length; i++) {
@@ -936,7 +937,7 @@ try {
         if (top > SPEED * 1.1) fail(`camera: the move to step ${k} by its tab reaches ${top.toFixed(2)} short sides a second, over ${SPEED}`);
         tabTop = Math.max(tabTop, top);
       }
-      console.log(`camera calm by tab: the fastest of ${cam.tracks.length - 1} tab moves reaches ${tabTop.toFixed(2)} short sides/s`);
+      console.log(`camera calm by tab: the fastest of ${tabSteps.length} tab moves reaches ${tabTop.toFixed(2)} short sides/s`);
       if (errors.length) fail(`camera: console errors: ${[...new Set(errors)].join(" | ")}`);
     }
     await p.close();
