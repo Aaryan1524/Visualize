@@ -2,7 +2,34 @@
 
 One version covers the kit and the skill (`package.json` `version` and `SKILL.md` `metadata.version` move together). Each entry names the failure that caused it, so the reason for a rule is never lost.
 
-## Unreleased
+## 1.1.0 (2026-11-21), studio rig, mechanical kit, deep mode and independent review
+
+A unified studio-grade Drawing rig for both machines and abstract concepts, a reusable mechanical parts kit, automated visual look checks, multi-chapter `--deep` explanations, and a mandatory cross-model independent review gate (Claude Code, Codex and Antigravity). Backward-compatible with 1.0.0 pages and checks.
+
+### Studio rig, mechanical kit and look checks
+
+An early automatic watch passed every geometry check and still read as a squashed cream-on-cream disc: raw 2D rotation skewed thick gears, bucket-sorted faces interleaved coiled springs, convex contact shadows plugged a C-shaped rotor into a solid D-blob, flat materials vanished against the stage, every step shared one framing, and leader lines ran the height of the movement. Each failure is now fixed in the engine and enforced by `check-drawing`.
+
+- **Rig engine upgrades (`src/rig/`):**
+  - `turningPart()` computes the fewest pre-drawn angle bins across a solid's symmetry to keep screen error under `0.5 px`, places on the part's mid-plane, and records exact `turnErrPx` on `RigStage`.
+  - Face-order sorting (`{ sort: "face" }`) and `drawSpiralRibbon` paint self-occluding coils and spoked cutouts without face-merge artefacts.
+  - `plateShadow` preserves concave openings and holes instead of collapsing shadows into a convex hull.
+  - Role classes (`.rig-cap`, `.rig-wall`, `.rig-end`) allow automated measurement of top-vs-side contrast across both themes.
+- **Reusable mechanical parts kit (`src/rig/mech.ts`):** `spokedWheel` and `pinion` (clock and involute profiles with `readableTeeth` guard), `arbor`, `meshCentres` and `assertMeshed`, `bridge` (with screw/jewel hole records), `jewelSetting`, `screw`, `cutawayShell` (opened toward `facingCamera(cam)`), `helicalSpring`, plus `explodedStack()` and dashed `centreLines()` for flat layered assemblies.
+- **Concept Plates (`src/rig/concept.ts`):** sculpted multi-tier instruments, hubs, conduits, and synchronized lenses for multi-stage system and architecture explanations.
+- **Studio look & automated look checks (`references/look.md`, `scripts/lib/look.mjs`):** widened OKLab material spans and calm neutral chrome in `rig.css`/`chrome.css` (light and dark). `check-drawing.mjs` now enforces turn error (`< 1 px` and no unbudgeted thick rotation), OKLab cap-vs-wall and lit-top-vs-stage contrast, framing variety across steps, minimum subject span, leader length and crossing limits, and focus visibility — verified by 9 of 9 planted faults in `scripts/plant-look.mjs`.
+- **Three new & rebuilt flagship pages:**
+  - `examples/automatic-watch/`: 14-step `--deep` 4-chapter exploded horological calibre on `src/rig/mech.ts` with per-step shots, 28 voice clips, 3 chapter predictions, and a `Regulate it` lab.
+  - `examples/differential/`: Open Differential cutaway second-machine proof built strictly on `src/rig/mech.ts` with meshed bevel/spur train, live 3D orbiting spider gears, and independent review.
+  - `examples/multi-agent/`: 3-tier Concept Plate with per-step camera shots, studio contrast, and 3-state physical Shared Artifact Vault.
+- **Cross-model studio consistency & mandatory end-of-`/visualize` independent review:**
+  - Upgraded `scripts/templates/machine/` (onto `src/rig/mech.ts` + `turningPart()`) and fixed `scripts/templates/concept/` Step 1 framing plus macOS symlink path resolution in `scripts/new-figure.mjs`, so both scaffolds pass every `check-drawing` look, skew, camera and arithmetic gate out of the box.
+  - Upgraded `scripts/review-brief.mjs` (auto-detecting `model.mjs` and `shots/`) to require a 3-part fresh-context review of **conceptual & domain sanity**, **studio visual consistency** in both light & dark themes, and **cross-consistency** — with explicit harness invocation instructions in `SKILL.md` for Claude Code, Codex and Antigravity.
+  - Hardened `src/claims/audit.mjs` to reject missing or self-authored reviews (`"reviewer": "independent"` required) and validate `checks: { conceptual, visual }` pass gates.
+  - Fixed `src/claims/arithmetic.mjs` to parse thousands separators (`28,800`, `1,200`) in printed equations and added `check-arithmetic.mjs` across all 7 Drawing pages in `check:drawing`.
+  - Fixed `scripts/check-drawing.mjs` chapter-tab iteration via `data-first` on `--deep` multi-chapter pages.
+
+### Deep mode and polish
 
 - **Deep explanations, on request.** A reader who asks with `--deep` (or "in depth", "deep dive") gets 4–6 chapters and about 10–15 minutes instead of one short story. The header shows one tab a chapter (`chapter` on each step), `DATA.predict` may be a list with one prediction a chapter (play and the tour stop at each, each answer kept and revealed on its own), and a page of 12 steps or more offers "Resume at step k". `check-drawing` checks every prediction and fails a long page with fewer than one every 8 steps. Single-prediction pages are unchanged.
 

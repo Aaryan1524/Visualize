@@ -4,7 +4,7 @@ description: Build step-through visual explanations whose picture is checked aga
 license: MIT
 compatibility: Works in Claude Code, Codex and Antigravity. Needs Node.js 24+ (runs TypeScript directly) and Google Chrome or Chromium for the checks. Run `npm install` (or `pnpm install`) once in this folder.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Visualize
