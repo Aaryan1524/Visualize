@@ -16,6 +16,7 @@ test("watch: going train ratios yield exact 60:1 minute-to-second, 960:1/600:1 c
   assert.equal(mod.N.beatMs, 125);
   assert.equal(mod.N.beatsPerDay, 691200);
   assert.equal(mod.N.reserveHours, 42);
+  assert.equal(mod.N.escapeTorqueIdealMNmm, 1.25);
   assert.equal(vin.N.totalRatio, 3600);
   assert.equal(vin.N.vph, 18000);
   assert.equal(vin.N.hz, 2.5);
@@ -23,6 +24,7 @@ test("watch: going train ratios yield exact 60:1 minute-to-second, 960:1/600:1 c
   assert.equal(vin.N.beatMs, 200);
   assert.equal(vin.N.beatsPerDay, 432000);
   assert.equal(vin.N.reserveHours, 42);
+  assert.equal(vin.N.escapeTorqueIdealMNmm, 2.0);
 });
 
 test("watch: barrel slipping bridle caps torque at 7.2 N·mm and slips only at full wind under wrist motion", () => {

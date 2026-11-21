@@ -1,0 +1,43 @@
+{
+  "stamp": "065a928a776a1346",
+  "reviewer": "independent",
+  "summary": "Round 2 verification complete (stamp 065a928a776a1346). All 4 Round-1 findings are fixed and visually verified on fresh screenshots (wide-step-1-light.png, wide-step-6-light.png, tight-step-1-light.png, wide-step-6-dark.png) and updated source/audit files. Title block has clean spacing before 'm / rpm' in both wide and tight variants; both 5-spoke wheels and carrier flanges render cleanly with zero bow-tie cutout artifacts; the Step 6 slipping left tire now retains full 3D shading with a subtle slip tint in both light and dark modes; and Step 6 caption and narration clearly state the stall condition (192 N·m total is below the 410 N·m resistance holding the car still). All automotive kinematics, gear ratios (41:11, 16:10), torque splits, cornering speeds, ice traction caps, and 3D mesh signs remain exact. Zero open findings.",
+  "findings": [
+    {
+      "where": "drawing title block (drawing.wide.11–12; drawing.tight.11–12; all screenshots)",
+      "text": "OPEN DIFFERENTIAL · ISOMETRIC · WIDE BEND (7.5 M) / m / rpm",
+      "severity": "misleading",
+      "finding": "In the bottom-right title block of every screenshot (wide-step-1-light.png through wide-step-6-light.png and wide-step-1-dark.png), the title string runs directly into the right-aligned unit label with zero gap ('WIDE BEND (7.5 M)m / rpm'). In the tight variant, 'TIGHT TURN (3.75 M)' is two characters wider and overlaps 'm / rpm'. Widen the title block, shorten the title line, or reduce its font size so there is clean breathing room before the unit label.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed and verified visually on fresh screenshots (wide-step-1-light.png, tight-step-1-light.png, wide-step-6-light.png, wide-step-6-dark.png). Widening the title block (x0 = 9880) and scaling .tb-title to 0.72 * FS leaves generous clearance before 'm / rpm' in both wide and tight variants."
+    },
+    {
+      "where": "figure wheel geometry (wheelLRim, wheelRRim; all screenshots)",
+      "text": "(picture) 5-spoke wheel rim cutouts on Left wheel and Right wheel",
+      "severity": "misleading",
+      "finding": "In every screenshot (wide-step-1-light.png through wide-step-6-light.png and wide-step-1-dark.png), the 5-spoke cutouts on both the left and right wheels render with criss-crossing, self-intersecting diagonal edges (bow-tie polygons) across the spokes rather than clean spoke windows. Fix the spokedHoles parameters/winding so the wheel rims render as clean 5-spoke alloys.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed and verified visually on fresh screenshots (wide-step-1-light.png, tight-step-1-light.png, wide-step-6-light.png, wide-step-6-dark.png). Using sort: 'face' on tire, spokes, and carrierFlange drawMesh calls eliminates all hidden back-edge bleed-through; both 5-spoke wheels and carrier flanges now render cleanly."
+    },
+    {
+      "where": "Step 6 slipping tire styling (wide-step-6-light.png; build.mjs CSS .rig-part[data-slip])",
+      "text": ".rig-part[data-slip]{--rig-graphite-lit:color-mix(in oklab,var(--t-bad) 42%,var(--rig-graphite-lit));--rig-graphite-dark:color-mix(in oklab,var(--t-bad) 32%,var(--rig-graphite-dark))}",
+      "severity": "misleading",
+      "finding": "In Step 6 (wide-step-6-light.png), the slipping left wheel's tire loses all 3D shading and renders as flat pitch-black instead of tinted graphite. Because --rig-graphite-lit and --rig-graphite-dark reference themselves on the same element, CSS treats them as a custom-property cycle (guaranteed-invalid), causing the SVG faces to fall back to solid black. Mix against explicit base graphite color tokens (or hex values) rather than self-referencing the overridden properties.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed and verified visually in both wide-step-6-light.png and wide-step-6-dark.png. Replacing the self-referential variables with explicit base graphite hex values in .rig-part[data-slip] restores crisp 3D shading with a subtle slip tint in both light and dark modes."
+    },
+    {
+      "where": "data.variants.wide.captions.6; data.variants.tight.captions.6",
+      "text": "Because the open differential enforces equal torque, the dry wheel is capped at 96 N·m too — delivering only 192 N·m total and stranding 924 N·m of available grip. The dry right wheel stalls at 0 rpm while the icy left wheel spins at twice carrier speed, 440 rpm, spinning the spider gears at 352 rpm.",
+      "severity": "missing",
+      "finding": "The caption states that 192 N·m total is delivered and immediately concludes that the dry right wheel stalls at 0 rpm without stating the physical condition for stalling: that 192 N·m is less than the resistance needed to get the car moving (e.g., starting on a slope, in snow, or against the 410 N·m load modelled here; on dead-flat dry asphalt, 192 N·m / 0.32 m = 600 N would exceed typical ~150–225 N rolling resistance). Briefly noting that 192 N·m is not enough to overcome the resistance holding the car still makes the 0 rpm stall physically complete.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed and verified in story.mjs and differential.audit.json (stamp 065a928a776a1346). Both the Step 6 caption and spoken narration now explicitly explain that 192 N·m total is less than the resistance holding the car still (410 N·m demand), making the 0 rpm dry-wheel stall physically airtight."
+    }
+  ]
+}

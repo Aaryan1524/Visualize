@@ -13,18 +13,22 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "../..");
 
 const VBW = 14200, VBH = 6550, FS = 148;
-const BOX = { x: 2250, y: 580, w: 5850, h: 5400 };
+const BOX = { x: 2720, y: 580, w: 5580, h: 5400 };
 const LENS = { x: 9040, y: 200, w: 5060, h: 4060 };
+// Clear area for framed camera shots: right of top-left .vz-caption heading (<= 3207 at 1280x800)
+// and left of View A / Title Block / .vz-cards (>= 9000 at both 1440x900 and 1280x800).
+const CLEAR = { x0: 3260, y0: 180, x1: 8800, y1: 6370 };
+const CARD_CLEAR = { x0: 4480, y0: 200, x1: 8800, y1: 6350 };
 
 const PRED_STEP = 3;
 const STEPS = [
   { tab: null, heading: "How do multiple agents beat one big prompt?", focus: null },
   { tab: "Three planes", heading: "Control, execution and tool planes isolate work and state.", focus: null },
-  { tab: "Fan out", heading: null, focus: ["orchestrator", "dispatch", "workers"] },
-  { tab: "Parallel work", heading: null, focus: ["workers", "tools", "dispatch"] },
-  { tab: "Context cliff", heading: null, focus: ["context", "orchestrator", "workers"] },
-  { tab: "Localized retry", heading: null, focus: ["retry", "tools", "workers", "context"] },
-  { tab: "Verifier gate", heading: null, focus: ["verifier", "vault", "orchestrator"] },
+  { tab: "Fan out", heading: null, shot: ["orchestrator", "dispatch"], around: ["workers"], subject: ["orchestrator", "dispatch"], focus: ["orchestrator", "dispatch", "workers"] },
+  { tab: "Parallel work", heading: null, shot: ["workers", "tools"], subject: ["workers", "tools"], focus: ["workers", "tools", "dispatch"] },
+  { tab: "Context cliff", heading: null, shot: ["context"], subject: ["context"], focus: ["context", "orchestrator", "workers"] },
+  { tab: "Localized retry", heading: null, shot: ["retry"], focus: ["retry", "tools", "workers", "context"] },
+  { tab: "Verifier gate", heading: null, shot: ["commit"], subject: ["commit"], focus: ["verifier", "vault", "orchestrator"] },
 ];
 
 const f1 = (v) => v.toFixed(1);
@@ -84,27 +88,27 @@ function captions(M) {
 const VOICE = existsSync(join(HERE, "voice.json")) ? JSON.parse(readFileSync(join(HERE, "voice.json"), "utf8")) : null;
 
 const label = (id, text, x, y, to, beats, anchor = "end") => ({ id, text, at: [x, y], to, beats, anchor });
-const LX = 2160;
+const LX = 2780;
 function labelsFor(mode) {
   if (mode === "monolith") {
     return [
-      label("orch", "Single agent core", LX, 2240, "orchestrator", [1, 2, 6], "end"),
-      label("root", "Shared window (32k cliff)", 6200, 420, "rootStack", [1, 4, 5], "start"),
-      label("w0", "Active serial lane", LX, 3140, "worker1", [1, 2, 3, 4], "end"),
+      label("orch", "Single agent core", LX, 2260, "orchestrator", [1, 2, 6], "end"),
+      label("root", "Shared window (32k cliff)", 6240, 420, "rootStack", [1, 4], "start"),
+      label("w0", "Active serial lane", LX, 3180, "worker1", [1, 2, 3], "end"),
       label("tools", "Tool valves", LX, 4880, "tools", [1, 3], "end"),
-      label("retry", "Serial retry (+1.7 s)", 8780, 6160, "retryValve", [5], "end"),
-      label("vault", "Artifact vault", 8760, 6240, "vault", [1, 6], "end"),
+      label("retry", "Serial retry (+1.7 s)", 8780, 5600, "retryValve", [5], "end"),
+      label("vault", "Artifact vault", 8780, 5940, "vault", [1, 6], "end"),
     ];
   }
   return [
-    label("orch", "Orchestrator hub", LX, 2240, "orchestrator", [1, 2, 6], "end"),
-    label("root", "Root context (32k cliff)", 6200, 420, "rootStack", [1, 4, 5], "start"),
-    label("w0", "Auth module blade", LX, 3140, "worker0", [1, 2, 3], "end"),
-    label("wstk", "Isolated context", LX, 3860, "workerStack", [1, 4], "end"),
+    label("orch", "Orchestrator hub", LX, 2260, "orchestrator", [1, 2, 6], "end"),
+    label("root", "Root context (32k cliff)", 6240, 420, "rootStack", [1, 4], "start"),
+    label("w0", "Auth module blade", LX, 3180, "worker0", [1, 2, 3], "end"),
+    label("wstk", "Isolated context", LX, 3920, "workerStack", [1, 4], "end"),
     label("tools", "Tool valves", LX, 4880, "tools", [1, 3], "end"),
-    label("retry", "Bounded retry (+1.7 s)", 8780, 6160, "retryValve", [5], "end"),
-    label("verifier", "Verifier gate", 8840, 3960, "verifier", [1, 6], "end"),
-    label("vault", "Artifact vault", 8760, 6240, "vault", [1, 6], "end"),
+    label("retry", "Bounded retry (+1.7 s)", 8780, 5600, "retryValve", [5], "end"),
+    label("verifier", "Verifier gate", 8840, 3860, "verifier", [1, 6], "end"),
+    label("vault", "Artifact vault", 8780, 5940, "vault", [1, 6], "end"),
   ];
 }
 const labelSvg = (l) => `<g class="label" data-label="${l.id}" data-beats="${l.beats.join(" ")}" data-at="${l.to}" data-to="${l.at[0]},${l.at[1]}"><path class="leader"/><circle class="ldot" r="26"/><text x="${l.at[0]}" y="${l.at[1]}" text-anchor="${l.anchor}">${esc(l.text)}</text></g>`;
@@ -112,7 +116,7 @@ const labelSvg = (l) => `<g class="label" data-label="${l.id}" data-beats="${l.b
 function skeleton(M) {
   const N = M.N;
   const x0 = 9040, x1 = VBW - 100, y0 = 4900, y1 = VBH - 80;
-  let tb = `<g class="tblock"><path class="tb-frame" d="M${x0},${y0}H${x1}V${y1}H${x0}Z"/><path class="tb-rule" d="M${x0},${y0 + 340}H${x1}M${x0},${y1 - 300}H${x1}"/>`;
+  let tb = `<g class="tblock" data-camera-avoid=""><path class="tb-frame" d="M${x0},${y0}H${x1}V${y1}H${x0}Z"/><path class="tb-rule" d="M${x0},${y0 + 340}H${x1}M${x0},${y1 - 300}H${x1}"/>`;
   tb += `<text class="tb-title" x="${x0 + 110}" y="${y0 + 225}">MULTI-AGENT ORCHESTRATION · ${esc(M.v.label.toUpperCase())}</text><text class="tb-small" x="${x1 - 110}" y="${y0 + 225}" text-anchor="end">s · k tok</text>`;
   const facts = [
     `${N.subtasks} modules · ${N.workers} ${N.workers === 1 ? "serial lane" : "parallel lanes"} · context cliff ${N.contextCliff}k tokens`,
@@ -125,7 +129,7 @@ function skeleton(M) {
     tb += `<g class="tbk"><path class="${cls}" d="M0,${y1 - 140}h200"/><text class="tb-text tb-key" x="0" y="${y1 - 100}">${t}</text></g>`;
   }
   tb += "</g></g>";
-  return `<defs id="rigDefs"></defs><g id="scene"></g><g id="lensHost" class="inset"></g><g id="labels">${labelsFor(M.v.mode).map(labelSvg).join("")}</g>${tb}`;
+  return `<defs id="rigDefs"></defs><g id="scene" data-camera=""></g><g id="lensHost" class="inset" data-camera-avoid=""></g><g id="labels">${labelsFor(M.v.mode).map(labelSvg).join("")}</g>${tb}`;
 }
 
 function variantData(name) {
@@ -158,8 +162,9 @@ function machine(DATA) {
 
   const anim = (k) => (V?.voice?.[k] ? Math.max(2.5, V.meet[k]) : 0.78 * DATA.plain);
   // Step 3 poses right before barrier fan-in (workEnd - 150 ms in orchestrated, where all 3 tool calls have
-  // finished and workers hold 47.0k raw logs while root still holds 3.0k; mid-work in monolith so Predict isn't spoiled!)
-  const POSE = [0.62, 0.45, 0.92, 1.0, 0.96, 0.56, 1.0];
+  // finished and workers hold 47.0k raw logs while root still holds 3.0k; mid-work in monolith so Predict isn't spoiled!).
+  // Step 4 poses at 0.72 so compact teal summary shuttles are visibly mid-flight at fan-in (8.6k root / 50.0k monolith).
+  const POSE = [0.62, 0.45, 0.92, 1.0, 0.72, 0.56, 1.0];
 
   function stateAt(k, u) {
     const m = model;
@@ -220,12 +225,31 @@ function machine(DATA) {
     setText("r-retries", `${snap.retriesTriggered}`);
   }
 
+  // Expand semantic camera groups per active variant ("commit" frames verifier+vault+orchestrator
+  // in parallel mode, and orchestrator+vault in monolith mode where no separate verifier exists).
+  const expand = (names) => names.flatMap((n) => (
+    n === "commit"
+      ? (model?.v?.mode === "monolith" ? ["orchestrator", "vault"] : ["verifier", "vault", "orchestrator"])
+      : [n]
+  ));
+  function unalias(list) {
+    const out = [];
+    for (let i = 0; i < list.length; ) {
+      const id = list[i];
+      out.push(id);
+      const a = DATA.alias?.[id];
+      if (a && a.every((x, j) => list[i + 1 + j] === x)) i += 1 + a.length;
+      else i += 1;
+    }
+    return out;
+  }
   function focusParts() {
     const { focus, lit } = lastFocus;
     const lab = root.hasAttribute("data-lab");
+    const active = [...new Set(expand(unalias(lit)))];
     const test = (part) => ({
-      recede: lit.length ? !lit.includes(part) : !lab && focus ? !focus.includes(part) : false,
-      named: lit.includes(part),
+      recede: active.length ? !active.includes(part) : !lab && focus ? !focus.includes(part) : false,
+      named: active.includes(part),
     });
     stageM?.focus(test);
   }
@@ -233,6 +257,27 @@ function machine(DATA) {
     lastFocus = f;
     focusParts();
   };
+
+  function boundsOf(names) {
+    const scene = $("scene");
+    if (!scene) return null;
+    const inv = scene.getCTM().inverse();
+    let b = null;
+    const add = (x0, y0, x1, y1) => (b = b ? { x0: Math.min(b.x0, x0), y0: Math.min(b.y0, y0), x1: Math.max(b.x1, x1), y1: Math.max(b.y1, y1) } : { x0, y0, x1, y1 });
+    for (const n of expand(names)) {
+      for (const el of scene.querySelectorAll(`[data-part="${n}"]`)) {
+        if (el.style.display === "none") continue;
+        const r = el.getBBox();
+        if (!r.width && !r.height) continue;
+        const m = inv.multiply(el.getCTM());
+        const pts = [[r.x, r.y], [r.x + r.width, r.y], [r.x, r.y + r.height], [r.x + r.width, r.y + r.height]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+        add(Math.min(...pts.map((q) => q[0])), Math.min(...pts.map((q) => q[1])), Math.max(...pts.map((q) => q[0])), Math.max(...pts.map((q) => q[1])));
+      }
+    }
+    return b;
+  }
+  const cardShot = () => ["deck", "orchestrator", "context", "workers", "tools", "vault"];
+  const cardClear = () => DATA.cardClear;
 
   function render(st) {
     cur = st;
@@ -363,6 +408,7 @@ function machine(DATA) {
     model: (v) => MODELS_IN_PAGE[v.name],
     mount, at, stillAt, render, focus,
     anchors: () => lastAt,
+    boundsOf, clearArea: () => DATA.camera.clear, cardShot, cardClear,
     lab, question,
     heading: (k) => V.heads[k] ?? null,
     info: () => (cur ? { mode: cur.run.mode, tMs: cur.tMs, totalMs: cur.run.totalMs, orchContext: cur.run.orchestratorContext, speedup: cur.run.speedup, lab: !!cur.lab } : {}),
@@ -380,7 +426,14 @@ const DATA = {
   lens: LENS,
   plain: 7,
   base: "orchestrated",
-  steps: STEPS.map(({ heading, focus }) => ({ heading, focus })),
+  steps: STEPS.map(({ heading, focus, shot }) => ({ heading, focus, ...(shot ? { shot } : {}) })),
+  camera: {
+    clear: CLEAR,
+    alias: {},
+    around: Object.fromEntries(STEPS.flatMap((s, k) => (s.around ? [[k, s.around]] : []))),
+    subject: Object.fromEntries(STEPS.flatMap((s, k) => (s.subject ? [[k, s.subject]] : []))),
+  },
+  cardClear: CARD_CLEAR,
   alias: {
     orchestrator: ["orchestrator", "dispatch"],
     workers: ["workers", "context"],
@@ -417,14 +470,21 @@ const DATA = {
 
 const CSS = `
 ${readFileSync(join(ROOT, "src/rig/rig.css"), "utf8")}
-#fig{shape-rendering:geometricPrecision}
+#fig{overflow:visible;shape-rendering:geometricPrecision}
 path,circle,rect{vector-effect:non-scaling-stroke}
 text{font-family:var(--sans);fill:var(--ink)}
+.vz-step-heading{text-shadow:0 0 6px var(--stage),0 0 12px var(--stage),0 0 18px var(--stage)}
+.vz-caption::before{content:"";position:absolute;z-index:-1;inset:-60px -70px -70px -60px;background:radial-gradient(closest-side,var(--stage) 62%,color-mix(in oklab,var(--stage) 0%,transparent))}
 .vz[data-practice] #fig .inset,.vz[data-practice] #fig .label{visibility:hidden}
+.lens-backdrop{fill:var(--stage);stroke:none}
+.retry-arc-halo{fill:none;stroke:var(--stage);stroke-width:8px;stroke-linecap:round;stroke-opacity:.88;vector-effect:non-scaling-stroke}
+.retry-arc-line{fill:none;stroke:color-mix(in oklab,var(--t-bad) calc(100% - var(--recede)),var(--stage));stroke-width:3.2px;stroke-dasharray:9 6;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.retry-arc.is-hot .retry-arc-line{stroke-width:3.8px}
+.retry-arc-head{fill:color-mix(in oklab,var(--t-bad) calc(100% - var(--recede)),var(--stage));stroke:var(--stage);stroke-width:1.4px;paint-order:stroke}
 .leader{fill:none;stroke:var(--ink);stroke-width:.55}
 .ldot{fill:var(--ink)}
-.label text{font-size:172px;font-weight:500;paint-order:stroke;stroke:var(--stage);stroke-width:34px;stroke-linejoin:round}
-.tb-frame{fill:none;stroke:var(--ink);stroke-width:.9}
+.label text{font-size:172px;font-weight:500;paint-order:stroke;stroke:var(--stage);stroke-width:44px;stroke-linejoin:round}
+.tb-frame{fill:var(--stage);stroke:var(--ink);stroke-width:.9}
 .tb-rule{fill:none;stroke:var(--ink);stroke-width:.5}
 .tb-title{font-size:${FS * 0.78}px;font-weight:600;letter-spacing:.05em}
 .tb-text{font-size:${FS * 0.78}px}

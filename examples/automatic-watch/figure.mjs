@@ -1,32 +1,38 @@
-// Automatic mechanical watch movement on Visualize's rig (src/rig):
-// True 3D horological cutaway calibre inside a sleek brushed-steel wristwatch case (smooth
-// continuous cutaway back shell, sculpted 12 & 6 o'clock lugs, fluted 3 o'clock winding crown),
-// stepped rhodium mainplate with perlage tracks, open-top mainspring barrel with depth-sorted
-// blued-steel spiral ribbon & vermilion slipping bridle, 4-stage brass going train, sculpted
-// chamfered steel bridges with flush brass-chaton ruby jewels & blued screws, Swiss lever
-// escapement, poised balance wheel with breathing hairspring, meshing twin reversing wheels
-// and ball-bearing oscillating rotor — paired with View A: a bevel-shaded 4.5:1 horological loupe.
+// Automatic mechanical watch movement on Visualize's rig (src/rig/mech.ts):
+// Museum-grade 6-layer exploded horological calibre inside a cutaway brushed-steel watch case:
+//   Layer 0: Cutaway steel case (hatched section faces, 3 o'clock fluted crown) + compact stepped
+//            mainplate with 6 recessed gold-chaton synthetic ruby lower bearings
+//   Layer 1: Open-top mainspring barrel (coiled blued-steel spiral ribbon + slipping bridle) and
+//            4-stage brass-and-steel going train laid out by meshCentres() & verified by assertMeshed()
+//   Layer 2: 3D Swiss lever escapement (15-tooth club-tooth escape wheel, steel pallet fork with
+//            twin ruby stones & banking pins, balance roller with ruby impulse jewel) + poised
+//            balance wheel with 6 rim weights & breathing blued-steel hairspring
+//   Layer 3: Sculpted chamfered rhodium bridges (train bridge, barrel bridge, escape cock, balance
+//            cock) with flush ruby jewels, lifted heat-blued slotted screws & micron regulator index
+//   Layer 4: Bidirectional automatic winding train (rotor pinion, twin reversing click wheels,
+//            barrel ratchet) — exact pitch-circle tangency verified by assertMeshed()
+//   Layer 5: Skeletonized steel-and-graphite ball-bearing oscillating rotor
 //
-// Zero-distortion contract: every cylindrical arbor, jewel, screw, bridge and pillar stays
-// stationary; every turning wheel, rotor, balance, fork and hand is angle-binned across its
-// symmetry period and placed by its mid-plane so affine shear stays strictly sub-pixel (< 0.25 px).
+// Dashed vertical centreLines() connect every arbor, jewel hole and screw axis across the exploded
+// gaps. Every stationary assembly is drawn once and placed by pure translation; every turning gear,
+// rotor, fork, roller, balance and pointer uses turningPart() with worst error strictly < 0.45 px.
 
 import {
-  add, affineString, arcOutline, axesOf, chamferPlate, circlePoints, drawMesh, drawSpiralRibbon,
-  escapeWheelOutline, fitCamera, gearOutline, keyLight, linesOn, moveInPlane, n1,
-  pathThrough, planeOf, plate, plateShadow, RigStage, rod, roundedHull, scale, screenOf,
-  spokedHoles, turned, turningPart,
+  add, arbor, arcOutline, assertMeshed, axesOf, bridge, centreLines, chamferPlate, circlePoints,
+  cutawayShell, drawAssembly, drawMesh, drawOrdered, drawPart, drawSpiralRibbon, escapeWheelOutline,
+  explodedStack, facingCamera, fitCamera, gearProfile, keyLight, linesOn, meshCentres, meshPhase,
+  moveInPlane, pathThrough, pinion, planeOf, plate, plateShadow, readableTeeth, RigStage, rod,
+  roundedHull, scale, screenOf, screw, spokedHoles, spokedWheel, stepOf, turned, turningPart,
 } from "../../src/rig/index.ts";
-export { RigStage, screenOf } from "../../src/rig/index.ts";
+export { RigStage, screenOf, assertMeshed, readableTeeth } from "../../src/rig/index.ts";
 
-// Classic three-quarter horological cutaway angle: sleek calibre proportions with crisp 3D depth
-export const VIEW = { azimuth: 230, elevation: 26 };
+// Three-quarter watchmaker's exploded elevation: generous top-to-side contrast and open front axis
+export const VIEW = { azimuth: 232, elevation: 30 };
 const TAU = Math.PI * 2;
 const RAD = Math.PI / 180;
 const FLOOR = planeOf([0, 0, 0], [0, 0, 1], [1, 0, 0]);
 const FLOOR_AXES = { origin: [0, 0, 0], u: FLOOR.u, v: FLOOR.v, n: FLOOR.n };
 
-// Solve exact circle-circle intersection for gear pitch-circle tangency
 function circleIntersect(ax, ay, ra, bx, by, rb, side = 1) {
   const dx = bx - ax, dy = by - ay;
   const d = Math.hypot(dx, dy);
@@ -36,73 +42,135 @@ function circleIntersect(ax, ay, ra, bx, by, rb, side = 1) {
   return [mx - (side * h * dy) / d, my + (side * h * dx) / d];
 }
 
-// Calibre layout in movement-scale units: EVERY meshing gear pair satisfies hypot(dx,dy) === rA + rB!
-const BARREL_POS = [-15.0, 14.0]; // dist to origin = 20.518
-const REV_B_R = 6.5, REV_A_R = 6.5, ROTOR_PIN_R = 8.2, RATCHET_R = 8.2;
-const REV_B_POS = [Math.cos(82 * RAD) * (ROTOR_PIN_R + REV_B_R), Math.sin(82 * RAD) * (ROTOR_PIN_R + REV_B_R)];
-const REV_A_POS = circleIntersect(REV_B_POS[0], REV_B_POS[1], REV_B_R + REV_A_R, BARREL_POS[0], BARREL_POS[1], RATCHET_R + REV_A_R, -1);
+// ---------------------------------------------------------------- exact gear train layout
+// Modules chosen so every tooth pitch is >= 11 px on screen (well above readableTeeth 8 px bar)
+// and every meshing pair satisfies assertMeshed() to machine precision.
+const M_BARREL = 0.46; // barrel (32T) <-> centerPin (8T)
+const M_G1 = 0.42;     // center (30T) <-> thirdPin (8T)
+const M_G2 = 0.40;     // third (28T)  <-> fourthPin (8T)
+const M_G3 = 0.38;     // fourth (28T) <-> escapePin (7T)
+const M_WIND = 0.42;   // rotorPin (18T) <-> revB (14T) <-> revA (14T) <-> ratchet (20T)
 
-// Compact, true-to-life mechanical calibre Z-stack (zero spindly stilts!)
+const GOING_STAGES = [
+  { driver: { teeth: 30, pitchR: 15 * M_G1 }, driven: { teeth: 8, pitchR: 4 * M_G1 }, angle: 20 * RAD },
+  { driver: { teeth: 28, pitchR: 14 * M_G2 }, driven: { teeth: 8, pitchR: 4 * M_G2 }, angle: -60 * RAD },
+  { driver: { teeth: 28, pitchR: 14 * M_G3 }, driven: { teeth: 7, pitchR: 3.5 * M_G3 }, angle: -132 * RAD },
+];
+const GOING = meshCentres([0, 0], GOING_STAGES, 0.08);
+const BARREL_CHAIN = meshCentres(
+  [0, 0],
+  [{ driver: { teeth: 8, pitchR: 4 * M_BARREL }, driven: { teeth: 32, pitchR: 16 * M_BARREL }, angle: 135 * RAD }],
+  GOING[0].rot,
+);
+
+const BARREL_AT = BARREL_CHAIN[1].at;
+const CENTER_AT = GOING[0].at;
+const THIRD_AT = GOING[1].at;
+const FOURTH_AT = GOING[2].at;
+const ESCAPE_AT = GOING[3].at;
+
+// Straight-line Swiss lever escapement axis: escape <-> pallet fork <-> balance roller & wheel
+const FORK_AT = [0.5, -10.55];
+const FE_DX = ESCAPE_AT[0] - FORK_AT[0], FE_DY = ESCAPE_AT[1] - FORK_AT[1];
+const FE_DIST = Math.hypot(FE_DX, FE_DY); // 6.50
+const FORK_BASE_ANG = Math.atan2(FE_DY, FE_DX); // ~ +18.9 deg (fork anchor points to escape)
+const BALANCE_DIST = 7.4;
+const BALANCE_AT = [
+  FORK_AT[0] - (FE_DX / FE_DIST) * BALANCE_DIST,
+  FORK_AT[1] - (FE_DY / FE_DIST) * BALANCE_DIST,
+]; // (-6.50, -12.94) — right in the open front-center!
+
+// Coplanar automatic winding train: rotorPin <-> revB <-> revA <-> barrel ratchet
+const ROTOR_PIN_T = 18, ROTOR_PIN_R = (ROTOR_PIN_T * M_WIND) / 2; // 3.78
+const REV_T = 14, REV_R = (REV_T * M_WIND) / 2;                   // 2.94
+const RATCHET_T = 20, RATCHET_R = (RATCHET_T * M_WIND) / 2;       // 4.20
+const REV_B_CHAIN = meshCentres(
+  CENTER_AT,
+  [{ driver: { teeth: ROTOR_PIN_T, pitchR: ROTOR_PIN_R }, driven: { teeth: REV_T, pitchR: REV_R }, angle: 74 * RAD }],
+  0.04,
+);
+const REV_B_AT = REV_B_CHAIN[1].at;
+const REV_A_AT = circleIntersect(REV_B_AT[0], REV_B_AT[1], REV_R + REV_R, BARREL_AT[0], BARREL_AT[1], RATCHET_R + REV_R, -1);
+const REV_A_ROT = meshPhase({ at: REV_B_AT, teeth: REV_T, rot: REV_B_CHAIN[1].rot }, { at: REV_A_AT, teeth: REV_T });
+const RATCHET_ROT = meshPhase({ at: REV_A_AT, teeth: REV_T, rot: REV_A_ROT }, { at: BARREL_AT, teeth: RATCHET_T });
+
+// Bridge mounting screw positions (well inside plateR = 21.4 and clear of all moving wheels)
+const SCREW_TRAIN = [13.6, 4.2];
+const SCREW_BARREL = [-13.4, 11.4];
+const SCREW_ESC = [12.4, -12.8];
+const SCREW_BAL = [-14.4, -4.6]; // sits BEHIND-LEFT of balance wheel, never hiding it!
+
 export const CAL = {
-  plateR: 48.5,
-  caseR: 53.5,
-  barrel:  { x: BARREL_POS[0], y: BARREL_POS[1], r: 15.2, rRatchet: RATCHET_R, z: 2.2 },
-  center:  { x: 0, y: 0, r: 13.5, pinR: 5.32, rotorPinR: ROTOR_PIN_R, z: 5.8 },
-  third:   { x: 16.4, y: 6.6, r: 11.4, pinR: 4.2, z: 9.2 },
-  fourth:  { x: 24.5, y: -6.6, r: 11.05, pinR: 4.0, z: 6.8 },
-  escape:  { x: 12.2, y: -14.4, r: 9.2, pinR: 3.5, z: 8.2 },
-  fork:    { x: -0.6, y: -19.8, z: 8.6 },
-  balance: { x: -18.2, y: -18.2, r: 14.2, z: 7.4 },
-  revB:    { x: REV_B_POS[0], y: REV_B_POS[1], r: REV_B_R, z: 14.6 },
-  revA:    { x: REV_A_POS[0], y: REV_A_POS[1], r: REV_A_R, z: 14.6 },
-  rotor:   { x: 0, y: 0, rIn: 31.5, rOut: 46.5, z: 17.6 },
+  plateR: 21.4,
+  caseR: 23.8,
+  caseWall: 1.7,
+  barrel:  { x: BARREL_AT[0], y: BARREL_AT[1], teeth: 32, r: 16 * M_BARREL, rot0: BARREL_CHAIN[1].rot, speed: BARREL_CHAIN[1].speed, rRatchet: RATCHET_R, ratchetT: RATCHET_T, ratchetRot0: RATCHET_ROT },
+  center:  { x: CENTER_AT[0], y: CENTER_AT[1], teeth: 30, r: 15 * M_G1, pinT: 8, pinR: 4 * M_BARREL, rotorPinT: ROTOR_PIN_T, rotorPinR: ROTOR_PIN_R, rot0: GOING[0].rot, speed: GOING[0].speed },
+  third:   { x: THIRD_AT[0], y: THIRD_AT[1], teeth: 28, r: 14 * M_G2, pinT: 8, pinR: 4 * M_G1, rot0: GOING[1].rot, speed: GOING[1].speed },
+  fourth:  { x: FOURTH_AT[0], y: FOURTH_AT[1], teeth: 28, r: 14 * M_G3, pinT: 8, pinR: 4 * M_G2, rot0: GOING[2].rot, speed: GOING[2].speed },
+  escape:  { x: ESCAPE_AT[0], y: ESCAPE_AT[1], teeth: 15, r: 4.85, rRoot: 3.30, pinT: 7, pinR: 3.5 * M_G3, rot0: GOING[3].rot, speed: GOING[3].speed },
+  fork:    { x: FORK_AT[0], y: FORK_AT[1], baseAng: FORK_BASE_ANG, feDist: FE_DIST, balDist: BALANCE_DIST },
+  balance: { x: BALANCE_AT[0], y: BALANCE_AT[1], r: 6.5, rollerR: 2.35 },
+  revB:    { x: REV_B_AT[0], y: REV_B_AT[1], teeth: REV_T, r: REV_R, rot0: REV_B_CHAIN[1].rot },
+  revA:    { x: REV_A_AT[0], y: REV_A_AT[1], teeth: REV_T, r: REV_R, rot0: REV_A_ROT },
+  rotor:   { x: 0, y: 0, rIn: 14.2, rOut: 21.4 },
+  screws:  { train: SCREW_TRAIN, barrel: SCREW_BARREL, esc: SCREW_ESC, bal: SCREW_BAL },
 };
 
-// Watch case orientation at azimuth 230 deg:
-// 3 o'clock (screen-right) = (+0.766, -0.643), 12 o'clock (top-back) = (+0.643, +0.766)
-const CROWN_ANG = Math.atan2(-0.643, 0.766); // -40 deg -> cleanly right on screen
-const LUG12_ANG = CROWN_ANG + Math.PI / 2;   // +50 deg -> cleanly top-back
-const LUG6_ANG  = CROWN_ANG - Math.PI / 2;   // -130 deg -> cleanly bottom-front
+// Every meshing gear pair — exported so figure.test.mjs & model.test.mjs assert exact tangency
+export const GEAR_PAIRS = [
+  { name: "barrel <-> centerPin", a: { at: BARREL_AT, teeth: CAL.barrel.teeth, pitchR: CAL.barrel.r }, b: { at: CENTER_AT, teeth: CAL.center.pinT, pitchR: CAL.center.pinR } },
+  { name: "center <-> thirdPin", a: { at: CENTER_AT, teeth: CAL.center.teeth, pitchR: CAL.center.r }, b: { at: THIRD_AT, teeth: CAL.third.pinT, pitchR: CAL.third.pinR } },
+  { name: "third <-> fourthPin", a: { at: THIRD_AT, teeth: CAL.third.teeth, pitchR: CAL.third.r }, b: { at: FOURTH_AT, teeth: CAL.fourth.pinT, pitchR: CAL.fourth.pinR } },
+  { name: "fourth <-> escapePin", a: { at: FOURTH_AT, teeth: CAL.fourth.teeth, pitchR: CAL.fourth.r }, b: { at: ESCAPE_AT, teeth: CAL.escape.pinT, pitchR: CAL.escape.pinR } },
+  { name: "rotorPin <-> revB", a: { at: CENTER_AT, teeth: CAL.center.rotorPinT, pitchR: CAL.center.rotorPinR }, b: { at: REV_B_AT, teeth: CAL.revB.teeth, pitchR: CAL.revB.r } },
+  { name: "revB <-> revA", a: { at: REV_B_AT, teeth: CAL.revB.teeth, pitchR: CAL.revB.r }, b: { at: REV_A_AT, teeth: CAL.revA.teeth, pitchR: CAL.revA.r } },
+  { name: "revA <-> ratchet", a: { at: REV_A_AT, teeth: CAL.revA.teeth, pitchR: CAL.revA.r }, b: { at: BARREL_AT, teeth: CAL.barrel.ratchetT, pitchR: CAL.barrel.rRatchet } },
+];
+for (const p of GEAR_PAIRS) assertMeshed(p.a, p.b, 1e-6);
+
+// ---------------------------------------------------------------- exploded Z stack
+// 6 functional watchmaker layers separated vertically along +z with dashed centreLines across gaps.
+export const STACK_LAYERS = [
+  { thickness: 2.6 }, // Layer 0: cutaway steel case + stepped mainplate
+  { thickness: 4.6, axes: [BARREL_AT, CENTER_AT, THIRD_AT, FOURTH_AT, ESCAPE_AT] }, // Layer 1: barrel + 4-stage going train
+  { thickness: 2.8, axes: [ESCAPE_AT, FORK_AT, BALANCE_AT] }, // Layer 2: Swiss lever escapement + balance + hairspring
+  { thickness: 2.6, axes: [BARREL_AT, CENTER_AT, THIRD_AT, FOURTH_AT, ESCAPE_AT, BALANCE_AT, SCREW_TRAIN, SCREW_BARREL, SCREW_ESC, SCREW_BAL] }, // Layer 3: rhodium bridges + ruby jewels + screws + regulator
+  { thickness: 1.6, axes: [CENTER_AT, BARREL_AT, REV_B_AT, REV_A_AT] }, // Layer 4: bidirectional automatic winding train
+  { thickness: 2.6, axes: [CENTER_AT] }, // Layer 5: ball-bearing oscillating rotor
+];
+export const BASE_EXPLODE = 0.88;
+export const STACK_SPREAD = 5.4;
+
+export function stackFor(explode = BASE_EXPLODE) {
+  return explodedStack(STACK_LAYERS, explode, { spread: STACK_SPREAD });
+}
+
+// 3 o'clock (screen-right) direction at azimuth 232 deg: right = (+0.788, -0.616)
+const CROWN_ANG = Math.atan2(-0.616, 0.788);
 
 export function cameraFor(box) {
+  const st = stackFor(BASE_EXPLODE);
+  const zTop = st.bases[5] + STACK_LAYERS[5].thickness + 1.2;
+  const zBot = -1.6;
   const pts = [];
   for (let i = 0; i < 16; i++) {
     const a = (TAU * i) / 16;
-    for (const z of [-6.0, 22.8]) pts.push([56 * Math.cos(a), 56 * Math.sin(a), z]);
+    for (const z of [zBot, zTop]) pts.push([CAL.caseR * Math.cos(a), CAL.caseR * Math.sin(a), z]);
   }
-  pts.push([Math.cos(CROWN_ANG) * 65, Math.sin(CROWN_ANG) * 65, 5]);
-  for (const ang of [LUG12_ANG + 0.38, LUG12_ANG - 0.38]) pts.push([Math.cos(ang) * 74, Math.sin(ang) * 74, 4]);
-  for (const ang of [LUG6_ANG + 0.38, LUG6_ANG - 0.38]) pts.push([Math.cos(ang) * 67, Math.sin(ang) * 67, 0]);
+  pts.push([Math.cos(CROWN_ANG) * (CAL.caseR + 4.4), Math.sin(CROWN_ANG) * (CAL.caseR + 4.4), 2.8]);
   return fitCamera(pts, box, VIEW.azimuth, VIEW.elevation);
 }
 
-/** Crisp horological spoked wheel centered at origin on z = 0..th, rotated by `rot`. */
-function wheelMesh(teeth, pitchR, th, spokes = 5, hubR = 3.0, rot = 0) {
-  const outer = gearOutline(teeth, pitchR, { addendum: pitchR * 0.085, dedendum: pitchR * 0.1, rot });
-  const holes = [circlePoints(hubR * 0.55, 14)];
-  if (pitchR > 7.5 && spokes > 0) holes.push(...spokedHoles(hubR + 1.0, pitchR * 0.76, spokes, 0.17, rot, 8));
-  return plate(FLOOR, { outer, holes }, 0, th);
-}
-
-/** Flush horological jewel bearing inside a golden brass chaton + steel pivot dot. */
-function jewelSetting(cam, x, y, z, rOuter = 2.1, rRuby = 1.4) {
-  return drawMesh(turned([x, y, z - 0.12], [0, 0, 1], [[0, rOuter], [0.35, rOuter], [0.5, rOuter * 0.85]], 18), cam, { material: "brass", shine: true })
-    + drawMesh(turned([x, y, z + 0.25], [0, 0, 1], [[0, rRuby], [0.32, rRuby], [0.44, rRuby * 0.72]], 16), cam, { material: "ruby", shine: true })
-    + drawMesh(turned([x, y, z + 0.5], [0, 0, 1], [[0, rRuby * 0.34], [0.2, rRuby * 0.34]], 10), cam, { material: "steel" });
-}
-
-/** Recessed slotted watchmaker screw head (blued steel or polished alloy). */
-function watchScrew(cam, x, y, z, r = 1.55, mat = "cobalt", slotAng = 0.5) {
-  const c = Math.cos(slotAng) * r * 0.82, s = Math.sin(slotAng) * r * 0.82;
-  return drawMesh(turned([x, y, z - 0.1], [0, 0, 1], [[0, r], [0.45, r], [0.65, r * 0.86]], 16), cam, { material: mat, shine: true })
-    + linesOn(cam, [[[x - c, y - s, z + 0.6], [x + c, y + s, z + 0.6]]], "rig-sil");
-}
-
-/** Build the complete isometric automatic watch movement figure. */
+/** Build the complete 6-layer exploded automatic watch figure on src/rig/mech.ts. */
 export function figure(M, cam, opts = {}) {
   const px = opts.prefix ?? "aw";
   const ax = axesOf(cam.azimuth, cam.elevation);
   const S = (x, y, z) => screenOf(cam, [x, y, z], ax);
+  const NSTEP = stepOf(cam, [0, 0, 1], ax); // exact screen shift per +1 world z
+  const zShift = (z) => `translate(${(NSTEP[0] * z).toFixed(2)} ${(NSTEP[1] * z).toFixed(2)})`;
+  const pxPerUnit = cam.scale / 10; // ~10 SVG units per screen pixel at 1440x900
+
   const parts = [];
   const defs = new Map();
   const once = (id, part, svg) => parts.push({ id: `${px}-${id}`, part, svg });
@@ -116,529 +184,570 @@ export function figure(M, cam, opts = {}) {
     for (const d of defs.values()) if (!d.sent) ((d.sent = true), out.push(d.svg));
     return out;
   };
-  const place = (theta, x, y, fromN, toN) => affineString(moveInPlane(cam, FLOOR_AXES, theta, [x, y], fromN, toN));
-  // A thick part that turns: drawn per angle bin (through tpl), placed by the plane halfway through
-  // everything it draws (n0..n1 along z, at rest), with enough bins to keep it under half a pixel;
-  // each placement reports its exact error to the stage.
-  const turning = (id, o) => turningPart(cam, FLOOR_AXES, { id, def: tpl, ...o });
+  const place = (theta, x, y, fromN, toN) => {
+    const m = moveInPlane(cam, FLOOR_AXES, theta, [x, y], fromN, toN);
+    return `matrix(${m.slice(0, 4).map((v) => +v.toFixed(6)).join(" ")} ${+m[4].toFixed(2)} ${+m[5].toFixed(2)})`;
+  };
+  const turningSpecs = [];
+  const turning = (id, o) => {
+    const t = turningPart(cam, FLOOR_AXES, { id, def: tpl, maxErrPx: 0.45, unitsPerPx: 10, ...o });
+    turningSpecs.push({ id, bins: t.bins, worstErrPx: t.worstErrPx });
+    return t;
+  };
   const turnedAt = (t, theta, x, y, shift) => {
     const r = t.place(theta, [x, y], shift);
     return { href: r.href, transform: r.transform, turnErrPx: r.turnErrPx };
   };
-  // a soft shadow under a turning part that keeps its real outline (a C stays a C); it lies below
-  // the part, so a part that carries one reaches down to shadowAway[2]
-  const shadowAway = scale(keyLight(ax), -1.6);
+  const shadowAway = scale(keyLight(ax), -1.1);
 
-  // ---- 1. Sleek Brushed-Steel Cutaway Watch Case (SMOOTH seamless back arc, sculpted 12 & 6 lugs, fluted 3 o'clock crown)
-  // One continuous 44-step arc from 3:30 around 12:00 to 8:30 -> zero brick seams, silky metallic shading!
-  const caseA0 = CROWN_ANG - 0.32;
-  const caseA1 = caseA0 + Math.PI * 1.12;
-  const backCaseWall = plate(FLOOR, { outer: arcOutline(CAL.plateR + 0.4, CAL.caseR, caseA0, caseA1, 44) }, -5.2, 13.0);
-  const backBezelLip = plate(FLOOR, { outer: arcOutline(CAL.plateR - 0.7, CAL.caseR - 0.9, caseA0, caseA1, 44) }, 13.0, 14.8);
-
-  // Sculpted watch lugs at 12 o'clock (extending gracefully out past the sleek case back) and 6 o'clock (framing the front cutaway base)
-  const makeLug = (ang, z0, z1, len = 14.5) => {
-    const c = Math.cos(ang), s = Math.sin(ang);
-    const nx = -s, ny = c;
-    const r0 = CAL.caseR - 3.0, r1 = CAL.caseR + len;
-    const poly = [
-      [c * r0 - nx * 4.5, s * r0 - ny * 4.5],
-      [c * r1 - nx * 2.5, s * r1 - ny * 2.5],
-      [c * r1 + nx * 2.5, s * r1 + ny * 2.5],
-      [c * r0 + nx * 4.5, s * r0 + ny * 4.5],
-    ];
-    return drawMesh(chamferPlate(FLOOR, poly, z0, z1, 1.3), cam, { material: "frame", shine: true });
-  };
-  const backLugsSvg = makeLug(LUG12_ANG + 0.38, -4.5, 9.8, 22.0) + makeLug(LUG12_ANG - 0.38, -4.5, 9.8, 22.0);
-  const frontLugsSvg = makeLug(LUG6_ANG + 0.38, -5.8, 1.4, 13.5) + makeLug(LUG6_ANG - 0.38, -5.8, 1.4, 13.5);
-
-  // Fluted 3 o'clock Winding Crown & Stem entering the case band cleanly
-  const crownDir = [Math.cos(CROWN_ANG), Math.sin(CROWN_ANG), 0];
-  const crownBase = [Math.cos(CROWN_ANG) * (CAL.caseR - 1.5), Math.sin(CROWN_ANG) * (CAL.caseR - 1.5), 4.6];
-  const crownTube = turned(crownBase, crownDir, [[0, 2.1], [3.4, 2.1]], 14);
-  const crownHead = turned([crownBase[0] + crownDir[0] * 2.8, crownBase[1] + crownDir[1] * 2.8, 4.6], crownDir, [
-    [0, 5.0], [0.9, 6.2], [5.4, 6.2], [6.4, 5.0], [6.8, 3.0],
+  // ================================================================ LAYER 0: Cutaway Case + Mainplate
+  const shell = cutawayShell({
+    r: CAL.caseR,
+    h: 4.8,
+    wall: CAL.caseWall,
+    floor: 1.4,
+    openAngle: 158 * RAD,
+    facing: facingCamera(cam),
+    material: "steel",
+    hatch: true,
+  });
+  const mainplate = bridge({ outline: circlePoints(CAL.plateR, 56) }, 2.2, {
+    at: [0, 0, 0.15],
+    chamfer: 0.38,
+    jewelHoles: [CENTER_AT, THIRD_AT, FOURTH_AT, ESCAPE_AT, FORK_AT, BALANCE_AT],
+    jewelR: 0.92,
+    fill: "jewels",
+    material: "frame",
+  });
+  // Fluted 3 o'clock winding crown on the right case wall
+  const cDir = [Math.cos(CROWN_ANG), Math.sin(CROWN_ANG), 0];
+  const cBase = [Math.cos(CROWN_ANG) * (CAL.caseR - 0.6), Math.sin(CROWN_ANG) * (CAL.caseR - 0.6), 2.5];
+  const crownTube = turned(cBase, cDir, [[0, 1.0], [1.6, 1.0]], 12);
+  const crownHead = turned(add(cBase, scale(cDir, 1.3)), cDir, [
+    [0, 2.3], [0.45, 2.9], [2.4, 2.9], [2.85, 2.3], [3.0, 1.3],
   ], 18);
   const crownGrooves = [];
   for (let i = 0; i < 12; i++) {
     const phi = (TAU * i) / 12;
-    const u1 = [-crownDir[1], crownDir[0], 0], u2 = [0, 0, 1];
-    const off = add(scale(u1, Math.cos(phi) * 6.25), scale(u2, Math.sin(phi) * 6.25));
+    const u1 = [-cDir[1], cDir[0], 0], u2 = [0, 0, 1];
+    const off = add(scale(u1, Math.cos(phi) * 2.93), scale(u2, Math.sin(phi) * 2.93));
     crownGrooves.push([
-      add(add(crownBase, scale(crownDir, 3.8)), off),
-      add(add(crownBase, scale(crownDir, 8.2)), off),
+      add(add(cBase, scale(cDir, 1.75)), off),
+      add(add(cBase, scale(cDir, 3.65)), off),
     ]);
   }
   const crownSvg = drawMesh(crownTube, cam, { material: "steel" })
     + drawMesh(crownHead, cam, { material: "alloy", shine: true })
     + linesOn(cam, crownGrooves, "rig-crease");
 
-  once("caseBack", "plate",
-    backLugsSvg
-    + drawMesh(backCaseWall, cam, { material: "steel", shine: true, crease: 52 })
-    + drawMesh(backBezelLip, cam, { material: "alloy", shine: true, crease: 52 })
-    + crownSvg,
-  );
-
-  // ---- 2. Stepped Horological Mainplate (German Silver / Rhodium with subtle perlage tracks)
-  const caseBase = chamferPlate(FLOOR, circlePoints(CAL.caseR, 56), -6.0, -4.0, 0.75);
-  const mainplate = chamferPlate(FLOOR, circlePoints(CAL.plateR, 56), -4.8, 2.0, 1.2);
+  // Subtle concentric perlage engine-turning lines on mainplate top face
   const perlage = [];
-  for (const r of [16, 28, 39, 45.5]) {
-    const ring = circlePoints(r, 48);
+  for (const r of [9.5, 15.8, 19.8]) {
+    const ring = circlePoints(r, 40);
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i], b = ring[(i + 1) % ring.length];
-      perlage.push([[a[0], a[1], 2.06], [b[0], b[1], 2.06]]);
+      perlage.push([[a[0], a[1], 2.38], [b[0], b[1], 2.38]]);
     }
   }
-  // Delicate recessed circular perlage outline around the balance wheel recess (clean, never a heavy dark blob!)
-  const balRing = circlePoints(CAL.balance.r + 1.0, 36, CAL.balance.x, CAL.balance.y);
-  for (let i = 0; i < balRing.length; i++) {
-    const a = balRing[i], b = balRing[(i + 1) % balRing.length];
-    perlage.push([[a[0], a[1], 2.08], [b[0], b[1], 2.08]]);
-  }
-  // Short, realistic horological bridge pedestals (wide, solid, tucked strictly behind/outside wheels!)
-  const trainFeet = [
-    turned([32.5, 4.5, 2.0], [0, 0, 1], [[0, 3.0], [10.0, 3.0]], 16),
-    turned([22.5, 16.0, 2.0], [0, 0, 1], [[0, 2.6], [10.0, 2.6]], 16),
-    // Balance cock pedestal seated cleanly OUTSIDE the left edge of the balance rim (never intersecting the rim!)
-    turned([-36.5, -14.5, 2.0], [0, 0, 1], [[0, 4.2], [9.8, 4.2]], 18),
-  ].map((m) => drawMesh(m, cam, { material: "alloy", shine: true })).join("");
+  once("caseShell", "case", drawAssembly([shell], cam, { shadow: true }) + crownSvg);
+  once("mainplate", "mainplate", drawAssembly([mainplate], cam, { shadow: false }) + linesOn(cam, perlage, "rig-deck-grid"));
 
-  once("mainplate", "plate",
-    frontLugsSvg
-    + drawMesh(caseBase, cam, { material: "steel", shine: false, crease: 38 })
-    + drawMesh(mainplate, cam, { material: "frame", shine: false, crease: 38 })
-    + linesOn(cam, perlage, "rig-deck-grid")
-    + trainFeet,
-  );
-
-  // ---- 3. Stationary Vertical Steel Arbors & Pivots (compact calibre height, ZERO affine shear!)
-  const arborsSvg = [
-    turned([CAL.center.x, CAL.center.y, 2.0], [0, 0, 1], [[0, 2.4], [14.0, 2.4], [15.4, 3.8], [17.8, 3.8]], 18),
-    turned([CAL.barrel.x, CAL.barrel.y, 2.2], [0, 0, 1], [[0, 3.5], [5.4, 5.4 > 0 ? 3.5 : 3.5], [6.2, 2.4], [13.5, 2.4]], 18),
-    turned([CAL.third.x, CAL.third.y, 2.0], [0, 0, 1], [[0, 1.4], [10.8, 1.4]], 12),
-    turned([CAL.fourth.x, CAL.fourth.y, 2.0], [0, 0, 1], [[0, 1.4], [11.2, 1.4]], 12),
-    turned([CAL.escape.x, CAL.escape.y, 2.0], [0, 0, 1], [[0, 1.25], [8.2, 1.25]], 12),
-    turned([CAL.fork.x, CAL.fork.y, 2.0], [0, 0, 1], [[0, 1.15], [8.2, 1.15]], 12),
-    turned([CAL.balance.x, CAL.balance.y, 2.0], [0, 0, 1], [[0, 1.5], [10.8, 1.5]], 14),
-    turned([CAL.revA.x, CAL.revA.y, 2.0], [0, 0, 1], [[0, 1.5], [14.0, 1.5]], 12),
-    turned([CAL.revB.x, CAL.revB.y, 2.0], [0, 0, 1], [[0, 1.5], [14.0, 1.5]], 12),
-  ].map((m) => drawMesh(m, cam, { material: "steel", shine: true })).join("");
-  once("arbors", "train", arborsSvg);
-
-  // ---- 4. Sculpted Horological Bridges (compact, bevel-chamfered, flush ruby jewels & blued screws!)
-  const trainBridgeOuter = roundedHull([
-    [CAL.third.x, CAL.third.y, 5.2],
-    [CAL.fourth.x, CAL.fourth.y, 4.8],
-    [32.8, 4.5, 5.2],
-    [22.5, 16.0, 4.4],
-  ]);
-  const trainBridge = chamferPlate(FLOOR, trainBridgeOuter, 11.8, 13.8, 0.5);
-  once("trainBridge", "train",
-    drawMesh(trainBridge, cam, { material: "alloy", shine: true, crease: 38 })
-    + jewelSetting(cam, CAL.third.x, CAL.third.y, 13.8, 2.4, 1.55)
-    + jewelSetting(cam, CAL.fourth.x, CAL.fourth.y, 13.8, 2.3, 1.45)
-    + watchScrew(cam, 32.5, 4.5, 13.8, 1.55, "cobalt", 0.4)
-    + watchScrew(cam, 22.5, 16.0, 13.8, 1.4, "cobalt", -0.7),
-  );
-
-  // Sculpted Balance Cock: sweeps cleanly from outer-left pedestal (-36.5, -14.5) to balance pivot!
-  const cockOuter = roundedHull([
-    [CAL.balance.x, CAL.balance.y, 4.4],
-    [-29.5, -17.0, 3.4],
-    [-36.5, -14.5, 5.2],
-  ]);
-  const cock = chamferPlate(FLOOR, cockOuter, 11.6, 13.5, 0.48);
-  once("balanceCock", "balance",
-    drawMesh(cock, cam, { material: "alloy", shine: true, crease: 38 })
-    + jewelSetting(cam, CAL.balance.x, CAL.balance.y, 13.5, 3.1, 1.95)
-    + watchScrew(cam, -36.5, -14.5, 13.5, 1.75, "cobalt", 0.7),
-  );
-
-  // Sleek escape bridge cock grounding the escape wheel pivot cleanly
-  const escBridgeOuter = roundedHull([[CAL.escape.x, CAL.escape.y, 2.8], [19.0, -22.5, 3.1]]);
-  once("escBridge", "escapement",
-    drawMesh(chamferPlate(FLOOR, escBridgeOuter, 10.0, 11.3, 0.35), cam, { material: "alloy", shine: true, crease: 38 })
-    + jewelSetting(cam, CAL.escape.x, CAL.escape.y, 11.3, 1.95, 1.25)
-    + watchScrew(cam, 19.0, -22.5, 11.3, 1.2, "cobalt", 1.1),
-  );
-
-  // ---- 5. Angle-Binned Turning Wheels & Subassemblies (Strictly < 0.25 px shear!)
-  const binnedWheel = (name, teeth, r, th, spokes, hubR, mat, bins, period = spokes > 0 ? TAU / spokes : TAU / teeth) => {
-    const t = turning(name, { period, n0: 0, n1: th, minBins: bins, draw: (rot) => drawMesh(wheelMesh(teeth, r, th, spokes, hubR, rot), cam, { material: mat, shine: true }) });
-    t.drawAll();
-    return (rad, x, y, z) => turnedAt(t, rad, x, y, z);
+  // ================================================================ LAYER 1: Barrel & Going Train
+  // Local sub-heights inside Layer 1 (0 .. 4.6)
+  const Z1 = {
+    barrel: [0.25, 3.4],
+    cPin: [0.35, 1.85],
+    center: [2.25, 0.82],
+    tPin: [1.65, 1.45],
+    third: [3.15, 0.78],
+    fPin: [2.80, 1.45],
+    fourth: [1.30, 0.78],
+    ePin: [0.95, 1.55],
   };
 
-  // Mainspring Barrel Drum: 30 crisp watchmaker teeth, open cutaway top showing coiled spring + vermilion bridle!
-  const BARREL_TH = 4.6;
-  once("barrelFloor", "barrel", drawMesh(plate(FLOOR, { outer: circlePoints(CAL.barrel.r - 1.8, 32, CAL.barrel.x, CAL.barrel.y), holes: [circlePoints(3.4, 14, CAL.barrel.x, CAL.barrel.y)] }, CAL.barrel.z, CAL.barrel.z + 0.75), cam, { material: "slate" }));
-  const barrelTurn = turning("barrel", { period: TAU / 30, n0: 0, n1: BARREL_TH, minBins: 2, draw: (rot) => {
-    const outer = gearOutline(30, CAL.barrel.r, { addendum: 0.92, dedendum: 1.0, rot });
-    const drum = plate(FLOOR, { outer, holes: [circlePoints(CAL.barrel.r - 2.1, 36)] }, 0, BARREL_TH);
-    return drawMesh(drum, cam, { material: "brass", shine: true });
-  } });
+  // Stationary steel arbors for Layer 1 (with `inside` cutouts so they never fight wheels)
+  const aBarrel = arbor(0.65, 4.5, { at: [BARREL_AT[0], BARREL_AT[1], 0], inside: [[Z1.barrel[0], Z1.barrel[0] + Z1.barrel[1]]], material: "steel" });
+  const aCenter = arbor(0.50, 4.6, { at: [CENTER_AT[0], CENTER_AT[1], 0], inside: [[Z1.cPin[0], Z1.cPin[0] + Z1.cPin[1]], [Z1.center[0], Z1.center[0] + Z1.center[1] * 1.65]], material: "steel" });
+  const aThird = arbor(0.42, 4.6, { at: [THIRD_AT[0], THIRD_AT[1], 0], inside: [[Z1.tPin[0], Z1.tPin[0] + Z1.tPin[1]], [Z1.third[0], Z1.third[0] + Z1.third[1] * 1.65]], material: "steel" });
+  const aFourth = arbor(0.42, 4.6, { at: [FOURTH_AT[0], FOURTH_AT[1], 0], inside: [[Z1.fourth[0], Z1.fourth[0] + Z1.fourth[1] * 1.65], [Z1.fPin[0], Z1.fPin[0] + Z1.fPin[1]]], material: "steel" });
+  const aEscL1 = arbor(0.36, 3.4, { at: [ESCAPE_AT[0], ESCAPE_AT[1], 0], inside: [[Z1.ePin[0], Z1.ePin[0] + Z1.ePin[1]]], material: "steel" });
+  once("trainArbors", "mainplate", drawAssembly([aBarrel, aCenter, aThird, aFourth, aEscL1], cam, { shadow: false }));
+
+  // Mainspring Barrel Drum (32 clock teeth, open top, recessed graphite floor, blued spiral ribbon, slipping bridle)
+  const BARREL_H = Z1.barrel[1];
+  const barrelFloorMesh = plate(FLOOR, {
+    outer: circlePoints(CAL.barrel.r - 1.15, 32, BARREL_AT[0], BARREL_AT[1]),
+    holes: [circlePoints(1.75, 14, BARREL_AT[0], BARREL_AT[1])],
+  }, Z1.barrel[0], Z1.barrel[0] + 0.55);
+  const barrelCoreMesh = turned([BARREL_AT[0], BARREL_AT[1], Z1.barrel[0] + 0.3], [0, 0, 1], [[0, 1.8], [BARREL_H - 0.5, 1.8], [BARREL_H - 0.2, 1.45]], 18);
+  once("barrelBase", "barrel",
+    drawMesh(barrelFloorMesh, cam, { material: "graphite" })
+    + drawMesh(barrelCoreMesh, cam, { material: "steel", shine: true }),
+  );
+  const barrelTurn = turning("barrel", {
+    period: TAU / CAL.barrel.teeth,
+    n0: 0,
+    n1: BARREL_H,
+    minBins: 2,
+    draw: (rot) => {
+      const outer = gearProfile(CAL.barrel.teeth, CAL.barrel.r, { form: "clock", kind: "wheel", rot });
+      const drum = plate(FLOOR, { outer, holes: [circlePoints(CAL.barrel.r - 1.25, 36)] }, 0, BARREL_H);
+      return drawOrdered(drum, cam, { material: "brass", shine: true, crease: 52 });
+    },
+  });
   barrelTurn.drawAll();
-  // Thin slipping bridle collar lining the front-left inner barrel rim (gleams vermilion at 100% wind, never obscures coils!)
-  const bridleTpl = (slipping) => tpl(`bridle-${slipping ? 1 : 0}`, () => {
-    const bridle = plate(FLOOR, { outer: arcOutline(CAL.barrel.r - 3.35, CAL.barrel.r - 2.15, -2.85, -0.55, 24) }, 0.9, 4.95);
-    return drawMesh(bridle, cam, { material: slipping ? "subject" : "steel", shine: true });
-  });
-  // Blued-steel mainspring: a solid coiled strip, its coils hiding one another face by face
+
+  // Coiled blued-steel mainspring ribbon (9 discrete wind states, drawn face-by-face)
   const mainspringTpl = (level) => tpl(`mspr-${level}`, () => {
-    const windF = level / 8;
-    const turns = 3.2 + windF * 2.1;
-    const r0 = 5.4 - windF * 1.6;
-    const r1 = CAL.barrel.r - 3.5;
-    return drawSpiralRibbon(cam, FLOOR, { r0, r1, turns, t0: 0.95, t1: 4.35, thick: 0.28, steps: 80, phase: 0.3 }, { material: "cobalt", shine: true, crease: 40 });
+    const f = level / 8;
+    const turns = 3.1 + f * 2.1;
+    const r0 = 2.65 - f * 0.72;
+    const r1 = CAL.barrel.r - 1.95;
+    return drawSpiralRibbon(
+      cam, FLOOR,
+      { r0, r1, turns, t0: 0.6, t1: BARREL_H - 0.25, thick: 0.17, steps: 84, phase: 0.35 },
+      { material: "blued", shine: true, crease: 40 },
+    );
   });
+  for (let i = 0; i <= 8; i++) mainspringTpl(i);
 
-  // Going train wheels + steel pinions (clean divisible tooth/spoke counts!)
-  const placeCenterPin = binnedWheel("cpin", 10, CAL.center.pinR, 3.0, 0, 2.2, "steel", 2, TAU / 10);
-  const placeCenter    = binnedWheel("center", 25, CAL.center.r, 1.6, 5, 3.2, "brass", 12);
-  const placeThirdPin  = binnedWheel("tpin", 10, CAL.third.pinR, 2.8, 0, 1.5, "steel", 2, TAU / 10);
-  const placeThird     = binnedWheel("third", 20, CAL.third.r, 1.5, 5, 2.6, "brass", 12);
-  const placeFourthPin = binnedWheel("fpin", 10, CAL.fourth.pinR, 2.4, 0, 1.4, "steel", 2, TAU / 10);
-  const placeFourth    = binnedWheel("fourth", 20, CAL.fourth.r, 1.5, 4, 2.5, "brass", 14);
+  // Slipping bridle lining the front-facing inner barrel wall (steel normally, subject orange when slipping!)
+  const bridleTpl = (slipping) => tpl(`bridle-${slipping ? 1 : 0}`, () => {
+    const arc = arcOutline(CAL.barrel.r - 1.90, CAL.barrel.r - 1.26, -2.75, -0.45, 24);
+    const mesh = plate(FLOOR, { outer: arc }, 0.55, BARREL_H + 0.15);
+    return drawOrdered(mesh, cam, { material: slipping ? "subject" : "steel", shine: true, crease: 45 });
+  });
+  bridleTpl(0);
+  bridleTpl(1);
 
-  // Blued-steel sweep second hand mounted above fourth wheel jewel + brass hub cap
-  const handTurn = turning("shand", { n0: 0, n1: 0.55, minBins: 36, draw: (a) => {
-    const c = Math.cos(a), s = Math.sin(a);
-    const nx = -s, ny = c;
-    const L = CAL.fourth.r * 0.94, B = -3.4;
-    const poly = [
-      [c * B - nx * 0.65, s * B - ny * 0.65],
-      [c * L - nx * 0.22, s * L - ny * 0.22],
-      [c * L + nx * 0.22, s * L + ny * 0.22],
-      [c * B + nx * 0.65, s * B + ny * 0.65],
-    ];
-    return drawMesh(plate(FLOOR, { outer: poly }, 0, 0.55), cam, { material: "cobalt", shine: true });
-  } });
-  handTurn.drawAll();
-  once("secondCap", "train", drawMesh(turned([CAL.fourth.x, CAL.fourth.y, 14.3], [0, 0, 1], [[0, 1.15], [0.65, 1.15]], 12), cam, { material: "brass", shine: true }));
+  // Going train wheels & pinions built via src/rig/mech.ts spokedWheel() & pinion()
+  const makeWheel = (id, teeth, pitchR, th, opts = {}) => {
+    const spokes = opts.spokes ?? 5;
+    const period = spokes > 0 ? TAU / spokes : TAU / teeth;
+    const colH = opts.colletH ?? th * 0.65;
+    const t = turning(id, {
+      period,
+      n0: 0,
+      n1: th + colH,
+      minBins: opts.minBins ?? 6,
+      draw: (rot) => drawPart(spokedWheel(teeth, pitchR, th, {
+        rot, spokes, colletH: colH, material: opts.material ?? "brass", colletMaterial: "steel", pxPerUnit,
+      }), cam, { shadow: false }),
+    });
+    t.drawAll();
+    return t;
+  };
+  const makePinion = (id, leaves, pitchR, len, opts = {}) => {
+    const t = turning(id, {
+      period: TAU / leaves,
+      n0: 0,
+      n1: len,
+      minBins: 2,
+      draw: (rot) => drawPart(pinion(leaves, pitchR, len, { rot, material: opts.material ?? "steel", pxPerUnit }), cam, { shadow: false }),
+    });
+    t.drawAll();
+    return t;
+  };
 
-  // 15-tooth Swiss club-tooth escape wheel (3 spokes -> 120 deg symmetry, 18 bins!)
-  const escTurn = turning("esc", { period: TAU / 3, n0: 0, n1: 1.3, minBins: 18, draw: (rot) => {
-    const outer = escapeWheelOutline(15, CAL.escape.r, CAL.escape.r * 0.68, rot);
-    const holes = [circlePoints(1.5, 12), ...spokedHoles(2.3, CAL.escape.r * 0.55, 3, 0.22, rot, 8)];
-    return drawMesh(plate(FLOOR, { outer, holes }, 0, 1.3), cam, { material: "brass", shine: true });
-  } });
+  const cPinTurn = makePinion("cpin", CAL.center.pinT, CAL.center.pinR, Z1.cPin[1]);
+  const centerTurn = makeWheel("center", CAL.center.teeth, CAL.center.r, Z1.center[1], { spokes: 5, material: "brass", minBins: 8 });
+  const tPinTurn = makePinion("tpin", CAL.third.pinT, CAL.third.pinR, Z1.tPin[1]);
+  const thirdTurn = makeWheel("third", CAL.third.teeth, CAL.third.r, Z1.third[1], { spokes: 5, material: "gilt", minBins: 8 });
+  const fPinTurn = makePinion("fpin", CAL.fourth.pinT, CAL.fourth.pinR, Z1.fPin[1]);
+  const fourthTurn = makeWheel("fourth", CAL.fourth.teeth, CAL.fourth.r, Z1.fourth[1], { spokes: 4, material: "brass", minBins: 8 });
+  const ePinTurn = makePinion("epin", CAL.escape.pinT, CAL.escape.pinR, Z1.ePin[1]);
+
+  // Delicate heat-blued sweep second hand coaxially mounted on the fourth-wheel collet
+  const secondHandTurn = turning("shand", {
+    n0: 0,
+    n1: 0.4,
+    minBins: 24,
+    draw: (a) => {
+      const c = Math.cos(a), s = Math.sin(a), nx = -s, ny = c;
+      const L = CAL.fourth.r * 0.96, B = -1.7;
+      const poly = [
+        [c * B - nx * 0.34, s * B - ny * 0.34],
+        [c * L - nx * 0.12, s * L - ny * 0.12],
+        [c * L + nx * 0.12, s * L + ny * 0.12],
+        [c * B + nx * 0.34, s * B + ny * 0.34],
+      ];
+      return drawMesh(plate(FLOOR, { outer: poly }, 0, 0.4), cam, { material: "blued", shine: true });
+    },
+  });
+  secondHandTurn.drawAll();
+
+  // ================================================================ LAYER 2: Escapement & Balance
+  // 15-tooth Swiss club-tooth escape wheel (3 spokes -> 120 deg symmetry)
+  const escTurn = turning("esc", {
+    period: TAU / 3,
+    n0: 0,
+    n1: 1.05,
+    minBins: 14,
+    draw: (rot) => {
+      const outer = escapeWheelOutline(CAL.escape.teeth, CAL.escape.r, CAL.escape.rRoot, rot);
+      const holes = [circlePoints(0.8, 12), ...spokedHoles(1.3, CAL.escape.rRoot * 0.80, 3, 0.22, rot, 8)];
+      const wheel = plate(FLOOR, { outer, holes }, 0, 0.85);
+      const collet = turned([0, 0, 0.75], [0, 0, 1], [[0, 1.05], [0.3, 0.9]], 16);
+      return drawOrdered(wheel, cam, { material: "gilt", shine: true, crease: 52 })
+        + drawMesh(collet, cam, { material: "steel", shine: true });
+    },
+  });
   escTurn.drawAll();
 
-  // Steel Pallet Fork with twin ruby stones, swinging +/- 6.5 deg (drawn every 3.25 deg or finer)
-  const forkTurn = turning("fork", { n0: Math.min(0, shadowAway[2]), n1: 1.45, minBins: Math.ceil(360 / 3.25), draw: (a) => {
-    const c = Math.cos(a), s = Math.sin(a);
-    const rotP = ([x, y]) => [x * c - y * s, x * s + y * c];
-    const arm = roundedHull([[-10.2, 0, 1.05], [0, 0, 2.0], [7.2, 4.2, 1.15]]).map(rotP);
-    const arm2 = roundedHull([[0, 0, 1.85], [7.2, -4.2, 1.15]]).map(rotP);
-    const stoneA = [[6.0, 3.0], [8.8, 3.8], [8.3, 5.2], [5.6, 4.3]].map(rotP);
-    const stoneB = [[6.0, -4.3], [8.6, -5.0], [9.0, -3.5], [6.4, -2.8]].map(rotP);
-    const arms = [plate(FLOOR, { outer: arm }, 0, 1.25), plate(FLOOR, { outer: arm2 }, 0, 1.25)];
-    return arms.map((m) => plateShadow(m, cam, shadowAway)).join("")
-      + arms.map((m) => drawMesh(m, cam, { material: "steel", shine: true })).join("")
-      + drawMesh(plate(FLOOR, { outer: stoneA }, 0.1, 1.45), cam, { material: "ruby", shine: true })
-      + drawMesh(plate(FLOOR, { outer: stoneB }, 0.1, 1.45), cam, { material: "ruby", shine: true });
-  } });
-  forkTurn.drawAll(-6.5 * RAD - forkTurn.step, 6.5 * RAD + forkTurn.step);
+  // Swiss Lever Pallet Fork with twin bold ruby stones (entry + exit) and U-shaped roller notch!
+  const D_FE = CAL.fork.feDist; // 6.50
+  const R_ESC = CAL.escape.r;   // 4.85
+  const forkTurn = turning("fork", {
+    n0: Math.min(0, shadowAway[2]),
+    n1: 1.1,
+    minBins: 72,
+    draw: (a) => {
+      const ang = FORK_BASE_ANG + a;
+      const c = Math.cos(ang), s = Math.sin(ang);
+      const rotP = ([x, y]) => [x * c - y * s, x * s + y * c];
+      // Stone positions at exact 2.5 tooth pitches (+/- 150 deg around escape center)
+      const stPt = (rf, deg) => [D_FE + R_ESC * rf * Math.cos(deg * RAD), R_ESC * rf * Math.sin(deg * RAD)];
+      const entryStone = [stPt(0.95, 145), stPt(0.97, 154), stPt(1.17, 155), stPt(1.15, 146)].map(rotP);
+      const exitStone = [stPt(0.97, -154), stPt(0.95, -145), stPt(1.15, -146), stPt(1.17, -155)].map(rotP);
+      const armL = CAL.fork.balDist - CAL.balance.rollerR * 0.82; // 5.47 -> surrounds roller impulse jewel!
+      const forkPoly = [
+        [-armL - 0.5, -0.95], [-armL + 0.45, -1.25], [-armL + 0.45, -0.42],
+        [-0.3, -0.48], [1.9, -2.55], [2.45, -2.15], [0.75, -0.55],
+        [0.75, 0.55], [2.45, 2.15], [1.9, 2.55], [-0.3, 0.48],
+        [-armL + 0.45, 0.42], [-armL + 0.45, 1.25], [-armL - 0.5, 0.95],
+      ].map(rotP);
+      const body = plate(FLOOR, { outer: forkPoly }, 0, 0.88);
+      const boss = turned([0, 0, 0], [0, 0, 1], [[0, 0.92], [1.05, 0.92]], 16);
+      return plateShadow(body, cam, shadowAway)
+        + drawOrdered(body, cam, { material: "steel", shine: true, crease: 45 })
+        + drawMesh(boss, cam, { material: "alloy", shine: true })
+        + drawOrdered(plate(FLOOR, { outer: entryStone }, 0.08, 1.05), cam, { material: "ruby", shine: true })
+        + drawOrdered(plate(FLOOR, { outer: exitStone }, 0.08, 1.05), cam, { material: "ruby", shine: true });
+    },
+  });
+  forkTurn.drawAll(-7.5 * RAD - forkTurn.step, 7.5 * RAD + forkTurn.step);
 
-  // Poised Glucydur Balance Wheel (3 spokes + 6 timing screws -> 120 deg symmetry, 18 bins!)
-  const balTurn = turning("bal", { period: TAU / 3, n0: 0, n1: 1.85, minBins: 18, draw: (rot) => {
-    const r = CAL.balance.r;
-    const rim = plate(FLOOR, { outer: circlePoints(r, 44), holes: [circlePoints(2.2, 14), ...spokedHoles(3.2, r - 2.3, 3, 0.18, rot + 0.2, 12)] }, 0, 1.85);
-    let weights = "";
-    for (let i = 0; i < 6; i++) {
-      const a = rot + (TAU * i) / 6;
-      weights += drawMesh(turned([Math.cos(a) * (r + 0.45), Math.sin(a) * (r + 0.45), 0.3], [0, 0, 1], [[0, 0.85], [1.15, 0.85]], 10), cam, { material: "alloy", shine: true });
-    }
-    return drawMesh(rim, cam, { material: "brass", shine: true }) + weights;
-  } });
+  // Twin stationary steel banking pins limiting fork travel to +/- 6.5 deg
+  const bpBase = -3.3;
+  const bpSpread = 1.08;
+  const cf = Math.cos(FORK_BASE_ANG), sf = Math.sin(FORK_BASE_ANG);
+  const bankingPinsSvg = [-1, 1].map((side) => {
+    const bx = FORK_AT[0] + bpBase * cf - side * bpSpread * sf;
+    const by = FORK_AT[1] + bpBase * sf + side * bpSpread * cf;
+    return drawMesh(turned([bx, by, 0], [0, 0, 1], [[0, 0.34], [1.25, 0.34]], 10), cam, { material: "graphite", shine: true });
+  }).join("");
+  once("bankingPins", "fork", bankingPinsSvg);
+
+  // Coaxial Balance Roller + Ruby Impulse Jewel (sits right beneath balance wheel, engages fork notch!)
+  const rollerTurn = turning("roller", {
+    n0: 0,
+    n1: 0.95,
+    minBins: 24,
+    draw: (a) => {
+      const disc = turned([0, 0, 0.05], [0, 0, 1], [[0, CAL.balance.rollerR], [0.55, CAL.balance.rollerR]], 24);
+      const jAng = FORK_BASE_ANG + a;
+      const jr = CAL.balance.rollerR * 0.84;
+      const pin = turned([Math.cos(jAng) * jr, Math.sin(jAng) * jr, 0.0], [0, 0, 1], [[0, 0.44], [0.92, 0.44]], 12);
+      return drawMesh(disc, cam, { material: "steel", shine: true })
+        + drawMesh(pin, cam, { material: "ruby", shine: true });
+    },
+  });
+  rollerTurn.drawAll();
+
+  // Poised Balance Wheel (3 spokes, 6 machined timing screws -> 120 deg symmetry)
+  const balTurn = turning("bal", {
+    period: TAU / 3,
+    n0: 0,
+    n1: 1.05,
+    minBins: 14,
+    draw: (rot) => {
+      const r = CAL.balance.r;
+      const rim = plate(FLOOR, {
+        outer: circlePoints(r, 44),
+        holes: [circlePoints(1.15, 14), ...spokedHoles(1.75, r - 1.15, 3, 0.17, rot + 0.15, 12)],
+      }, 0, 1.05);
+      let weights = "";
+      for (let i = 0; i < 6; i++) {
+        const a = rot + (TAU * i) / 6;
+        weights += drawMesh(turned([Math.cos(a) * (r + 0.24), Math.sin(a) * (r + 0.24), 0.15], [0, 0, 1], [[0, 0.44], [0.75, 0.44]], 10), cam, { material: "steel", shine: true });
+      }
+      return drawOrdered(rim, cam, { material: "brass", shine: true, crease: 52 }) + weights;
+    },
+  });
   balTurn.drawAll();
 
-  // Breathing 3D Blued-Steel Hairspring Ribbon (9 breathing radii, depth-sorted, stationary!)
+  // Breathing 3D blued-steel hairspring ribbon (9 breathing states, stationary center)
   const hairspringTpl = (bin) => tpl(`hspr-${bin}`, () => {
     const f = 0.88 + (bin / 8) * 0.24;
-    return drawSpiralRibbon(cam, FLOOR, { r0: 2.3, r1: 9.6 * f, turns: 4.2, t0: 0, t1: 1.25, thick: 0.2, steps: 64, phase: 0.5 }, { material: "cobalt", shine: true, crease: 40 });
+    return drawSpiralRibbon(
+      cam, FLOOR,
+      { r0: 1.2, r1: 4.55 * f, turns: 4.2, t0: 0, t1: 0.72, thick: 0.12, steps: 64, phase: 0.5 },
+      { material: "blued", shine: true, crease: 40 },
+    );
+  });
+  for (let i = 0; i <= 8; i++) hairspringTpl(i);
+
+  // ================================================================ LAYER 3: Rhodium Bridges, Jewels, Screws & Regulator
+  const trainBr = bridge({ points: [CENTER_AT, THIRD_AT, FOURTH_AT, SCREW_TRAIN], width: 4.5, boss: 2.9 }, 1.2, {
+    chamfer: 0.28,
+    jewelHoles: [CENTER_AT, THIRD_AT, FOURTH_AT],
+    jewelR: 1.02,
+    screwHoles: [SCREW_TRAIN],
+    screwR: 1.10,
+    fill: "jewels",
+    material: "rhodium",
+  });
+  const barrelBr = bridge({ points: [BARREL_AT, SCREW_BARREL], width: 4.4, boss: 2.8 }, 1.2, {
+    chamfer: 0.28,
+    jewelHoles: [BARREL_AT],
+    jewelR: 1.10,
+    screwHoles: [SCREW_BARREL],
+    screwR: 1.10,
+    fill: "jewels",
+    material: "rhodium",
+  });
+  const escCock = bridge({ points: [ESCAPE_AT, SCREW_ESC], width: 3.6, boss: 2.35 }, 1.05, {
+    chamfer: 0.24,
+    jewelHoles: [ESCAPE_AT],
+    jewelR: 0.92,
+    screwHoles: [SCREW_ESC],
+    screwR: 1.02,
+    fill: "jewels",
+    material: "rhodium",
+  });
+  const balCock = bridge({ points: [BALANCE_AT, SCREW_BAL], width: 4.2, boss: 2.75 }, 1.15, {
+    chamfer: 0.26,
+    jewelHoles: [BALANCE_AT],
+    jewelR: 1.18,
+    screwHoles: [SCREW_BAL],
+    screwR: 1.10,
+    fill: "jewels",
+    material: "rhodium",
   });
 
-  // Regulator index pointer arm (sweeps cleanly atop balance cock)
-  // drawn every 5 deg or finer; its pin reaches 2.5 below the arm, so it is placed by the plane
-  // halfway between the pin's foot and the arm's top
-  const regTurn = turning("reg", { n0: -2.5, n1: 1.2, minBins: 72, draw: (a) => {
-    const c = Math.cos(a), s = Math.sin(a);
-    const rotP = ([x, y]) => [x * c - y * s, x * s + y * c];
-    const arm = roundedHull([[0, 0, 2.0], [-14.0, 0, 0.92]]).map(rotP);
-    const px0 = -10.2 * c, py0 = -10.2 * s;
-    return drawMesh(plate(FLOOR, { outer: arm }, 0, 0.95), cam, { material: "subject", shine: true })
-      + drawMesh(rod([px0, py0, -2.5], [px0, py0, 1.2], 0.52, 8), cam, { material: "brass", shine: true });
-  } });
-  regTurn.drawAll(-40 * RAD - regTurn.step, 40 * RAD + regTurn.step);
+  // Lifted heat-blued watchmaker screws with real slots and shanks hovering above each bridge!
+  const makeBlueScrew = (pt, r, slotAngle) => screw(r, { at: [pt[0], pt[1], 2.55], shank: 1.5, slotAngle, material: "blued" });
+  once("trainBridge", "trainBridge", drawAssembly([trainBr, makeBlueScrew(SCREW_TRAIN, 1.10, 0.45)], cam, { shadow: true }));
+  once("barrelBridge", "barrelBridge", drawAssembly([barrelBr, makeBlueScrew(SCREW_BARREL, 1.10, -0.6)], cam, { shadow: true }));
+  once("escCock", "escCock", drawAssembly([escCock, makeBlueScrew(SCREW_ESC, 1.02, 1.1)], cam, { shadow: true }));
+  once("balanceCock", "balanceCock", drawAssembly([balCock, makeBlueScrew(SCREW_BAL, 1.10, 0.7)], cam, { shadow: true }));
 
-  // Coplanar Automatic Winding Train (bright machined alloy/steel gears + active teal click wheel!)
-  const placeRotorPin = binnedWheel("rpin", 20, CAL.center.rotorPinR, 1.35, 4, 2.8, "alloy", 10);
-  const placeRatchet  = binnedWheel("ratch", 20, CAL.barrel.rRatchet, 1.35, 4, 2.6, "alloy", 10);
-  const placeRevTeal  = binnedWheel("rev-t", 16, CAL.revA.r, 1.45, 4, 2.0, "teal", 10);
-  const placeRevSteel = binnedWheel("rev-s", 16, CAL.revA.r, 1.45, 4, 2.0, "alloy", 10);
+  // Micron Regulator Index Pointer Arm (subject orange, seated atop balance cock jewel!)
+  const regTurn = turning("reg", {
+    n0: -1.35,
+    n1: 0.75,
+    minBins: 72,
+    draw: (a) => {
+      const ang = a - 155 * RAD; // rests sweeping along the balance cock toward the outer scale
+      const c = Math.cos(ang), s = Math.sin(ang);
+      const rotP = ([x, y]) => [x * c - y * s, x * s + y * c];
+      const arm = roundedHull([[0, 0, 1.05], [7.2, 0, 0.45]]).map(rotP);
+      const pinX = 4.6 * c, pinY = 4.6 * s;
+      return drawOrdered(plate(FLOOR, { outer: arm }, 0, 0.58), cam, { material: "subject", shine: true })
+        + drawMesh(rod([pinX, pinY, -1.35], [pinX, pinY, 0.72], 0.28, 8), cam, { material: "brass", shine: true });
+    },
+  });
+  regTurn.drawAll(-26 * RAD - regTurn.step, 26 * RAD + regTurn.step);
 
-  // ---- 6. Sculpted Ball-Bearing Oscillating Rotor (36 angle bins -> true rotating 3D light!)
-  const rotorTurn = turning("rotor", { n0: Math.min(0, shadowAway[2]), n1: 3.1, minBins: 36, draw: (rot) => {
-    const span = Math.PI * 0.47;
-    const lowerArc = arcOutline(CAL.rotor.rIn, CAL.rotor.rOut, rot - span, rot + span, 28);
-    const upperArc = arcOutline(CAL.rotor.rIn + 1.3, CAL.rotor.rOut - 1.1, rot - span + 0.03, rot + span - 0.03, 28);
-    const lowerRim = plate(FLOOR, { outer: lowerArc }, 0, 1.75);
-    const upperRim = plate(FLOOR, { outer: upperArc }, 1.75, 3.05);
-    const ribs = [];
-    for (let i = -4; i <= 4; i++) {
-      const a = rot + i * 0.28;
-      ribs.push([
-        [Math.cos(a) * (CAL.rotor.rIn + 2.4), Math.sin(a) * (CAL.rotor.rIn + 2.4), 3.1],
-        [Math.cos(a) * (CAL.rotor.rOut - 2.0), Math.sin(a) * (CAL.rotor.rOut - 2.0), 3.1],
-      ]);
-    }
-    let arms = "";
-    for (const da of [-1.06, 0, 1.06]) {
-      const a = rot + da;
-      const p1 = [Math.cos(a) * (CAL.rotor.rIn + 1.8), Math.sin(a) * (CAL.rotor.rIn + 1.8)];
-      arms += drawMesh(plate(FLOOR, { outer: roundedHull([[0, 0, 4.7], [p1[0], p1[1], 1.9]]) }, 0.4, 1.65), cam, { material: "alloy", shine: true });
-    }
-    return plateShadow(lowerRim, cam, shadowAway)
-      + arms
-      + drawMesh(lowerRim, cam, { material: "steel", shine: true })
-      + drawMesh(upperRim, cam, { material: "subject", shine: true })
-      + linesOn(cam, ribs, "rig-crease");
-  } });
+  // ================================================================ LAYER 4: Automatic Winding Train
+  // Solid-web click/ratchet wheels (spokes: 0) match real automatic winding trains and keep <defs> lean.
+  const rotorPinTurn = makeWheel("rpin", CAL.center.rotorPinT, CAL.center.rotorPinR, 0.88, { spokes: 0, material: "steel", minBins: 3 });
+  const ratchetTurn = makeWheel("ratch", CAL.barrel.ratchetT, CAL.barrel.rRatchet, 0.88, { spokes: 0, material: "alloy", minBins: 3 });
+  const revHotTurn = makeWheel("rev-hot", CAL.revA.teeth, CAL.revA.r, 0.92, { spokes: 0, material: "subject", minBins: 3 });
+  const revIdleTurn = makeWheel("rev-idle", CAL.revA.teeth, CAL.revA.r, 0.92, { spokes: 0, material: "steel", minBins: 3 });
+
+  // ================================================================ LAYER 5: Ball-Bearing Oscillating Rotor
+  const rotorShadow = [shadowAway[0], shadowAway[1], 0];
+  const rotorTurn = turning("rotor", {
+    n0: 0,
+    n1: 2.35,
+    minBins: 36,
+    draw: (rot) => {
+      const span = Math.PI * 0.46;
+      const lowerArc = arcOutline(CAL.rotor.rIn, CAL.rotor.rOut, rot - span, rot + span, 16);
+      const weightArc = arcOutline(CAL.rotor.rIn + 1.1, CAL.rotor.rOut - 0.5, rot - span + 0.03, rot + span - 0.03, 16);
+      const accentArc = arcOutline(CAL.rotor.rIn + 0.15, CAL.rotor.rIn + 1.05, rot - span + 0.06, rot + span - 0.06, 12);
+      const lowerRim = plate(FLOOR, { outer: lowerArc }, 0, 1.15);
+      const weightRim = plate(FLOOR, { outer: weightArc }, 1.15, 2.30);
+      const accentRim = plate(FLOOR, { outer: accentArc }, 1.15, 1.95);
+      const ribs = [];
+      for (let i = -4; i <= 4; i++) {
+        const a = rot + i * 0.27;
+        ribs.push([
+          [Math.cos(a) * (CAL.rotor.rIn + 1.5), Math.sin(a) * (CAL.rotor.rIn + 1.5), 2.33],
+          [Math.cos(a) * (CAL.rotor.rOut - 0.9), Math.sin(a) * (CAL.rotor.rOut - 0.9), 2.33],
+        ]);
+      }
+      let arms = "";
+      for (const da of [-1.05, 0, 1.05]) {
+        const a = rot + da;
+        const p1 = [Math.cos(a) * (CAL.rotor.rIn + 0.9), Math.sin(a) * (CAL.rotor.rIn + 0.9)];
+        arms += drawOrdered(plate(FLOOR, { outer: roundedHull([[0, 0, 2.5], [p1[0], p1[1], 1.05]]) }, 0.25, 1.1), cam, { material: "steel", shine: true });
+      }
+      return plateShadow(lowerRim, cam, rotorShadow)
+        + arms
+        + drawOrdered(lowerRim, cam, { material: "steel", shine: true, crease: 45 })
+        + drawOrdered(weightRim, cam, { material: "graphite", shine: true, crease: 45 })
+        + drawOrdered(accentRim, cam, { material: "subject", shine: true, crease: 45 })
+        + linesOn(cam, ribs, "rig-crease");
+    },
+  });
   rotorTurn.drawAll();
 
-  // Stationary Central Ball-Bearing Hub mounted flush onto the rotor shaft
-  const rotorHubOuter = turned([0, 0, CAL.rotor.z - 0.2], [0, 0, 1], [[0, 6.0], [2.2, 6.0], [2.95, 5.0]], 28);
-  const rotorHubInner = turned([0, 0, CAL.rotor.z + 2.2], [0, 0, 1], [[0, 2.9], [1.0, 2.9]], 18);
-  let bearings = "";
+  // Central 5-ball bearing hub on rotor axis
+  const hubOuter = turned([0, 0, 0.2], [0, 0, 1], [[0, 3.0], [1.6, 3.0], [2.1, 2.45]], 24);
+  const hubInner = turned([0, 0, 1.6], [0, 0, 1], [[0, 1.35], [0.75, 1.35]], 18);
+  let balls = "";
   for (let i = 0; i < 5; i++) {
     const a = (TAU * i) / 5 + 0.3;
-    bearings += drawMesh(turned([Math.cos(a) * 4.1, Math.sin(a) * 4.1, CAL.rotor.z + 2.3], [0, 0, 1], [[0, 0.7], [0.7, 0.7]], 10), cam, { material: "alloy", shine: true });
+    balls += drawMesh(turned([Math.cos(a) * 2.0, Math.sin(a) * 2.0, 1.7], [0, 0, 1], [[0, 0.38], [0.45, 0.38]], 10), cam, { material: "alloy", shine: true });
   }
   once("rotorHub", "rotor",
-    drawMesh(rotorHubOuter, cam, { material: "steel", shine: true })
-    + bearings
-    + drawMesh(rotorHubInner, cam, { material: "ruby", shine: true }),
+    drawMesh(hubOuter, cam, { material: "steel", shine: true })
+    + balls
+    + drawMesh(hubInner, cam, { material: "ruby", shine: true }),
   );
 
-  // Anchors for callout leaders — every dot lands squarely on its exposed physical component!
-  const at = {
-    rotor: S(Math.cos(22 * RAD) * 40, Math.sin(22 * RAD) * 40, CAL.rotor.z + 2.8),
-    reversing: S(CAL.revA.x - 1.5, CAL.revA.y + 2.5, CAL.revA.z + 1.4),
-    barrel: S(CAL.barrel.x - 14.0, CAL.barrel.y + 3.5, CAL.barrel.z + 4.0),
-    // Lands directly on the bright vermilion slipping bridle rim lining the front-left of the barrel!
-    bridle: S(CAL.barrel.x - 10.2, CAL.barrel.y - 7.5, CAL.barrel.z + 4.85),
-    // Lands directly on the exposed golden brass center wheel rim in the open center window
-    center: S(CAL.center.x + 6.5, CAL.center.y - 6.5, CAL.center.z + 1.5),
-    fourth: S(CAL.fourth.x + 7.5, CAL.fourth.y - 5.5, CAL.fourth.z + 1.5),
-    escape: S(CAL.escape.x + 5.0, CAL.escape.y - 5.0, CAL.escape.z + 1.4),
-    fork: S(CAL.fork.x, CAL.fork.y - 3.2, CAL.fork.z + 1.3),
-    balance: S(CAL.balance.x - 9.5, CAL.balance.y - 8.5, CAL.balance.z + 1.6),
-    regulator: S(CAL.balance.x - 11.5, CAL.balance.y + 1.5, 14.5),
+  // Pre-build the dashed vertical centreLines per explode setting (cached so 60 fps costs 0!)
+  const guidesCache = new Map();
+  const guidesFor = (explode) => {
+    const k = Math.round(explode * 1000);
+    if (!guidesCache.has(k)) {
+      const st = stackFor(explode);
+      const svgs = st.guides.map((segs) => centreLines(cam, segs));
+      // Add vertical screw centre lines from each bridge top up to its lifted blued screw
+      const b3 = st.bases[3];
+      const screwSegs = Object.values(CAL.screws).map(([x, y]) => [[x, y, b3 + 1.2], [x, y, b3 + 2.55]]);
+      svgs[3] = (svgs[3] || "") + centreLines(cam, screwSegs);
+      guidesCache.set(k, { st, svgs });
+    }
+    return guidesCache.get(k);
   };
 
-  /** Compute one 60 fps frame for the movement state. */
+  /** Compute one 60 fps frame for the exploded watch state. */
   function pose(st) {
-    const { rotorDeg, revDir, barrelDeg, windPct, slipping, trainDeg, esc, regRateDeg, hideRotor } = st;
+    const {
+      explode = BASE_EXPLODE,
+      rotorDeg = 52,
+      revDir = 1,
+      ratchetDeg = 0,
+      windPct = 78,
+      slipping = false,
+      centerDeg = 0,
+      esc,
+      regRateDeg = 0,
+      useEscDrive = false,
+    } = st;
+
+    const { st: stack, svgs: guideSvgs } = guidesFor(explode);
+    const [b0, b1, b2, b3, b4, b5] = stack.bases;
     const items = [];
 
-    items.push({ id: `${px}-caseBack`, key: 2 });
-    items.push({ id: `${px}-mainplate`, key: 5 });
-    items.push({ id: `${px}-arbors`, key: 8 });
+    // ---- Layer 0: Cutaway case & compact stepped mainplate
+    items.push({ id: `${px}-caseShell`, key: 2, transform: zShift(b0) });
+    items.push({ id: `${px}-mainplate`, key: 4, transform: zShift(b0) });
+    items.push({ id: `${px}-guide1`, part: "guides", key: 8, svg: guideSvgs[1] });
 
-    // Mainspring barrel drum + stationary slipping bridle + depth-sorted coiled mainspring ribbon
+    // ---- Layer 1: Mainspring barrel & 4-stage going train (100% kinematically meshed!)
+    // Either driven by exact escapement beats (Chapters 1, 2, 4) OR sped up smoothly by centerDeg (Chapter 3)
+    const cRad = useEscDrive
+      ? (esc.escapeDeg * RAD) / CAL.escape.speed
+      : centerDeg * RAD;
+    const barrelRad = CAL.barrel.rot0 + cRad * CAL.barrel.speed;
+    const centerRad = CAL.center.rot0 + cRad * CAL.center.speed;
+    const thirdRad = CAL.third.rot0 + cRad * CAL.third.speed;
+    const fourthRad = CAL.fourth.rot0 + cRad * CAL.fourth.speed;
+    const escPinRad = CAL.escape.rot0 + cRad * CAL.escape.speed;
+    const escWheelRad = useEscDrive ? (esc.escapeDeg * RAD) : escPinRad;
+
     const windLevel = Math.max(0, Math.min(8, Math.round((windPct / 100) * 8)));
-    items.push({ id: `${px}-barrelFloor`, key: 11 });
+    items.push({ id: `${px}-trainArbors`, key: 10, transform: zShift(b1) });
+    items.push({ id: `${px}-barrelBase`, key: 12, transform: zShift(b1) });
     items.push({
-      id: `${px}-barrel`, part: slipping ? "bridle" : "barrel", key: 12,
-      ...turnedAt(barrelTurn, barrelDeg * RAD, CAL.barrel.x, CAL.barrel.y, CAL.barrel.z),
+      id: `${px}-barrel`, part: "barrel", key: 14,
+      ...turnedAt(barrelTurn, barrelRad, CAL.barrel.x, CAL.barrel.y, b1 + Z1.barrel[0]),
     });
     items.push({
-      id: `${px}-mainspring`, part: "barrel", key: 13,
+      id: `${px}-mainspring`, part: "barrel", key: 15,
       href: mainspringTpl(windLevel),
-      transform: place(0, CAL.barrel.x, CAL.barrel.y, 0, CAL.barrel.z),
+      transform: place(0, CAL.barrel.x, CAL.barrel.y, 0, b1 + Z1.barrel[0]),
     });
     items.push({
-      id: `${px}-bridle`, part: slipping ? "bridle" : "barrel", key: 14,
-      href: bridleTpl(slipping),
-      transform: place(0, CAL.barrel.x, CAL.barrel.y, 0, CAL.barrel.z),
+      id: `${px}-bridle`, part: "bridle", key: 16,
+      href: bridleTpl(slipping ? 1 : 0),
+      transform: place(0, CAL.barrel.x, CAL.barrel.y, 0, b1 + Z1.barrel[0]),
     });
 
-    // Going train: meshing wheels alternate CW / CCW, every wheel binned for < 0.15 px accuracy!
-    const centerRad = -trainDeg * 0.25 * RAD;
-    const thirdRad = trainDeg * 0.8 * RAD;
-    const fourthRad = -trainDeg * 2.4 * RAD;
-    const escRad = esc.escapeDeg * RAD;
+    items.push({ id: `${px}-cpin`, part: "center", key: 18, ...turnedAt(cPinTurn, centerRad, CAL.center.x, CAL.center.y, b1 + Z1.cPin[0]) });
+    items.push({ id: `${px}-epin`, part: "escapePin", key: 19, ...turnedAt(ePinTurn, escPinRad, CAL.escape.x, CAL.escape.y, b1 + Z1.ePin[0]) });
+    items.push({ id: `${px}-fourth`, part: "fourth", key: 20, ...turnedAt(fourthTurn, fourthRad, CAL.fourth.x, CAL.fourth.y, b1 + Z1.fourth[0]) });
+    items.push({ id: `${px}-secondHand`, part: "fourth", key: 21, ...turnedAt(secondHandTurn, fourthRad, CAL.fourth.x, CAL.fourth.y, b1 + Z1.fourth[0] + Z1.fourth[1] + 0.55) });
+    items.push({ id: `${px}-tpin`, part: "third", key: 22, ...turnedAt(tPinTurn, thirdRad, CAL.third.x, CAL.third.y, b1 + Z1.tPin[0]) });
+    items.push({ id: `${px}-center`, part: "center", key: 24, ...turnedAt(centerTurn, centerRad, CAL.center.x, CAL.center.y, b1 + Z1.center[0]) });
+    items.push({ id: `${px}-fpin`, part: "fourth", key: 25, ...turnedAt(fPinTurn, fourthRad, CAL.fourth.x, CAL.fourth.y, b1 + Z1.fPin[0]) });
+    items.push({ id: `${px}-third`, part: "third", key: 26, ...turnedAt(thirdTurn, thirdRad, CAL.third.x, CAL.third.y, b1 + Z1.third[0]) });
 
-    items.push({ id: `${px}-cpin`, part: "train", key: 16, ...placeCenterPin(centerRad, CAL.center.x, CAL.center.y, CAL.center.z - 3.0) });
-    items.push({ id: `${px}-center`, part: "train", key: 18, ...placeCenter(centerRad, CAL.center.x, CAL.center.y, CAL.center.z) });
-    items.push({ id: `${px}-fpin`, part: "train", key: 19, ...placeFourthPin(fourthRad, CAL.fourth.x, CAL.fourth.y, CAL.fourth.z - 2.4) });
-    items.push({ id: `${px}-fourth`, part: "train", key: 20, ...placeFourth(fourthRad, CAL.fourth.x, CAL.fourth.y, CAL.fourth.z) });
-    items.push({ id: `${px}-tpin`, part: "train", key: 22, ...placeThirdPin(thirdRad, CAL.third.x, CAL.third.y, CAL.third.z - 2.8) });
-    items.push({ id: `${px}-third`, part: "train", key: 23, ...placeThird(thirdRad, CAL.third.x, CAL.third.y, CAL.third.z) });
-
-    // Swiss lever escapement: club-tooth escape wheel + ruby-stone pallet fork
-    items.push({
-      id: `${px}-escape`, part: "escapement", key: 25,
-      ...turnedAt(escTurn, escRad, CAL.escape.x, CAL.escape.y, CAL.escape.z),
-    });
-    items.push({
-      id: `${px}-fork`, part: "escapement", key: 27,
-      ...turnedAt(forkTurn, esc.forkDeg * RAD, CAL.fork.x, CAL.fork.y, CAL.fork.z),
-    });
-    items.push({ id: `${px}-escBridge`, key: 28 });
-
-    // Poised balance wheel + depth-sorted breathing hairspring
+    // ---- Layer 2: 3D Swiss Lever Escapement & Harmonic Oscillator
+    items.push({ id: `${px}-guide2`, part: "guides", key: 30, svg: guideSvgs[2] });
+    items.push({ id: `${px}-bankingPins`, key: 32, transform: zShift(b2) });
+    items.push({ id: `${px}-escape`, part: "escape", key: 34, ...turnedAt(escTurn, escWheelRad, CAL.escape.x, CAL.escape.y, b2 + 0.25) });
+    items.push({ id: `${px}-fork`, part: "fork", key: 36, ...turnedAt(forkTurn, esc.forkDeg * RAD, CAL.fork.x, CAL.fork.y, b2 + 0.28) });
+    items.push({ id: `${px}-roller`, part: "roller", key: 37, ...turnedAt(rollerTurn, esc.balDeg * RAD, CAL.balance.x, CAL.balance.y, b2 + 0.20) });
     const breathBin = Math.max(0, Math.min(8, Math.round(((esc.breath - 0.88) / 0.24) * 8)));
+    items.push({ id: `${px}-balance`, part: "balance", key: 39, ...turnedAt(balTurn, esc.balDeg * RAD, CAL.balance.x, CAL.balance.y, b2 + 1.15) });
     items.push({
-      id: `${px}-balance`, part: "balance", key: 30,
-      ...turnedAt(balTurn, esc.balDeg * RAD, CAL.balance.x, CAL.balance.y, CAL.balance.z),
-    });
-    items.push({
-      id: `${px}-hairspring`, part: "balance", key: 32,
+      id: `${px}-hairspring`, part: "balance", key: 41,
       href: hairspringTpl(breathBin),
-      transform: place(0, CAL.balance.x, CAL.balance.y, 0, CAL.balance.z + 2.0),
+      transform: place(0, CAL.balance.x, CAL.balance.y, 0, b2 + 2.20),
     });
 
-    // Sculpted bridges + sweep second hand + regulator index
-    items.push({ id: `${px}-trainBridge`, key: 35 });
-    items.push({
-      id: `${px}-secondHand`, part: "train", key: 36,
-      ...turnedAt(handTurn, fourthRad, CAL.fourth.x, CAL.fourth.y, 14.4 - 0.275),
-    });
-    items.push({ id: `${px}-secondCap`, key: 37 });
-    items.push({ id: `${px}-balanceCock`, key: 38 });
-    const rDeg = Math.max(-40, Math.min(40, regRateDeg ?? 0));
-    items.push({
-      id: `${px}-regArm`, part: "regulator", key: 40,
-      ...turnedAt(regTurn, rDeg * RAD, CAL.balance.x, CAL.balance.y, 14.3 - 0.475),
-    });
+    // ---- Layer 3: Sculpted Rhodium Bridges, Ruby Jewels, Blued Screws & Regulator
+    items.push({ id: `${px}-guide3`, part: "guides", key: 45, svg: guideSvgs[3] });
+    items.push({ id: `${px}-barrelBridge`, key: 48, transform: zShift(b3) });
+    items.push({ id: `${px}-trainBridge`, key: 50, transform: zShift(b3) });
+    items.push({ id: `${px}-escCock`, key: 52, transform: zShift(b3) });
+    items.push({ id: `${px}-balanceCock`, key: 54, transform: zShift(b3) });
+    const rDeg = Math.max(-24, Math.min(24, regRateDeg ?? 0));
+    items.push({ id: `${px}-regArm`, part: "regulator", key: 56, ...turnedAt(regTurn, rDeg * RAD, CAL.balance.x, CAL.balance.y, b3 + 1.55) });
 
-    // Coplanar automatic winding train: rotor pinion <-> twin reversing wheels <-> barrel ratchet
+    // ---- Layer 4: Automatic Winding Train (rotorPin <-> revB <-> revA <-> ratchet)
+    items.push({ id: `${px}-guide4`, part: "guides", key: 60, svg: guideSvgs[4] });
     const rRad = rotorDeg * RAD;
-    items.push({ id: `${px}-rotorPin`, part: "reversing", key: 42, ...placeRotorPin(rRad, CAL.center.x, CAL.center.y, CAL.revB.z) });
-    items.push({ id: `${px}-ratchet`, part: "reversing", key: 43, ...placeRatchet(barrelDeg * RAD, CAL.barrel.x, CAL.barrel.y, CAL.revA.z) });
-    items.push({ id: `${px}-revB`, part: "reversing", key: 44, ...(revDir < 0 ? placeRevTeal : placeRevSteel)(-rRad * 1.26, CAL.revB.x, CAL.revB.y, CAL.revB.z) });
-    items.push({ id: `${px}-revA`, part: "reversing", key: 45, ...(revDir >= 0 ? placeRevTeal : placeRevSteel)(rRad * 1.26, CAL.revA.x, CAL.revA.y, CAL.revA.z) });
+    const revBRad = CAL.revB.rot0 - rRad * (CAL.center.rotorPinT / CAL.revB.teeth);
+    const revARad = CAL.revA.rot0 + rRad * (CAL.center.rotorPinT / CAL.revA.teeth);
+    const ratchetRad = CAL.barrel.ratchetRot0 - (ratchetDeg * RAD);
+    items.push({ id: `${px}-rotorPin`, part: "reversing", key: 62, ...turnedAt(rotorPinTurn, 0.04 + rRad, CAL.center.x, CAL.center.y, b4) });
+    items.push({ id: `${px}-ratchet`, part: "reversing", key: 63, ...turnedAt(ratchetTurn, ratchetRad, CAL.barrel.x, CAL.barrel.y, b4) });
+    items.push({ id: `${px}-revB`, part: "reversing", key: 64, ...turnedAt(revDir < 0 ? revHotTurn : revIdleTurn, revBRad, CAL.revB.x, CAL.revB.y, b4) });
+    items.push({ id: `${px}-revA`, part: "reversing", key: 65, ...turnedAt(revDir >= 0 ? revHotTurn : revIdleTurn, revARad, CAL.revA.x, CAL.revA.y, b4) });
 
-    // Ball-bearing oscillating rotor (36 angle bins -> true rotating 3D light!)
-    items.push({
-      id: `${px}-rotor`, part: "rotor", key: 50,
-      hidden: !!hideRotor,
-      ...turnedAt(rotorTurn, rRad, CAL.rotor.x, CAL.rotor.y, CAL.rotor.z),
-    });
-    items.push({ id: `${px}-rotorHub`, part: "rotor", key: 52, hidden: !!hideRotor });
+    // ---- Layer 5: Ball-Bearing Oscillating Rotor
+    items.push({ id: `${px}-guide5`, part: "guides", key: 70, svg: guideSvgs[5] });
+    items.push({ id: `${px}-rotor`, part: "rotor", key: 74, ...turnedAt(rotorTurn, rRad, CAL.rotor.x, CAL.rotor.y, b5) });
+    items.push({ id: `${px}-rotorHub`, key: 76, transform: zShift(b5) });
 
-    const liveRotorAt = S(Math.cos(rRad) * 40, Math.sin(rRad) * 40, CAL.rotor.z + 2.8);
-    return { items, at: { ...at, rotor: liveRotorAt }, defs: drainDefs() };
+    // Live projected anchors for callout leaders (placed cleanly on outer exposed faces)
+    const regAng = rDeg * RAD - 155 * RAD;
+    const at = {
+      rotor: S(Math.cos(rRad) * 18.5, Math.sin(rRad) * 18.5, b5 + 1.8),
+      reversing: S(CAL.revA.x - 1.5, CAL.revA.y + 1.2, b4 + 0.9),
+      trainBridge: S(CAL.third.x + 2.5, CAL.third.y + 1.2, b3 + 1.2),
+      barrel: S(CAL.barrel.x - 5.5, CAL.barrel.y + 1.2, b1 + 2.6),
+      bridle: S(CAL.barrel.x + 0.1, CAL.barrel.y - 5.75, b1 + 2.6),
+      center: S(CAL.center.x - 5.45, CAL.center.y - 1.98, b1 + 2.8),
+      third: S(CAL.third.x + 5.0, CAL.third.y, b1 + 3.7),
+      fourth: S(CAL.fourth.x + 4.0, CAL.fourth.y - 1.5, b1 + 2.2),
+      escape: S(CAL.escape.x + 3.2, CAL.escape.y - 1.8, b2 + 0.9),
+      fork: S(CAL.fork.x + 0.2, CAL.fork.y - 1.2, b2 + 0.9),
+      roller: S(CAL.balance.x + 1.4, CAL.balance.y + 0.4, b2 + 0.6),
+      balance: S(CAL.balance.x - 4.8, CAL.balance.y - 3.0, b2 + 1.9),
+      balanceCock: S(SCREW_BAL[0] + 1.5, SCREW_BAL[1], b3 + 1.1),
+      regulator: S(CAL.balance.x + 3.6 * Math.cos(regAng), CAL.balance.y + 3.6 * Math.sin(regAng), b3 + 1.85),
+      case: S(Math.cos(CROWN_ANG) * (CAL.caseR + 2.4), Math.sin(CROWN_ANG) * (CAL.caseR + 2.4), b0 + 2.5),
+    };
+
+    return { items, at, defs: drainDefs() };
   }
 
-  return { parts, pose };
+  return { parts, pose, turningSpecs, pxPerUnit };
 }
-
-/**
- * Magnified 4.5 : 1 Horological Loupe (VIEW A) of the Swiss Lever Escapement.
- * Exact 2.5-pitch (60 deg) ruby pallet stone geometry, 52 deg lift angle, banking-pin contact,
- * and bevel-shaded watchmaker drafting craft.
- */
-export function renderEscapementLoupe(inset, esc, M) {
-  const [cx, cy] = inset.c;
-  const R = inset.r;
-  const ex = cx + R * 0.44, ey = cy;
-  const fx = cx - R * 0.22, fy = cy;
-  const bx = cx - R * 0.78, by = cy;
-  const D = ex - fx;
-
-  let ticks = "";
-  for (let i = 0; i < 36; i++) {
-    const a = (TAU * i) / 36;
-    const len = i % 3 === 0 ? 70 : 38;
-    const r0 = R - len, r1 = R - 10;
-    ticks += `M${n1(cx + Math.cos(a) * r0)},${n1(cy + Math.sin(a) * r0)}L${n1(cx + Math.cos(a) * r1)},${n1(cy + Math.sin(a) * r1)}`;
-  }
-
-  const escR = R * 0.42, escRoot = escR * 0.68;
-  const escRot = (esc.escapeDeg + 9.2) * RAD;
-  const toothPts = escapeWheelOutline(15, escR, escRoot, escRot).map(([x, y]) => [ex + x, ey - y]);
-  const escPath = pathThrough(toothPts, true);
-  let escSpokes = "";
-  for (let i = 0; i < 3; i++) {
-    const a0 = escRot + (TAU * i) / 3 + 0.22;
-    const a1 = a0 + TAU / 3 - 0.44;
-    const pts = arcOutline(escR * 0.22, escR * 0.56, a0, a1, 10).map(([x, y]) => [ex + x, ey - y]);
-    escSpokes += `<path class="loupe-hole" d="${pathThrough(pts, true)}"/>`;
-  }
-
-  const fRad = -esc.forkDeg * RAD;
-  const rotF = (lx, ly) => [
-    fx + lx * Math.cos(fRad) - ly * Math.sin(fRad),
-    fy + lx * Math.sin(fRad) + ly * Math.cos(fRad),
-  ];
-  const stonePt = (rFrac, degYUp) => {
-    const a = degYUp * RAD;
-    return [D + escR * rFrac * Math.cos(a), -escR * rFrac * Math.sin(a)];
-  };
-  const entryStone = [
-    stonePt(0.985, 144.0), stonePt(0.995, 150.0), stonePt(1.115, 151.5), stonePt(1.105, 145.5),
-  ].map(([x, y]) => rotF(x, y));
-  const exitStone = [
-    stonePt(0.995, -150.0), stonePt(0.985, -144.0), stonePt(1.105, -145.5), stonePt(1.115, -151.5),
-  ].map(([x, y]) => rotF(x, y));
-
-  const armLen = R * 0.34;
-  const eRoot = stonePt(1.07, 148.5), eOut = stonePt(1.13, 148.5);
-  const xRoot = stonePt(1.07, -148.5), xOut = stonePt(1.13, -148.5);
-  const forkPoly = [
-    [-armLen * 1.04, -56], [-armLen * 0.86, -86], [-armLen * 0.86, -34],
-    [0, -38], [eOut[0] - 40, eOut[1] - 10], [eRoot[0] + 15, eRoot[1] + 24], [armLen * 0.28, -32],
-    [armLen * 0.28, 32], [xRoot[0] + 15, xRoot[1] - 24], [xOut[0] - 40, xOut[1] + 10],
-    [0, 38], [-armLen * 0.86, 34], [-armLen * 0.86, 86], [-armLen * 1.04, 56],
-  ].map(([x, y]) => rotF(x, y));
-
-  const rolR = R * 0.25;
-  const jAng = clampDeg(esc.balDeg, -140, 140) * RAD;
-  const jx = bx + Math.cos(jAng) * (rolR * 0.86);
-  const jy = by + Math.sin(jAng) * (rolR * 0.86);
-
-  const bpX = fx - armLen * 0.56;
-  const bpOffset = armLen * 0.56 * Math.sin(6.5 * RAD) + 36 + 30;
-  const bpTop = [bpX, fy - bpOffset];
-  const bpBot = [bpX, fy + bpOffset];
-
-  const phLabel = esc.phase.toUpperCase();
-  const isImp = esc.phase === "impulse";
-  const isUnl = esc.phase === "unlock";
-  const phCls = isImp ? "is-imp" : isUnl ? "is-unl" : "is-lock";
-
-  return `<g class="loupe">`
-    + `<path class="loupe-axis" d="M${n1(cx - R)},${n1(cy)}H${n1(cx + R)}M${n1(ex)},${n1(cy - R)}V${n1(cy + R)}${ticks}"/>`
-    + `<circle class="loupe-sh" cx="${n1(bx + 18)}" cy="${n1(by + 24)}" r="${n1(rolR)}"/>`
-    + `<circle class="loupe-roller" cx="${n1(bx)}" cy="${n1(by)}" r="${n1(rolR)}"/>`
-    + `<circle class="loupe-bevel" cx="${n1(bx)}" cy="${n1(by)}" r="${n1(rolR * 0.88)}"/>`
-    + `<circle class="loupe-chaton" cx="${n1(bx)}" cy="${n1(by)}" r="76"/>`
-    + `<circle class="loupe-ruby" cx="${n1(bx)}" cy="${n1(by)}" r="52"/>`
-    + `<circle class="loupe-pivot" cx="${n1(bx)}" cy="${n1(by)}" r="22"/>`
-    + `<circle class="loupe-ruby${isImp || isUnl ? " is-hot" : ""}" cx="${n1(jx)}" cy="${n1(jy)}" r="54"/>`
-    + `<circle class="loupe-spec" cx="${n1(jx - 16)}" cy="${n1(jy - 16)}" r="14"/>`
-    + `<g transform="translate(18 24)"><path class="loupe-sh" d="${escPath}"/></g>`
-    + `<path class="loupe-brass" d="${escPath}"/>${escSpokes}`
-    + `<circle class="loupe-bevel" cx="${n1(ex)}" cy="${n1(ey)}" r="${n1(escRoot * 0.94)}"/>`
-    + `<circle class="loupe-chaton" cx="${n1(ex)}" cy="${n1(ey)}" r="94"/>`
-    + `<circle class="loupe-ruby" cx="${n1(ex)}" cy="${n1(ey)}" r="64"/>`
-    + `<circle class="loupe-pivot" cx="${n1(ex)}" cy="${n1(ey)}" r="26"/>`
-    + `<circle class="loupe-pin" cx="${n1(bpTop[0])}" cy="${n1(bpTop[1])}" r="30"/>`
-    + `<circle class="loupe-pin" cx="${n1(bpBot[0])}" cy="${n1(bpBot[1])}" r="30"/>`
-    + `<g transform="translate(14 20)"><path class="loupe-sh" d="${pathThrough(forkPoly, true)}"/></g>`
-    + `<path class="loupe-steel" d="${pathThrough(forkPoly, true)}"/>`
-    + `<path class="loupe-ruby${isImp ? " is-hot" : ""}" d="${pathThrough(entryStone, true)}"/>`
-    + `<path class="loupe-ruby${isImp ? " is-hot" : ""}" d="${pathThrough(exitStone, true)}"/>`
-    + `<circle class="loupe-chaton" cx="${n1(fx)}" cy="${n1(fy)}" r="64"/>`
-    + `<circle class="loupe-pivot" cx="${n1(fx)}" cy="${n1(fy)}" r="34"/>`
-    + `<rect class="loupe-badge ${phCls}" x="${n1(cx - 810)}" y="${n1(cy + R * 0.58)}" width="1620" height="270" rx="135"/>`
-    + `<text class="loupe-badge-txt ${phCls}" x="${n1(cx)}" y="${n1(cy + R * 0.58 + 178)}" text-anchor="middle">${phLabel} · ${M.N.beatsPerSec} BEATS/S</text>`
-    + `</g>`;
-}
-
-const clampDeg = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
