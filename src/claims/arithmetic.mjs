@@ -12,16 +12,17 @@
 //   import { checkArithmetic } from "./arithmetic.mjs";
 //   const { checked, problems } = checkArithmetic([{ where: "step:5", text: "…" }]);
 
-const NUM = String.raw`\d+(?:\.\d+)?`;
-const UNIT = String.raw`(?:\s?(?:mm|cm|m|km|g|kg|N|N·mm|s|ms|°|%|teeth|links|bits|bytes|ms|V|A|W))?`;
+const NUM = String.raw`(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?`;
+const UNIT = String.raw`(?:\s?(?:mm|cm|m|km|g|kg|N|N·mm|s|ms|°|%|teeth|links|bits|bytes|ms|V|A|W|vph|Hz|rpm|N·m))?`;
 const OP = "[+−×÷]|-(?=\\s)"; // a hyphen counts as minus only with a space after it ("29 - 5"), not in "11-speed"
 const MOD = /(?<![\d,.])(\d{1,3}(?:,\d{3})+|\d+) mod (\d+) = (\d+)\b/g;
 const EQ = new RegExp(`(${NUM}${UNIT}(?:\\s*(?:${OP})\\s*${NUM}${UNIT})+)\\s*=\\s*(${NUM})${UNIT}`, "g");
 
+const num = (s) => Number(s.replace(/,/g, ""));
 const decimals = (s) => (s.split(".")[1] ?? "").length;
 /** A printed number as the interval of values that round to it. */
 const interval = (s) => {
-  const v = Number(s), h = 0.5 * 10 ** -decimals(s);
+  const v = num(s), h = 0.5 * 10 ** -decimals(s);
   return [v - h, v + h];
 };
 const iv = {
@@ -41,7 +42,7 @@ const iv = {
 /** The left side's interval, × and ÷ before + and −. */
 function evaluate(left, exact = false) {
   const tokens = [...left.matchAll(new RegExp(`(${NUM})|(${OP})`, "g"))].map((m) => (m[1] !== undefined ? { n: m[1] } : { op: m[2] === "-" ? "−" : m[2] }));
-  const val = (s) => (exact ? [Number(s), Number(s)] : interval(s));
+  const val = (s) => (exact ? [num(s), num(s)] : interval(s));
   // products first
   const terms = [];
   let cur = val(tokens[0].n), sign = "+";
@@ -70,7 +71,7 @@ export function checkArithmetic(texts) {
       // each share on its own is the fault this exists for. A product or quotient may round.
       const exact = !/[×÷]/.test(m[1]);
       const [lo, hi] = evaluate(m[1], exact);
-      const [rlo, rhi] = exact ? [Number(m[2]) - 1e-9, Number(m[2]) + 1e-9] : interval(m[2]);
+      const [rlo, rhi] = exact ? [num(m[2]) - 1e-9, num(m[2]) + 1e-9] : interval(m[2]);
       checked++;
       if (hi < rlo - 1e-12 || lo > rhi + 1e-12) {
         const mid = (lo + hi) / 2;

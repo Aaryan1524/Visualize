@@ -13,6 +13,8 @@ test("arithmetic: sums, differences, products and quotients that hold at the pri
     "73 mm = 61 + 12? no equation here, but 61 mm + 12 mm = 73 mm is one",
     "2 + 3 × 4 = 14",
     "The half-wrap rule (half of 17 teeth × 12.7 mm = 108 mm)",
+    "16 × 30 × 60 = 28,800 vph",
+    "1,200 + 800 = 2,000",
   ]) {
     const r = one(text);
     assert.deepEqual(r.problems, [], text);
