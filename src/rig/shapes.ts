@@ -11,11 +11,27 @@ export interface Face {
   loops: number[][];
   normal: V3;
   role: Role;
+  /**
+   * A chamfer between a wall and the cap on one side: "high" next to the cap whose normal is the
+   * plate's +n, "low" next to the other. A bevel keeps role "wall"; drawing paints the bevel next to
+   * the cap the viewer sees after every wall and just before that cap.
+   */
+  bevel?: "high" | "low";
 }
+
+/**
+ * How drawing orders a mesh's side faces: "bucket" merges same-shade walls into one path (cheap,
+ * right for convex slabs and turned parts whose bands never overlap), "face" paints every face
+ * strictly far to near with its own edges (right for anything that hides parts of itself: coils,
+ * tubes, concave shells).
+ */
+export type FaceSort = "bucket" | "face";
 
 export interface Mesh {
   verts: V3[];
   faces: Face[];
+  /** the order this mesh needs; a Look's sort overrides it; unset means "bucket" */
+  sort?: FaceSort;
 }
 
 /** A plane: points are origin + a·u + b·v, and n = u × v is its normal. */
@@ -131,4 +147,349 @@ export function sprocket(teeth: number, R: number, tip: number, rot = 0): P2[] {
     for (const [f, r] of [[-0.5, root], [-0.32, root + 0.6], [-0.1, R + tip], [0.1, R + tip], [0.32, root + 0.6]] as const) out.push([r * Math.cos(a + f * step), r * Math.sin(a + f * step)]);
   }
   return out;
+}
+
+/** A regular polygon centred at (cx, cy). */
+export const regularPolygon = (sides: number, r: number, cx = 0, cy = 0, phase = 0): P2[] =>
+  Array.from({ length: sides }, (_, i) => {
+    const a = phase + (2 * Math.PI * i) / sides;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)] as P2;
+  });
+
+/** A rounded rectangle of width w and height h, centred at (cx, cy), corner radius r. */
+export function roundedRect(w: number, h: number, r: number, cx = 0, cy = 0, cornerSegs = 5): P2[] {
+  const cr = Math.max(0, Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4));
+  const hw = w / 2 - cr, hh = h / 2 - cr;
+  if (cr <= 1e-6) return [[cx - w / 2, cy - h / 2], [cx + w / 2, cy - h / 2], [cx + w / 2, cy + h / 2], [cx - w / 2, cy + h / 2]];
+  const corners: readonly [number, number, number, number][] = [
+    [cx + hw, cy + hh, 0, Math.PI / 2],
+    [cx - hw, cy + hh, Math.PI / 2, Math.PI],
+    [cx - hw, cy - hh, Math.PI, 1.5 * Math.PI],
+    [cx + hw, cy - hh, 1.5 * Math.PI, 2 * Math.PI],
+  ];
+  const out: P2[] = [];
+  for (const [ox, oy, a0, a1] of corners) {
+    for (let i = 0; i <= cornerSegs; i++) {
+      const a = a0 + ((a1 - a0) * i) / cornerSegs;
+      out.push([ox + cr * Math.cos(a), oy + cr * Math.sin(a)]);
+    }
+  }
+  return out;
+}
+
+/** An annular sector (ring arc) from angle a0 to a1, inner radius rIn to outer radius rOut. */
+export function arcOutline(rIn: number, rOut: number, a0: number, a1: number, steps = 32, cx = 0, cy = 0): P2[] {
+  const out: P2[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const a = a0 + ((a1 - a0) * i) / steps;
+    out.push([cx + rOut * Math.cos(a), cy + rOut * Math.sin(a)]);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const a = a0 + ((a1 - a0) * i) / steps;
+    out.push([cx + rIn * Math.cos(a), cy + rIn * Math.sin(a)]);
+  }
+  return out;
+}
+
+export interface GearOptions {
+  /** tooth height above pitch circle (default: 0.9 * module) */
+  addendum?: number;
+  /** tooth depth below pitch circle (default: 1.15 * module) */
+  dedendum?: number;
+  rot?: number;
+}
+
+/** A horological / involute-taper gear wheel outline on pitch radius R. */
+export function gearOutline(teeth: number, R: number, opts: GearOptions = {}): P2[] {
+  const mod = (2 * R) / teeth;
+  const addH = opts.addendum ?? mod * 0.92;
+  const dedH = opts.dedendum ?? mod * 1.15;
+  const rTip = R + addH, rRoot = Math.max(0.5, R - dedH);
+  const step = (2 * Math.PI) / teeth, rot = opts.rot ?? 0;
+  const out: P2[] = [];
+  for (let j = 0; j < teeth; j++) {
+    const a = rot + j * step;
+    for (const [f, r] of [
+      [-0.46, rRoot],
+      [-0.28, rRoot],
+      [-0.21, R],
+      [-0.12, rTip],
+      [0.12, rTip],
+      [0.21, R],
+      [0.28, rRoot],
+      [0.46, rRoot],
+    ] as const) {
+      out.push([r * Math.cos(a + f * step), r * Math.sin(a + f * step)]);
+    }
+  }
+  return out;
+}
+
+/** Watchmaker spoked-wheel cutouts between rInner and rOuter, leaving `spokes` radial arms. */
+export function spokedHoles(rInner: number, rOuter: number, spokes = 5, spokeHalfAngle = 0.14, phase = 0, arcSteps = 10): P2[][] {
+  const holes: P2[][] = [];
+  const step = (2 * Math.PI) / spokes;
+  for (let i = 0; i < spokes; i++) {
+    const a0 = phase + i * step + spokeHalfAngle;
+    const a1 = phase + (i + 1) * step - spokeHalfAngle;
+    if (a1 - a0 <= 0.05) continue;
+    holes.push(arcOutline(rInner, rOuter, a0, a1, arcSteps));
+  }
+  return holes;
+}
+
+/** A Swiss lever club-tooth escape wheel outline: raked teeth with angled impulse clubs. */
+export function escapeWheelOutline(teeth: number, rTip: number, rRoot: number, rot = 0): P2[] {
+  const step = (2 * Math.PI) / teeth;
+  const rMid = rRoot + (rTip - rRoot) * 0.62;
+  const out: P2[] = [];
+  for (let j = 0; j < teeth; j++) {
+    const a = rot + j * step;
+    // Raked forward in direction of CCW travel (+angle): narrow root, clubbed impulse tip, undercut back
+    for (const [f, r] of [
+      [0.0, rRoot],
+      [0.28, rRoot],
+      [0.52, rMid],
+      [0.72, rTip],
+      [0.84, rTip * 0.985],
+      [0.64, rMid * 0.96],
+      [0.44, rRoot * 1.03],
+    ] as const) {
+      out.push([r * Math.cos(a + f * step), r * Math.sin(a + f * step)]);
+    }
+  }
+  return out;
+}
+
+/** Inset a counter-clockwise 2D polygon by `d` along vertex bisectors (clamped against inversion). */
+function insetLoop(loop: readonly P2[], d: number): P2[] {
+  const n = loop.length;
+  const out: P2[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = loop[(i - 1 + n) % n]!;
+    const cur = loop[i]!;
+    const next = loop[(i + 1) % n]!;
+    const e0x = cur[0] - prev[0], e0y = cur[1] - prev[1], l0 = Math.hypot(e0x, e0y) || 1;
+    const e1x = next[0] - cur[0], e1y = next[1] - cur[1], l1 = Math.hypot(e1x, e1y) || 1;
+    // inward normals for CCW loop: (-ey, ex)
+    const n0x = -e0y / l0, n0y = e0x / l0;
+    const n1x = -e1y / l1, n1y = e1x / l1;
+    const bx = n0x + n1x, by = n0y + n1y, bl = Math.hypot(bx, by);
+    if (bl < 1e-6) {
+      out.push([cur[0] + n0x * d, cur[1] + n0y * d]);
+    } else {
+      const ux = bx / bl, uy = by / bl;
+      const cosHalf = Math.max(0.35, ux * n0x + uy * n0y);
+      const step = Math.min(d / cosHalf, d * 2.2);
+      out.push([cur[0] + ux * step, cur[1] + uy * step]);
+    }
+  }
+  return out;
+}
+
+/** Whether a closed outline turns one way all round (straight runs allowed). */
+export function isConvex(loop: readonly P2[]): boolean {
+  const n = loop.length;
+  let span = 0;
+  for (const p of loop) span = Math.max(span, Math.abs(p[0]), Math.abs(p[1]));
+  const tol = 1e-9 * Math.max(1, span * span);
+  let sign = 0;
+  for (let i = 0; i < n; i++) {
+    const a = loop[i]!, b = loop[(i + 1) % n]!, c = loop[(i + 2) % n]!;
+    const t = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+    if (Math.abs(t) <= tol) continue;
+    if (sign === 0) sign = Math.sign(t);
+    else if (Math.sign(t) !== sign) return false;
+  }
+  return true;
+}
+
+/**
+ * A closed plate extruded from t0 to t1 with true 45-degree beveled top and bottom rims.
+ * The beveled rims catch directional specular light and give architectural chassis and horological
+ * plates sharp, machined silhouettes.
+ */
+export function chamferPlate(pl: Plane, outer: readonly P2[], t0: number, t1: number, bevel: number): Mesh {
+  const loop = area2(outer) > 0 ? [...outer] : [...outer].reverse();
+  const h = t1 - t0;
+  const b = Math.max(0, Math.min(bevel, h * 0.42));
+  if (b <= 1e-5) return plate(pl, { outer: loop }, t0, t1);
+  const inner = insetLoop(loop, b);
+  const n = loop.length;
+  const verts: V3[] = [];
+  const pushRing = (pts: readonly P2[], t: number) => pts.map(([x, y]) => verts.push(pointOn(pl, x, y, t)) - 1);
+  const r0 = pushRing(inner, t0);
+  const r1 = pushRing(loop, t0 + b);
+  const r2 = pushRing(loop, t1 - b);
+  const r3 = pushRing(inner, t1);
+
+  const faces: Face[] = [
+    { loops: [[...r3]], normal: pl.n, role: "cap" },
+    { loops: [[...r0].reverse()], normal: scale(pl.n, -1), role: "cap" },
+  ];
+  const quadNormal = (a: number, bIdx: number, c: number): V3 => {
+    const pa = verts[a]!, pb = verts[bIdx]!, pc = verts[c]!;
+    return unit(cross(sub(pb, pa), sub(pc, pa)));
+  };
+  const connect = (lo: number[], hi: number[], role: Role) => {
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const q = [lo[i]!, lo[j]!, hi[j]!, hi[i]!];
+      faces.push({ loops: [q], normal: quadNormal(q[0]!, q[1]!, q[2]!), role });
+    }
+  };
+  let at = faces.length;
+  connect(r0, r1, "wall");
+  for (const f of faces.slice(at)) f.bevel = "low";
+  connect(r1, r2, "wall");
+  at = faces.length;
+  connect(r2, r3, "wall");
+  for (const f of faces.slice(at)) f.bevel = "high";
+  // a concave outline hides parts of its own walls: those need a strict far-to-near order
+  return isConvex(loop) ? { verts, faces } : { verts, faces, sort: "face" };
+}
+
+/**
+ * A closed circular tube swept along a 3D polyline using parallel-transport frames (so it never
+ * twists or kinks through inflection points), with capped ends and exact outward normals.
+ */
+export function tube(points: readonly V3[], r: number, segments = 12): Mesh {
+  // Deduplicate near-coincident consecutive points
+  const pts: V3[] = [];
+  for (const p of points) {
+    const prev = pts[pts.length - 1];
+    if (!prev || Math.hypot(p[0] - prev[0], p[1] - prev[1], p[2] - prev[2]) > 1e-6) pts.push(p);
+  }
+  if (pts.length < 2) throw new RangeError("tube needs at least two distinct points");
+  const m = pts.length;
+  const tangents: V3[] = [];
+  for (let i = 0; i < m; i++) {
+    const a = pts[Math.max(0, i - 1)]!, b = pts[Math.min(m - 1, i + 1)]!;
+    tangents.push(unit(sub(b, a)));
+  }
+  // Initial normal perpendicular to first tangent
+  const t0 = tangents[0]!;
+  const ref: V3 = Math.abs(dot(t0, [0, 0, 1])) > 0.92 ? [1, 0, 0] : [0, 0, 1];
+  let U = unit(sub(ref, scale(t0, dot(ref, t0))));
+  let V = cross(t0, U);
+  const frames: { u: V3; v: V3 }[] = [{ u: U, v: V }];
+  for (let i = 1; i < m; i++) {
+    const prevT = tangents[i - 1]!, curT = tangents[i]!;
+    const axis = cross(prevT, curT);
+    const sinA = Math.hypot(axis[0], axis[1], axis[2]);
+    if (sinA > 1e-7) {
+      const k = scale(axis, 1 / sinA);
+      const cosA = Math.max(-1, Math.min(1, dot(prevT, curT)));
+      // Rodrigues rotation of U around k by angle(prevT, curT)
+      U = unit(add(add(scale(U, cosA), scale(cross(k, U), sinA)), scale(k, dot(k, U) * (1 - cosA))));
+    }
+    // Re-orthogonalize against curT
+    U = unit(sub(U, scale(curT, dot(U, curT))));
+    V = cross(curT, U);
+    frames.push({ u: U, v: V });
+  }
+
+  const verts: V3[] = [];
+  const rings: number[][] = [];
+  for (let i = 0; i < m; i++) {
+    const p = pts[i]!, { u, v } = frames[i]!;
+    const ring: number[] = [];
+    for (let s = 0; s < segments; s++) {
+      const a = (2 * Math.PI * s) / segments;
+      const off = add(scale(u, r * Math.cos(a)), scale(v, r * Math.sin(a)));
+      ring.push(verts.push(add(p, off)) - 1);
+    }
+    rings.push(ring);
+  }
+  const faces: Face[] = [];
+  for (let i = 0; i < m - 1; i++) {
+    const rA = rings[i]!, rB = rings[i + 1]!;
+    for (let s = 0; s < segments; s++) {
+      const s2 = (s + 1) % segments;
+      const q = [rA[s]!, rA[s2]!, rB[s2]!, rB[s]!];
+      const pa = verts[q[0]!]!, pb = verts[q[1]!]!, pc = verts[q[2]!]!;
+      const normal = unit(cross(sub(pb, pa), sub(pc, pa)));
+      faces.push({ loops: [q], normal, role: "band" });
+    }
+  }
+  faces.push({ loops: [[...rings[0]!].reverse()], normal: scale(tangents[0]!, -1), role: "end" });
+  faces.push({ loops: [[...rings[m - 1]!]], normal: tangents[m - 1]!, role: "end" });
+  // a bent tube passes in front of itself (a coil, a loop): paint it face by face
+  return { verts, faces, sort: "face" };
+}
+
+/** A 3D Archimedean spiral polyline in plane `pl`, from radius r0 to r1 over `turns` turns. */
+export function spiralPoints(pl: Plane, r0: number, r1: number, turns: number, steps: number, z0 = 0, z1 = 0, phase = 0): V3[] {
+  const out: V3[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const u = i / steps;
+    const a = phase + u * turns * 2 * Math.PI;
+    const r = r0 + (r1 - r0) * u;
+    const t = z0 + (z1 - z0) * u;
+    out.push(pointOn(pl, r * Math.cos(a), r * Math.sin(a), t));
+  }
+  return out;
+}
+
+export interface SpiralStrip {
+  /** radius at the start and at the end (Archimedean between) */
+  r0: number;
+  r1: number;
+  turns: number;
+  /** the strip's height along the plane's normal: from t0 to t1 */
+  t0: number;
+  t1: number;
+  /** the strip's thickness across its face */
+  thick: number;
+  /** facets along the whole spiral */
+  steps: number;
+  /** the start angle, radians from u toward v */
+  phase?: number;
+}
+
+/**
+ * A flat spring coiled in a plane (a mainspring, a hairspring, a clock spring): a thin strip of
+ * height t1 - t0 wound as an Archimedean spiral about the plane's origin. A closed mesh: an outer
+ * and an inner wall, a cap at each height and an end at each end. Its coils hide one another, so
+ * it is drawn face by face.
+ */
+export function spiralStrip(pl: Plane, o: SpiralStrip): Mesh {
+  const phase = o.phase ?? 0, steps = Math.max(2, Math.round(o.steps)), half = o.thick / 2;
+  if (!(o.thick > 0)) throw new RangeError("spiralStrip needs a thickness above zero");
+  const centre: P2[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const f = i / steps, a = phase + f * o.turns * 2 * Math.PI, r = o.r0 + (o.r1 - o.r0) * f;
+    centre.push([r * Math.cos(a), r * Math.sin(a)]);
+  }
+  const verts: V3[] = [];
+  // per station: inner-low, outer-low, outer-high, inner-high
+  const ring: number[][] = centre.map((p, i) => {
+    const a = centre[Math.max(0, i - 1)]!, b = centre[Math.min(steps, i + 1)]!;
+    const tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty) || 1;
+    let nx = ty / tl, ny = -tx / tl; // perpendicular to travel
+    if (nx * p[0] + ny * p[1] < 0) (nx = -nx), (ny = -ny); // outward
+    const at = (s: number, t: number) => verts.push(pointOn(pl, p[0] + nx * s, p[1] + ny * s, t)) - 1;
+    return [at(-half, o.t0), at(half, o.t0), at(half, o.t1), at(-half, o.t1)];
+  });
+  const faces: Face[] = [];
+  const face = (loop: number[], want: V3, role: Role) => {
+    const [a, b, c] = loop.map((k) => verts[k]!) as [V3, V3, V3];
+    let n = unit(cross(sub(b, a), sub(c, a)));
+    if (dot(n, want) < 0) (loop = [...loop].reverse()), (n = scale(n, -1));
+    faces.push({ loops: [loop], normal: n, role });
+  };
+  for (let i = 0; i < steps; i++) {
+    const A = ring[i]!, B = ring[i + 1]!;
+    const mid = (k: number) => scale(add(verts[A[k]!]!, verts[B[k]!]!), 0.5);
+    const out = sub(mid(1), mid(0));
+    face([A[1]!, B[1]!, B[2]!, A[2]!], out, "wall");
+    face([A[0]!, A[3]!, B[3]!, B[0]!], scale(out, -1), "wall");
+    face([A[3]!, A[2]!, B[2]!, B[3]!], pl.n, "cap");
+    face([A[0]!, B[0]!, B[1]!, A[1]!], scale(pl.n, -1), "cap");
+  }
+  const first = ring[0]!, last = ring[steps]!;
+  const along0 = sub(verts[ring[1]![0]!]!, verts[first[0]!]!), alongN = sub(verts[last[0]!]!, verts[ring[steps - 1]![0]!]!);
+  face([...first], scale(along0, -1), "end");
+  face([...last], alongN, "end");
+  return { verts, faces, sort: "face" };
 }

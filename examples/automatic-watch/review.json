@@ -1,0 +1,43 @@
+{
+  "stamp": "ee7a034877c17075",
+  "reviewer": "independent",
+  "summary": "Round 2 verification of the rebuilt 14-step --deep exploded Automatic Watch page (stamp ee7a034877c17075). All 4 Round 1 findings are genuinely fixed and verified in both code/audit JSON and fresh rendered screenshots (modern-step-3-light.png, modern-step-5-light.png, modern-step-7-light.png, modern-step-8-light.png, modern-step-13-light.png): escape-wheel ideal torque now uses exact mN·mm units (1.25 mN·mm modern / 2 mN·mm vintage), the Step 5 Slipping bridle callout lands squarely on the highlighted orange bridle arc, Steps 7–8 Center wheel and Third wheel callouts land cleanly on their exposed brass rims with zero Predict-card overlap, and Step 13 Balance cock and Regulator index labels sit cleanly in the open left margin. Zero open findings.",
+  "findings": [
+    {
+      "where": "model.mjs (makeModel.escapeTorqueIdealUNmm); variants.modern.captions.9; variants.vintage.captions.9",
+      "text": "delivering roughly 1.25 µN·mm of ideal torque to the escape wheel / delivering roughly 2 µN·mm of ideal torque to the escape wheel",
+      "severity": "wrong",
+      "finding": "Dividing 7.2 N·mm by 5,760 (modern) gives 0.00125 N·mm = 1.25 mN·mm = 1,250 µN·mm (equivalently 1.25 µN·m), and dividing 7.2 N·mm by 3,600 (vintage) gives 0.002 N·mm = 2.00 mN·mm = 2,000 µN·mm (equivalently 2.00 µN·m). In model.mjs line 162, escapeTorqueIdealUNmm multiplies slipTorque (N·mm) by 1,000 instead of 1,000,000, producing values in mN·mm (or µN·m) while the captions label them µN·mm — understated by a factor of 1,000.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed. model.mjs now computes escapeTorqueIdealMNmm = r2((D.slipTorque * 1000) / totalRatio) and both modern and vintage step 9 captions in automatic-watch.audit.json (stamp ee7a034877c17075) report 1.25 mN·mm and 2 mN·mm respectively."
+    },
+    {
+      "where": "step:5 (drawing — Slipping bridle callout)",
+      "text": "Slipping bridle",
+      "severity": "misleading",
+      "finding": "In modern-step-5-light.png, the slipping bridle is clearly highlighted in bright orange along the front inner wall of the barrel at 100% wind (7.20 N·mm), but the 'Slipping bridle' callout leader dot lands on the outer brass barrel teeth at roughly 8 o'clock — to the left of both the blue mainspring and the orange bridle band. Move the bridle anchor onto the broad front-facing orange arc so the leader dot lands squarely on the highlighted slipping bridle.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed and visually verified in fresh modern-step-5-light.png: the 'Slipping bridle' leader dot now lands squarely on the broad front-facing bright orange slipping bridle band."
+    },
+    {
+      "where": "step:7, step:8 (drawing — Center wheel and Third wheel callouts)",
+      "text": "Center wheel / Third wheel",
+      "severity": "misleading",
+      "finding": "Because the Layer 2 balance wheel and Layer 3 balance cock sit in front of the Layer 1 center and third wheels along the 232°/30° sightline, two going-train callouts visually mislabel foreground parts: (1) in step 7 (modern-step-7-light.png), the 'Center wheel' label is covered behind the Predict card while its leader line emerges from the card and lands its dot on the blue balance hairspring; (2) in step 8 (modern-step-8-light.png), the 'Center wheel' dot again lands dead center on the blue balance hairspring and the 'Third wheel' dot lands on the rhodium balance cock near the regulator arm. Anchor both callouts on exposed arcs of their actual brass rims and keep the step 7 'Center wheel' label clear of the Predict card.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed and visually verified in fresh modern-step-7-light.png and modern-step-8-light.png: 'Center wheel' is positioned cleanly on the left clear of the Predict card with its dot on the exposed brass center-wheel rim, and 'Third wheel' sits cleanly on the upper right with its dot on the exposed third-wheel rim."
+    },
+    {
+      "where": "step:13 (drawing — Balance cock and Regulator index callout placement)",
+      "text": "Balance cock / Regulator index",
+      "severity": "misleading",
+      "finding": "In modern-step-13-light.png, although the 'Regulator index' dot reaches the orange regulator arm and the 'Balance cock' dot reaches the cock screw, both text labels are placed directly over the busy blue mainspring coils and brass barrel teeth rather than in the open white margin to the left of the case, hurting legibility and visually associating those labels with the barrel.",
+      "resolved": true,
+      "fixed": true,
+      "response": "Fixed and visually verified in fresh modern-step-13-light.png: both 'Balance cock' and 'Regulator index' labels now sit cleanly in the open white left margin clear of the barrel and coils, with leaders landing squarely on the balance cock and orange regulator index arm."
+    }
+  ]
+}

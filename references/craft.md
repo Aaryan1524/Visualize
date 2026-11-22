@@ -1,6 +1,6 @@
 # Craft
 
-The look comes from constraint: one camera, one material system, a few tones, finished parts and few words. Each rule below records the defect that taught it, so it can be dropped if the reason stops holding.
+The look comes from constraint: one camera angle (it zooms and pans to frame each step, never turns), one material system, a few tones, finished parts and few words. Each rule below records the defect that taught it, so it can be dropped if the reason stops holding.
 
 ## Form
 

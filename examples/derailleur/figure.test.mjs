@@ -7,12 +7,12 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MODELS } from "./model.mjs";
-import { figure, cameraFor, W, BINS, VIEW_A } from "./figure.mjs";
+import { MODELS, indexing, labRows, offLine } from "./model.mjs";
+import { figure, cameraFor, W, BINS } from "./figure.mjs";
 import { pathAt } from "./model.mjs";
-import { angleBin, applyAffine, moveInPlane, planeOf, screenOf } from "../../src/rig/index.ts";
+import { angleBin, applyAffine, carry, checkContacts, moveInPlane, planeOf, screenOf } from "../../src/rig/index.ts";
 
-const BOX = { x: 4300, y: 260, w: 5100, h: 6080 };
+const BOX = { x: 4500, y: 230, w: 5900, h: 6120 }; // as the page
 const PX = 10; // svg units per screen pixel at 1440 x 900
 const SIDE = planeOf([0, 0, 0], [0, -1, 0], [1, 0, 0]);
 const AX = { origin: [0, 0, 0], u: SIDE.u, v: SIDE.v, n: SIDE.n };
@@ -96,62 +96,102 @@ for (const [name, M] of Object.entries(MODELS)) {
 }
 
 // The chain drives every wheel it touches: where it meets a cog or a pulley, the tooth there must move
-// on screen with the chain, the same way and at the same speed. A sign slip anywhere (a pulley turned
-// the wrong way, a mirrored inset camera, a cassette angle that runs backward) shows up here.
-const parseMatrix = (t) => t.match(/matrix\(([^)]*)\)/)[1].trim().split(/\s+/).map(Number);
-const apply = (m, p) => [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]];
-const invert = (m) => {
-  const det = m[0] * m[3] - m[1] * m[2];
-  const a = m[3] / det, b = -m[1] / det, c = -m[2] / det, d = m[0] / det;
-  return [a, b, c, d, -(a * m[4] + c * m[5]), -(b * m[4] + d * m[5])];
-};
-for (const [name, M] of Object.entries(MODELS)) {
-  const cams = [
-    ["main view", cameraFor(M, BOX), false],
-    ["View A", { azimuth: VIEW_A.azimuth, elevation: VIEW_A.elevation, scale: 70, origin: [0, 0] }, true],
-  ];
-  for (const [view, cam, inset] of cams) {
-    test(`${name}, ${view}: where the chain meets the cog and both pulleys, the teeth move with the chain`, () => {
-      const F = figure(M, cam, { prefix: "v", inset });
-      const dr = 0.4; // mm of chain between the two frames
-      let checked = 0;
-      for (const k of [0, 3, M.last]) {
-        const pose = M.pose(M.pullFor(k), k);
-        const total = pose.path.total, p = M.D.p;
-        for (const roll of [0, 37, 151.3]) {
-          const a = F.pose({ pose, roll, show: {} }).items, b = F.pose({ pose, roll: roll + dr, show: {} }).items;
-          const byId = (list, id) => list.find((i) => i.id === id);
-          for (const [wrap, wheel] of [["cog", `v-cog${k}`], ["guide", "v-guideTeeth"], ["tension", "v-tensionTeeth"]]) {
-            const wa = byId(a, wheel), wb = byId(b, wheel);
-            if (wa.href !== wb.href) continue; // a different drawing between the frames: skip this pair
-            // a chain link lying on this wrap: its centre, as drawn in both frames
-            for (let i = 0; i < M.links; i++) {
-              const q0 = pathAt(pose.path, (((-roll + i * p) % total) + total) % total), q1 = pathAt(pose.path, (((-roll + (i + 1) * p) % total) + total) % total);
-              if (q0.on !== wrap || q1.on !== wrap) continue;
-              const la = byId(a, `v-cn${i}`), lb = byId(b, `v-cn${i}`);
-              if (!la || !lb || la.hidden || lb.hidden || la.href !== lb.href) continue;
-              // each part is moved exactly on the plane it is placed by: the link's near plate, the
-              // cog's or pulley's mid-plane; take the point at the contact on each
-              const e = wrap === "cog" ? pose.chainE : pose.e, sm = BINS.placeBy[i % 2 === 0 ? "outer" : "inner"];
-              const mx = (q0.p[0] + q1.p[0]) / 2, my = (q0.p[1] + q1.p[1]) / 2;
-              const atLink = screenOf(cam, W(mx, my, e + sm)), atWheel = screenOf(cam, W(mx, my, e));
-              // the chain: the link's drawn point there, carried to the next frame
-              const linkMove = apply(parseMatrix(lb.transform), apply(invert(parseMatrix(la.transform)), atLink));
-              // the wheel: its drawn point there, carried to the next frame
-              const toothMove = apply(parseMatrix(wb.transform), apply(invert(parseMatrix(wa.transform)), atWheel));
-              const vc = [linkMove[0] - atLink[0], linkMove[1] - atLink[1]], vt = [toothMove[0] - atWheel[0], toothMove[1] - atWheel[1]];
-              const lc = Math.hypot(...vc), lt = Math.hypot(...vt);
-              assert.ok(lc > 0.5 && lt > 0.5, `${wrap}: both move`);
-              const cos = (vc[0] * vt[0] + vc[1] * vt[1]) / (lc * lt);
-              assert.ok(cos > 0.9, `${view}, gear ${k + 1}, ${wrap}: the ${wrap === "cog" ? "cog's" : wrap + " pulley's"} teeth move against the chain (cos ${cos.toFixed(2)})`);
-              assert.ok(Math.abs(lt / lc - 1) < 0.2, `${view}, gear ${k + 1}, ${wrap}: teeth at ${(lt / lc).toFixed(2)} of the chain's speed`);
-              checked++;
-              break;
-            }
-          }
+// on screen with the chain, the same way and at the same speed (src/rig/contacts.ts). A sign slip
+// anywhere (a pulley turned the wrong way, a cassette angle that runs backward) shows up here.
+function contactsOf(M, cam, { reverse = null } = {}) {
+  const F = figure(M, cam, { prefix: "v" });
+  const dr = 0.4; // mm of chain between the two frames
+  const contacts = [];
+  for (const k of [0, 3, M.last]) {
+    const pose = M.pose(M.pullFor(k), k);
+    const total = pose.path.total, p = M.D.p;
+    for (const roll of [0, 37, 151.3]) {
+      const a = F.pose({ pose, roll, show: {} }).items, b = F.pose({ pose, roll: roll + dr, show: {} }).items;
+      const byId = (list, id) => list.find((i) => i.id === id);
+      for (const [wrap, wheel] of [["cog", `v-cog${k}`], ["guide", "v-guideTeeth"], ["tension", "v-tensionTeeth"]]) {
+        const wa = byId(a, wheel), wb = byId(b, wheel);
+        if (wa.href !== wb.href) continue; // a different drawing between the frames: skip this pair
+        // a chain link lying on this wrap: its centre, as drawn in both frames
+        for (let i = 0; i < M.links; i++) {
+          const q0 = pathAt(pose.path, (((-roll + i * p) % total) + total) % total), q1 = pathAt(pose.path, (((-roll + (i + 1) * p) % total) + total) % total);
+          if (q0.on !== wrap || q1.on !== wrap) continue;
+          const la = byId(a, `v-cn${i}`), lb = byId(b, `v-cn${i}`);
+          if (!la || !lb || la.hidden || lb.hidden || la.href !== lb.href) continue;
+          // each part is moved exactly on the plane it is placed by: the link's near plate, the
+          // cog's or pulley's mid-plane; take the point at the contact on each
+          const e = wrap === "cog" ? pose.chainE : pose.e, sm = BINS.placeBy[i % 2 === 0 ? "outer" : "inner"];
+          const mx = (q0.p[0] + q1.p[0]) / 2, my = (q0.p[1] + q1.p[1]) / 2;
+          const atLink = screenOf(cam, W(mx, my, e + sm)), atWheel = screenOf(cam, W(mx, my, e));
+          const wheelMoved = reverse === wrap ? carry(wb.transform, wa.transform, atWheel) : carry(wa.transform, wb.transform, atWheel);
+          contacts.push({ where: wrap, chain: [atLink, carry(la.transform, lb.transform, atLink)], wheel: [atWheel, wheelMoved] });
+          break;
         }
       }
-      assert.ok(checked >= 12, `only ${checked} contacts checked`);
-    });
+    }
   }
+  return contacts;
+}
+for (const [name, M] of Object.entries(MODELS)) {
+  test(`${name}: where the chain meets the cog and both pulleys, the teeth move with the chain`, () => {
+    const r = checkContacts(contactsOf(M, cameraFor(M, BOX)));
+    assert.deepEqual(r.faults, []);
+    // never pass with nothing checked: every kind of contact, several times
+    for (const where of ["cog", "guide", "tension"]) assert.ok((r.byWhere[where] ?? 0) >= 3, `${name}: only ${r.byWhere[where] ?? 0} ${where} contacts checked`);
+  });
+}
+test("a planted fault: a guide pulley turned the wrong way fails the contact test", () => {
+  const M = MODELS.road, r = checkContacts(contactsOf(M, cameraFor(M, BOX), { reverse: "guide" }));
+  assert.ok(r.faults.some((f) => f.startsWith("guide: the wheel moves against the chain")), r.faults.join("; "));
+  assert.ok(!r.faults.some((f) => f.startsWith("cog") || f.startsWith("tension")));
+});
+
+// Off line, the main figure shows which way and how far: under the guide pulley, an arrow from the
+// pulley's plane back to the line of the cog the reader asked for (not the nearest cog: past half a cog
+// off that is the wrong one), long enough to read at 1x, with where the pulley sits written at its end.
+// The arrow's words, the readout and the lab's rows say the same number, the same side and the same cog.
+for (const [name, M] of Object.entries(MODELS)) {
+  test(`${name}: across the lab, the arrow, the readout and the lab's rows agree, from the cog asked for, and the arrow points back to it`, () => {
+    const cam = cameraFor(M, BOX), F = figure(M, cam, { prefix: "o" });
+    let shown = 0, checked = 0;
+    for (let gear = 1; gear <= M.n; gear++)
+      for (let e10 = -30; e10 <= 30; e10 += 1)
+        for (let l2 = 0; l2 <= 12; l2 += 3) {
+          const err = e10 / 10, lOut = l2 / 2;
+          const x = indexing(M, gear, err, lOut), pose = M.pose(x.pull, x.on, lOut), ol = offLine(M, pose.z, x.k);
+          const items = F.pose({ pose, roll: 0, ref: x.k, show: { offline: true } }).items;
+          const mark = items.find((i) => i.id === "o-offline"), teeth = items.find((i) => i.id === "o-guideTeeth");
+          const rows = labRows(M, gear, err, lOut);
+          const at = `gear ${gear}, error ${err}, L out ${lOut}`;
+          checked++;
+          // the rows name the same number, side and cog as the readout (offLine is what the readout prints)
+          assert.ok(rows[2].includes(ol.text), `${at}: rows "${rows[2]}" do not say "${ol.text}"`);
+          if (Math.abs(ol.off) <= 0.05) {
+            assert.ok(!mark && !teeth.flags.off, `${at}: on line, no arrow`);
+            continue;
+          }
+          shown++;
+          assert.ok(mark && teeth.flags.off, `${at}: off by ${ol.off}, but no arrow or red teeth`);
+          assert.ok(mark.svg.includes(`>pulley ${ol.text}<`), `${at}: the arrow says ${mark.svg.match(/>([^<]*mm[^<]*)</)?.[1]}, the readout "${ol.text}"`);
+          assert.ok(Number(mark.svg.match(/data-len="([\d.]+)"/)[1]) >= 15 * PX, "the arrow is at least 15 px long");
+          // it runs from the pulley's plane back to the asked-for cog's line, and the words sit at the pulley's end
+          const y = pose.G[1] - M.r - M.D.tipAdd - 7, a = screenOf(cam, W(pose.G[0], y, pose.e)), c = screenOf(cam, W(pose.G[0], y, -M.cogZ(x.k)));
+          const head = mark.svg.match(/class="offline-head" d="M([-\d.]+) ([-\d.]+)/), b = [Number(head[1]), Number(head[2])];
+          assert.ok((b[0] - a[0]) * (c[0] - a[0]) + (b[1] - a[1]) * (c[1] - a[1]) > 0, `${at}: the arrow points away from the ${ol.teeth}'s line`);
+          const tx = Number(mark.svg.match(/class="offline-text" x="([-\d.]+)"/)[1]);
+          assert.ok(Math.abs(tx - a[0]) < Math.abs(tx - b[0]), `${at}: the words are not at the pulley's end`);
+        }
+    assert.ok(shown > 1000 && checked > 3000, `${shown} of ${checked} off line`);
+  });
+
+  test(`${name}: a slack cable puts the pulley outboard of the cog asked for, a tight one inboard, on every cog no limit screw holds`, () => {
+    for (let gear = 1; gear <= M.n; gear++)
+      for (const err of [-3, -2, -1.5, -1, -0.4, 0.4, 1, 1.5, 2, 3]) {
+        const x = indexing(M, gear, err), ol = offLine(M, x.z, x.k);
+        const held = (err < 0 && gear === 1) || (err > 0 && gear === M.n); // the H screw, the L screw
+        if (held) assert.equal(ol.side, "on", `cog ${gear}, error ${err}: held on its line`);
+        else assert.equal(ol.side, err < 0 ? "outboard" : "inboard", `cog ${gear}, error ${err}: ${ol.text}`);
+      }
+    // the reviewer's case: the 17 with the cable 1.5 mm tight sits 2.10 mm inboard of the 17
+    if (name === "road") assert.equal(offLine(M, indexing(M, 6, 1.5).z, 5).text, "2.10 mm inboard of the 17");
+  });
 }

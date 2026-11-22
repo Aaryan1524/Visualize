@@ -7,7 +7,7 @@
   <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-compatible-1b1b19?style=flat-square" alt="Agent Skills compatible"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1b1b19?style=flat-square" alt="MIT license"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2024-1b1b19?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node 24 or later"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.0.0-1b1b19?style=flat-square" alt="Version 1.0.0"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.1.0-1b1b19?style=flat-square" alt="Version 1.1.0"></a>
   <a href="https://github.com/Aaryan1524/Visualize/actions/workflows/ci.yml"><img src="https://github.com/Aaryan1524/Visualize/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
@@ -174,6 +174,14 @@ You don't have to name the skill. It also loads when you ask for an algorithm, d
 ```
 
 </details>
+
+Want the long version? Add `--deep`, or just ask for it in words ("in depth", "deep dive"):
+
+```text
+/visualize --deep explain multi-agent orchestration
+```
+
+A deep explanation is 4–6 chapters, about 10–15 minutes: the core idea, then how it fails, the trade-offs, the variants used in practice and the edge cases. Each chapter has its own prediction, the header shows one tab a chapter, and the page remembers where you stopped. Every step is still checked against the model.
 
 Three habits get the best pages:
 

@@ -1,5 +1,7 @@
 # Authoring a scene
 
+> **Legacy.** This page describes the scene.ts route (the Unfold stage, `verify.mjs`), kept so `examples/lru/`, `retries/`, `attention/` and `lru-3d/` still build. **Do not use it for a new page:** every new page, machine or concept, is a Drawing page on the rig (`references/figures.md`). Where this page and `figures.md` disagree (the camera, the checks, the parts), `figures.md` is right.
+
 A scene is a module with a default export from `defineScene`. Start from `node scripts/new-scene.mjs <name>`, which builds and verifies as generated.
 
 ```ts

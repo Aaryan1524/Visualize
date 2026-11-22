@@ -11,6 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { player } from "./player.mjs";
+import { cameraKit } from "./camera.mjs";
 import { audit, textsOf } from "../claims/audit.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -33,7 +34,12 @@ export const icon = {
 // The lab: the reader's own values in, the model's verdict out. It sits where Now you try sits.
 function labPanel(lab) {
   if (!lab) return "";
-  const row = (i) => `<label class="vz-lab-input"><span>${esc(i.label)}</span><input type="range" data-id="${i.id}" min="${i.min}" max="${i.max}" step="${i.step ?? 1}" value="${i.value}" aria-label="${esc(i.label)}"><b id="lab-v-${i.id}">${i.value}</b></label>`;
+  // a number on a slider (min, max, step), or `type: "text"`: a word or key the reader types (maxlength;
+  // `samples`, the entries the checks try in place of a slider's two ends)
+  const row = (i) =>
+    i.type === "text"
+      ? `<label class="vz-lab-input vz-lab-text"><span>${esc(i.label)}</span><input type="text" data-id="${i.id}" maxlength="${i.maxlength ?? 16}" value="${esc(i.value)}" spellcheck="false" autocomplete="off" aria-label="${esc(i.label)}"><b id="lab-v-${i.id}"></b></label>`
+      : `<label class="vz-lab-input"><span>${esc(i.label)}</span><input type="range" data-id="${i.id}" min="${i.min}" max="${i.max}" step="${i.step ?? 1}" value="${i.value}" aria-label="${esc(i.label)}"><b id="lab-v-${i.id}">${i.value}</b></label>`;
   return `
         <section class="vz-predict vz-practice vz-lab" id="lab" aria-label="${esc(lab.title)}" hidden><span class="vz-predict-kicker">${esc(lab.title)}</span><p>${esc(lab.intro)}</p><div class="vz-lab-inputs">${lab.inputs.map(row).join("")}</div><p class="vz-lab-verdict" id="lab-verdict" aria-live="polite"></p><ul class="vz-lab-rows" id="lab-rows"></ul></section>`;
 }
@@ -66,6 +72,22 @@ function labPanel(lab) {
  *                                optionally lab: { button, title, heading, intro, inputs: [{ id, label, min, max, step, value, format }] }
  */
 /** Run the correctness audit over everything the page says. */
+/**
+ * The header's tabs. A page whose steps name a `chapter` (a deep page) gets one tab a chapter,
+ * spanning its steps; any other page, one tab a step. Step 0 (the concept) has no tab.
+ */
+export function tabsOf(steps) {
+  if (!steps.slice(1).some((s) => s.chapter)) return steps.slice(1).map((s, i) => ({ label: s.tab, first: i + 1, last: i + 1 }));
+  const out = [];
+  steps.forEach((s, k) => {
+    if (k === 0) return;
+    const name = s.chapter ?? out.at(-1)?.label ?? s.tab;
+    if (out.at(-1)?.label === name) out.at(-1).last = k;
+    else out.push({ label: name, first: k, last: k });
+  });
+  return out;
+}
+
 export function auditPage(o) {
   const strip = (h) => String(h).replace(/<[^>]+>/g, " ");
   const texts = [
@@ -76,7 +98,8 @@ export function auditPage(o) {
     // the drawing's own words: callouts, the title block, detail titles
     ...Object.entries(o.data.variants ?? {}).flatMap(([name, v]) => [...String(v.svg ?? "").matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map((m, i) => ({ where: `drawing.${name}.${i}`, text: m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<") }))),
   ];
-  const places = [...o.steps.map((_, k) => `step:${k}`).slice(1), "whatif", "practice", ...(o.data.lab ? ["lab"] : [])];
+  // step 0 is the concept (the problem, before the first tab): a topic it teaches is placed there too
+  const places = [...o.steps.map((_, k) => `step:${k}`), "whatif", "practice", ...(o.data.lab ? ["lab"] : [])];
   const captions = Object.values(o.data.variants ?? {}).flatMap((v) => v.captions ?? []);
   const details = [o.setup, ...o.facts.map(strip), ...captions].join("\n");
   if (!o.audit) return { ok: false, problems: ["audit: this page declares no audit (claims, coverage, review)"], review: "missing", stamp: "", counts: {} };
@@ -109,7 +132,7 @@ ${o.css}</style>
   <header class="vz-head">
     <div class="vz-heading"><h1 class="vz-title">${esc(o.title)}</h1><p class="vz-about">${esc(o.about)}</p></div>
     <nav class="vz-chapters" aria-label="Chapters">
-${o.steps.slice(1).map((s, i) => `      <button type="button"><span>${String(i + 1).padStart(2, "0")}</span> ${esc(s.tab)}</button>`).join("\n")}
+${tabsOf(o.steps).map((t, i) => `      <button type="button" data-first="${t.first}" data-last="${t.last}"><span>${String(i + 1).padStart(2, "0")}</span> ${esc(t.label)}</button>`).join("\n")}
     </nav>
     <div class="vz-utilities"><button class="vz-info" type="button" data-details aria-haspopup="dialog" aria-controls="details">Details</button><button class="vz-theme" id="theme" type="button">Dark</button></div>
   </header>
@@ -167,7 +190,7 @@ ${o.facts.map((f) => `        <li>${f}</li>`).join("\n")}
 <script>
 ${o.scripts ? o.scripts + "\n" : ""}${o.modelSrc}
 const DATA = ${JSON.stringify(o.data)};
-(${player.toString()})(DATA, (${o.machine.toString()})(DATA));
+(${player.toString()})(DATA, (${o.machine.toString()})(DATA), (${cameraKit.toString()})());
 </script>
 </body>
 </html>

@@ -2,16 +2,128 @@
 
 One version covers the kit and the skill (`package.json` `version` and `SKILL.md` `metadata.version` move together). Each entry names the failure that caused it, so the reason for a rule is never lost.
 
-## Unreleased
+## 1.1.0 (2026-11-21), studio rig, mechanical kit, deep mode and independent review
+
+A unified studio-grade Drawing rig for both machines and abstract concepts, a reusable mechanical parts kit, automated visual look checks, multi-chapter `--deep` explanations, and a mandatory cross-model independent review gate (Claude Code, Codex and Antigravity). Backward-compatible with 1.0.0 pages and checks.
+
+### Studio rig, mechanical kit and look checks
+
+An early automatic watch passed every geometry check and still read as a squashed cream-on-cream disc: raw 2D rotation skewed thick gears, bucket-sorted faces interleaved coiled springs, convex contact shadows plugged a C-shaped rotor into a solid D-blob, flat materials vanished against the stage, every step shared one framing, and leader lines ran the height of the movement. Each failure is now fixed in the engine and enforced by `check-drawing`.
+
+- **Rig engine upgrades (`src/rig/`):**
+  - `turningPart()` computes the fewest pre-drawn angle bins across a solid's symmetry to keep screen error under `0.5 px`, places on the part's mid-plane, and records exact `turnErrPx` on `RigStage`.
+  - Face-order sorting (`{ sort: "face" }`) and `drawSpiralRibbon` paint self-occluding coils and spoked cutouts without face-merge artefacts.
+  - `plateShadow` preserves concave openings and holes instead of collapsing shadows into a convex hull.
+  - Role classes (`.rig-cap`, `.rig-wall`, `.rig-end`) allow automated measurement of top-vs-side contrast across both themes.
+- **Reusable mechanical parts kit (`src/rig/mech.ts`):** `spokedWheel` and `pinion` (clock and involute profiles with `readableTeeth` guard), `arbor`, `meshCentres` and `assertMeshed`, `bridge` (with screw/jewel hole records), `jewelSetting`, `screw`, `cutawayShell` (opened toward `facingCamera(cam)`), `helicalSpring`, plus `explodedStack()` and dashed `centreLines()` for flat layered assemblies.
+- **Concept Plates (`src/rig/concept.ts`):** sculpted multi-tier instruments, hubs, conduits, and synchronized lenses for multi-stage system and architecture explanations.
+- **Studio look & automated look checks (`references/look.md`, `scripts/lib/look.mjs`):** widened OKLab material spans and calm neutral chrome in `rig.css`/`chrome.css` (light and dark). `check-drawing.mjs` now enforces turn error (`< 1 px` and no unbudgeted thick rotation), OKLab cap-vs-wall and lit-top-vs-stage contrast, framing variety across steps, minimum subject span, leader length and crossing limits, and focus visibility — verified by 9 of 9 planted faults in `scripts/plant-look.mjs`.
+- **Three new & rebuilt flagship pages:**
+  - `examples/automatic-watch/`: 14-step `--deep` 4-chapter exploded horological calibre on `src/rig/mech.ts` with per-step shots, 28 voice clips, 3 chapter predictions, and a `Regulate it` lab.
+  - `examples/differential/`: Open Differential cutaway second-machine proof built strictly on `src/rig/mech.ts` with meshed bevel/spur train, live 3D orbiting spider gears, and independent review.
+  - `examples/multi-agent/`: 3-tier Concept Plate with per-step camera shots, studio contrast, and 3-state physical Shared Artifact Vault.
+- **Cross-model studio consistency & mandatory end-of-`/visualize` independent review:**
+  - Upgraded `scripts/templates/machine/` (onto `src/rig/mech.ts` + `turningPart()`) and fixed `scripts/templates/concept/` Step 1 framing plus macOS symlink path resolution in `scripts/new-figure.mjs`, so both scaffolds pass every `check-drawing` look, skew, camera and arithmetic gate out of the box.
+  - Upgraded `scripts/review-brief.mjs` (auto-detecting `model.mjs` and `shots/`) to require a 3-part fresh-context review of **conceptual & domain sanity**, **studio visual consistency** in both light & dark themes, and **cross-consistency** — with explicit harness invocation instructions in `SKILL.md` for Claude Code, Codex and Antigravity.
+  - Hardened `src/claims/audit.mjs` to reject missing or self-authored reviews (`"reviewer": "independent"` required) and validate `checks: { conceptual, visual }` pass gates.
+  - Fixed `src/claims/arithmetic.mjs` to parse thousands separators (`28,800`, `1,200`) in printed equations and added `check-arithmetic.mjs` across all 7 Drawing pages in `check:drawing`.
+  - Fixed `scripts/check-drawing.mjs` chapter-tab iteration via `data-first` on `--deep` multi-chapter pages.
+
+### Deep mode and polish
+
+- **Deep explanations, on request.** A reader who asks with `--deep` (or "in depth", "deep dive") gets 4–6 chapters and about 10–15 minutes instead of one short story. The header shows one tab a chapter (`chapter` on each step), `DATA.predict` may be a list with one prediction a chapter (play and the tour stop at each, each answer kept and revealed on its own), and a page of 12 steps or more offers "Resume at step k". `check-drawing` checks every prediction and fails a long page with fewer than one every 8 steps. Single-prediction pages are unchanged.
 
 - **Pages open light on every system.** They followed the reader's system theme, so a reader in dark mode met a black page first; the builder found it ugly. The Dark button switches, and a `#theme=dark` link opens dark. The checks set the theme on the page as a link does, so the dark checks still test dark (49 of 49 planted faults caught).
 - **Ready for contributors:** a contribution guide with the rules behind the checks, a code of conduct, a security policy, issue forms (a figure problem, a bug, a feature), a pull-request checklist, code owners and weekly dependency updates.
 - **The README opens with the rear derailleur playing**, and links the full narrated tour (MP4 with sound) on the release.
 
+### One route for machines and concepts
+
+A fresh agent asked to explain a Bloom filter followed `SKILL.md` down the old concept route (scene.ts, the Unfold stage, `look: "drawing"`) and shipped a flat, pale plan view: two small rows of bits on an empty stage, with none of the rig's look, the lit subject or the camera. Its words were good (three review rounds to no open findings); its figure did not belong beside the derailleur, and two of the Drawing checks crashed on its page. The builder wants every subject to come out consistent and beautiful, so there is now one route.
+
+- **Concept parts on the rig** (`src/rig/parts.ts`): a cell with a printed value and a tone set by flag, a rail with indices, a key card, a ring of slots, a marker, an arrow drawn in the figure's projection, a board. Each is drawn once and moved; a value or tone changes by attribute.
+- **`scripts/new-figure.mjs <name> --kind machine|concept`.** The concept scaffold is a hash table with linear probing (slots, a key card walking to the slot it looks at, an arrow, a marker, a lab where the reader inserts a key). Both kinds build and pass `check-drawing` as generated, all but the review. `new-machine.mjs` remains as `--kind machine`.
+- **`examples/bloom/`: the Bloom filter on the rig**, from the concept scaffold, reusing the eval's model, words, claims and topics: two rows of shaded bit cells, a word card, one arrow a hash function, the camera on each word's bits, What if for 1, 3, 4 and 6 hash functions, and a lab where the reader types any word.
+- **The Drawing checks run on concept pages, and refuse old ones clearly.** `check-drawing`, `shoot-steps` and `check-arithmetic` say a scene.ts page is not a Drawing page and point to `verify.mjs`, instead of crashing.
+- **The working on stage.** A Bloom filter's hashing hid in captions and lab rows, as an eval had found before; a `workingStrip` (`src/rig/parts.ts`) now shows each hash function's row beside the word card, `h1  2,668,802,083 mod 16 = 3`, added as its arrow lands and framed with the card.
+- **The Bloom filter's independent review, nine findings fixed.** The true expected false-positive rate, E[(X/m)^k], is computed by counting and tested against an exact reference and a simulation; Bloom's classic formula is named as the estimate it is, and the hash counts are ranked by the true rate. The prediction is built per variant. Each variant's words are chosen by the model so every lesson happens in it. The readouts show this run's chance beside the expected rate. The sizing rule and the counter-overflow caveat are stated properly. The lab asks the filter on screen and says which; Now you try draws its own filter; the legend no longer calls a just-cleared bit "still 0".
+- **Every lit part in view.** `check-drawing` fails a lit part that runs off the stage or sits under an open card, at every still frame and lab sample. The player frames the lab's and Now you try's state beside their card when the machine gives `cardShot`; the camera may zoom out below 1 there.
+- **No arrow across a printed value.** Arrows to the back row cross the front row over the gap between two cells (`arrow`'s new `via`), and end on a face beside its index; `check-drawing` fails an arrow that runs across a value or an index at a still frame, and a planted fault proves it.
+- **`check-arithmetic` redoes remainders** ("27 mod 8 = 3"), thousands separators included.
+- **A lab input can be typed** (`{ type: "text", samples }`): the checks and the shots try each sample and an empty entry.
+- **Coverage may place a topic at `"step:0"`**, the concept, where "the problem first" puts it.
+- **The review brief** shoots with `shoot-steps.mjs` by its absolute path, so a reviewer started elsewhere can run it.
+- **Values read in both themes.** A toned cell prints its value in the tone's dark ink; a set cell and a card have their own ink in each theme. White figures on a lit orange top, and light ones on a light card in the dark theme, had been unreadable.
+- **`SKILL.md` and the references describe one route.** `figures.md` covers machines and concepts. The scene.ts route is marked legacy in `SKILL.md`, `authoring.md`, `kit.md` and `verify.md`. Fixed the points the test agent found unclear: the camera ("one camera" now means one angle that zooms and pans), checks listed for every page that only Drawing pages run, a delivery report promising checks the stage did not run, the hands-on rule naming only Drawing and Clay pages, step 0 and coverage, and the review brief's shoot path.
+
+### The camera and the rear derailleur
+
+- **The figure shows what is being explained.** The derailleur's limit screws are a few millimetres across, and on a whole-machine figure the reader had to hunt for them. The shared player now has a camera (`src/drawing/camera.mjs`): zoom and pan only, one transform, nothing redrawn. A step names its `shot` (part names), and the camera centres those parts, zoomed up to 2×. While the voice speaks a `[phrase|part]` the shot does not frame well, the camera eases to it, holds at least 0.8 s and comes back. Callouts follow; View A, the title block and the cards stay put. The machine supplies `boundsOf(names)` and `clearArea()`.
+  - `check-drawing` checks it:
+    - framing at every step and every spoken name;
+    - the same camera by seek, play and tab;
+    - no move faster than 2 short sides a second, and no hold under 0.8 s.
+  - It fails three planted faults: a shot naming a missing part, a voice link to an unknown part, and a shot framed under a card.
+  - The first version passed every check and still read wrong. At 3×, the barrel adjuster sat centred but small on a parallelogram five times its size, so the parallelogram read as the subject. A straight fade cut the zoomed drawing beside the heading, and the drawing clipped to its own box inside the stage. Now:
+    - the zoom stops at 2×;
+    - a shot's parts are lit while the rest recede;
+    - parts a subject attaches to stay in view (`DATA.camera.around`);
+    - nothing clips the drawing but the stage.
+  - New checks would have caught it:
+    - the subject's centre lies in the middle half of the clear area;
+    - it spans 15% of the clear area;
+    - it outweighs the other parts in focus;
+    - nothing clips the drawing but the stage;
+    - every name's bounds are smaller than the figure and hold its anchor.
+
+    The first version's page fails them. A fourth planted fault, a shot pushed off centre, fails too. `shots.mjs --check-fresh` fails on a screenshot older than its page.
+  - The escalator and lock have no shots and are pixel-identical.
+- **View A is a true view from behind.** The builder: "It is not showing the side view, it's at an angle." The inset's camera sat a little outboard and above, so the cogs showed slanted faces, and the reader could not judge alignment by eye.
+  - It is now a rear elevation: orthographic, azimuth 180°, elevation 0. Each cog is a bar as tall as its diameter and as thick as the cog, at its lateral position.
+  - The chain is a ladder of links running down from its cog through the pulleys. The guide pulley sits between the cage plates.
+  - Dashed centrelines mark the cog's line and the pulley's. When they differ, the gap is written in mm from the model, in red.
+  - From behind everything only slides, so every part is drawn once and moved by a translate.
+  - Tests hold:
+    - the camera to 180° and 0;
+    - each cog's bar to the model's lateral position, within a pixel;
+    - the drawn offset to the model's, across the lab's whole range.
+- **Round 5: the off-line label tells one story.**
+  - Past half a cog off, the arrow and the readout measured from the nearest cog. Cog 6 with the cable 1.5 mm tight said "1.64 mm outboard" (of the 19), while the lab's rows said 2.10 mm inboard of the 17.
+  - The arrow, the readout and the rows now all measure from the cog asked for and name it: "2.10 mm inboard of the 17".
+  - The words sit at the pulley's end, as the pulley's position ("pulley 1.40 mm outboard of the 17"), and the arrow runs back to that cog's line.
+  - A test across the lab holds all three to the same number, side and cog, and holds the rule that a slack cable puts the pulley outboard and a tight one inboard on every cog no limit screw holds.
+- **Round 4 of the review: the picture shows the cause again.**
+  - Step 4's heading, "The pulley moves at once; the chain waits for a ramp to come round", now has all three in frame through the step: the shift gate, the run of chain at an angle, and the guide pulley under the next cog. Its first framing after View A's removal showed only the cassette.
+  - The "Ramp and pin" callout moved off the chain's upper run, so it names the gate on the cog.
+  - New check: every part a step's heading names (`DATA.camera.subject`) stays in frame through the step. A planted step that frames only the cassette fails it.
+  - Off line, the guide pulley's teeth turn red and an arrow under it points to its cog's line, labelled with the model's offset, e.g. "1.40 mm outboard". The arrow is drawn longer than the offset so it reads at 1×; the legend says so, and the number is exact. Before, the only mark was about 1 px long, behind the parallelogram.
+  - Step 7 frames the guide pulley with the barrel adjuster and lights it.
+  - A test holds the arrow's label, direction and length across the lab.
+- **View A is removed; the main figure carries the explanation.** The builder: "remove the side view, we can add that later. I just want the main figure to be robust."
+  - The derailleur draws no inset. The callout column on the right moves out, and the figure fits a wider box.
+  - The camera's clear area widens with it. Every shot still passes centring, subject and framing; step 7 now frames the barrel adjuster with its cable.
+  - The lab teaches alignment in the main figure: the off-line readout, the lab's rows, and the guide pulley's teeth turning red when it is off line.
+  - In the docs an inset view is optional and off by default. If one is added later, it must be a true elevation, never a near angle.
+- **What the derailleur taught is now the kit, not one page's memory.**
+  - `references/figures.md` is the recipe for a machine figure on the rig: when to use one, the look, draw once and move, the camera, insets, and every failure with the check that now catches it.
+  - `node scripts/new-machine.mjs <name>` writes a gear pair. As generated, it builds and passes `check-drawing`, all but the independent review. It has:
+    - a model with a tested contact pair;
+    - a rig figure;
+    - a shot per step;
+    - a recorded voice;
+    - claims, topics, a lab and Now you try.
+
+    Its first build drew every solid black, because `rig.css` was missing, and passed every check. So `check-drawing` now fails solids with no material colours.
+  - **Shared checks:**
+    - `checkContacts` in `src/rig/contacts.ts`: where a chain or gear drives a wheel, the two move together on screen.
+    - `scripts/check-arithmetic.mjs`: every printed equation, re-done from the printed digits. It is in `check:drawing`.
+    - `scripts/shoot-steps.mjs`: every step, theme, variant, lab end and Now you try, each printed with its time. `--check-fresh` fails on a shot older than the page.
+  - Each fails a planted fault: a reversed gear, a wrong sum, a day-old screenshot.
+  - `SKILL.md` routes machines to the recipe and the scaffold. A machine's report now states the contacts checked, the equations checked and the fresh shots looked at.
+
 ## 1.0.0 (2026-11-18), first public release
 
 A skill that turns a one-line request into a step-through explanation checked against a working model: abstract concepts in Clay 3D, machines as technical cutaways, each with a voice that explains first and lights what it names, a prediction, What if and Now you try. Installs in Claude Code, Codex and the Antigravity CLI. Desktop first; phone layouts work but are not yet polished.
-
 
 What a machine needs. The escalator built in Clay came out as about forty identical soft wheels in front of two thin track lines, with a floor shadow that meant nothing. The builder called it unprofessional. Drawn as a to-scale side cutaway, the same mechanism read at a glance.
 

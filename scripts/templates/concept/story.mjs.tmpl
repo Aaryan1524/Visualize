@@ -1,0 +1,93 @@
+// __TITLE__: the story, in one place: steps, headings, captions, the narration, and the claims and
+// topics the audit holds the page to. build.mjs, voice.mjs and the tests all read it.
+//
+// Every number is written from the model, whole numbers in words in the narration, and each
+// cause-and-effect sentence in CLAIMS appears on the page word for word, with a test against every
+// variant's model.
+
+import { insert } from "./model.mjs";
+
+// Steps: step 0 is the concept (no tab). `shot` names the parts the camera centres on (lit); `subject`
+// every part the heading names, which must stay in frame. Names: "rail" (all the slots), "card" (the
+// key), "target" (the slot being looked at), "run" (the slots this key has looked at), "probe" (the
+// marker on the slot looked at).
+export const STEPS = [
+  { tab: null, focus: null },
+  { tab: "The table", focus: null, subject: ["slots", "card"] },
+  { tab: "Hash", focus: null, shot: ["card", "target"], subject: ["card", "target"] },
+  { tab: "Collide", focus: null, shot: ["target", "probe", "card"], subject: ["target", "card"] },
+  { tab: "Cluster", focus: null, shot: ["run", "card"], subject: ["target", "card"] },
+  { tab: "Look up", focus: null, shot: ["run", "card"], subject: ["target", "card"] },
+];
+export const PRED_STEP = 2;
+// which model step each page step shows (null: none yet)
+export const EVENT = [null, null, 0, 1, 2, 3];
+
+const ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+const words = (n) => (n < 20 ? ONES[n] : n < 100 ? TENS[Math.floor(n / 10)] + (n % 10 ? "-" + ONES[n % 10] : "") : String(n));
+const list = (xs) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+
+/** What one model step says, in a heading. */
+function said(e, m) {
+  if (e.op === "lookup") {
+    const taken = e.probes.slice(0, -1);
+    return taken.length ? `${e.key} mod ${m} = ${e.home}: slots ${list(taken)} hold other keys and slot ${e.slot} is empty, so ${e.key} is not in the table.` : `${e.key} mod ${m} = ${e.home}: slot ${e.slot} is empty, so ${e.key} is not in the table.`;
+  }
+  return e.probes.length === 1 ? `${e.key} mod ${m} = ${e.home}: slot ${e.slot} is free, so ${e.key} goes there.` : `${e.key} mod ${m} = ${e.home}: slot ${e.home} is taken, so ${e.key} probes on to slot ${e.slot}.`;
+}
+
+/** The headings, one a step, from the model. */
+export const headings = (M) => [
+  "How does a hash table find a key's slot without searching?",
+  `${M.m} slots, all empty, and a key to place.`,
+  ...EVENT.slice(2).map((i) => said(M.steps[i], M.m)),
+];
+
+/** The Details caption for each step. */
+export const captions = (M) => [
+  `A hash table keeps keys in ${M.m} slots. A key's home slot is the remainder after dividing it by ${M.m}, so finding it takes one division, not a search.`,
+  `${M.m} empty slots, numbered from 0. Each key will be placed by its remainder, and a key goes into the first free slot at or after its home slot.`,
+  `${said(M.steps[0], M.m)} The table never moves a key once it is placed.`,
+  `${said(M.steps[1], M.m)} When two keys share a home slot, the second walks forward to the next free one: linear probing.`,
+  `${said(M.steps[2], M.m)} Keys that probe on fill the slots after a busy home slot, so runs of full slots grow: clustering.`,
+  `${said(M.steps[3], M.m)} An empty slot ends a lookup: the key is not in the table, because an insert would have stopped there.`,
+];
+
+/** The narration, one string a step. [phrase|part] lights those parts while they are spoken. */
+export const script = (M) => {
+  const e = M.steps;
+  const ins = (s) => (s.probes.length === 1 ? `[Slot ${words(s.slot)}|target] is free, so it goes there.` : `[Slot ${words(s.home)}|target] is taken, so it probes on to slot ${words(s.slot)}.`);
+  const look = e[3];
+  return [
+    `A hash table finds a key's place without searching. It divides the key by the number of slots, and the remainder is where the key lives.`,
+    `These ${words(M.m)} slots start empty. [The key|card] will go to its remainder, or the first free slot after it.`,
+    `[${cap(words(e[0].key))}|card] divided by ${words(M.m)} leaves ${words(e[0].home)}. ${ins(e[0])}`,
+    `Now [${words(e[1].key)}|card]. Its remainder is ${words(e[1].home)}. ${ins(e[1])}`,
+    `Then [${words(e[2].key)}|card], with remainder ${words(e[2].home)}. ${ins(e[2])} Keys that probe on make runs of full slots.`,
+    `Is [${words(look.key)}|card] in the table? Its remainder is ${words(look.home)}. The lookup walks on until [an empty slot|target]. An empty slot ends a lookup: the key is not in the table.`,
+  ];
+};
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+
+/** Each claim: words that must be on the page, and a test of them against a model. */
+export const CLAIMS = [
+  { text: "a key goes into the first free slot at or after its home slot", test: (m) => m.steps.filter((s) => s.op === "insert").every((s) => { for (let i = 0; i < m.m; i++) { const j = (s.home + i) % m.m; if (s.before[j] === null) return j === s.slot; } return s.slot === -1; }) },
+  { text: "The table never moves a key once it is placed", test: (m) => m.steps.filter((s) => s.op === "insert").every((s) => s.table.every((v, i) => i === s.slot ? v === s.key : v === s.before[i])) },
+  { text: "An empty slot ends a lookup: the key is not in the table, because an insert would have stopped there", test: (m) => { const l = m.steps.at(-1); return !l.found && l.table[l.slot] === null && !l.table.includes(l.key) && insert(l.table, l.key).slot === l.slot; } },
+];
+
+/** The field's core topics, each placed on the page, and the source the list came from. */
+export const COVERAGE = {
+  source: "any algorithms text's chapter on hash tables with open addressing (division hashing, linear probing, clustering, unsuccessful search)",
+  topics: [
+    { topic: "slots and a hash: a key's home slot is its remainder", where: "step:1" },
+    { topic: "insert: the home slot, or the next free one", where: "step:2" },
+    { topic: "collisions and linear probing", where: "step:3" },
+    { topic: "clustering: runs of full slots grow", where: "step:4" },
+    { topic: "lookup: probe until the key or an empty slot", where: "step:5" },
+    { topic: "table size changes which keys collide", where: "whatif" },
+    { topic: "your own key", where: "lab" },
+    { topic: "deleting a key without breaking lookups", core: false, where: "deferred", why: "needs tombstones, a page of its own; named in Details" },
+  ],
+};

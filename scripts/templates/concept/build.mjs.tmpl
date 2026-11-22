@@ -1,0 +1,233 @@
+#!/usr/bin/env node
+// __TITLE__: the page. Made by scripts/new-figure.mjs --kind concept as a starting point; replace the
+// model first (model.mjs), then the figure (figure.mjs) and the story (story.mjs). references/figures.md
+// is the recipe; concepts and machines are built the same way, on the rig and drawingPage.
+//
+//   node build.mjs [--out <page.html>]     then: node <skill>/scripts/check-drawing.mjs <page.html>
+
+import { createRequire } from "node:module";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { MODELS, VARIANTS } from "./model.mjs";
+import { STEPS, PRED_STEP, EVENT, headings, captions, CLAIMS, COVERAGE } from "./story.mjs";
+import { drawingPage, esc } from "__ROOT__/src/drawing/page.mjs";
+
+const { buildSync } = createRequire(new URL("__ROOT__/package.json", import.meta.url))("esbuild");
+const HERE = dirname(fileURLToPath(import.meta.url));
+const outArg = process.argv.indexOf("--out");
+const out = outArg > 0 ? process.argv[outArg + 1] : join(HERE, "dist", "__NAME__.html");
+
+// The drawing's units: about 10 to a screen pixel at 1440 x 900. The figure fills BOX, between the two
+// columns of callouts (LX, RX), clear of the heading on the left and the cards on the right.
+const VBW = 14200, VBH = 6550, FS = 150, LX = 3900, RX = 10560;
+const BOX = { x: 4300, y: 900, w: 6100, h: 4800 };
+const CLEAR = { x0: LX + 150, y0: 150, x1: RX - 150, y1: VBH - 150 };
+const VOICE = existsSync(join(HERE, "voice.json")) ? JSON.parse(readFileSync(join(HERE, "voice.json"), "utf8")) : null;
+
+// Callouts: text in the columns, a leader drawn live to the part's anchor (figure.mjs `at`).
+const label = (id, text, x, y, to, beats, anchor) => ({ id, text, at: [x, y], to, beats, anchor });
+const LABELS = [
+  label("slots", "Slots", LX, 2600, "slots", [1], "end"),
+  label("card", "Key", LX, 4300, "card", [1], "end"),
+];
+const labelSvg = (l) => `<g class="label" data-label="${l.id}" data-beats="${l.beats.join(" ")}" data-at="${l.to}" data-to="${l.at[0]},${l.at[1]}"><path class="leader"/><circle class="ldot" r="26"/><text x="${l.at[0]}" y="${l.at[1]}" text-anchor="${l.anchor}">${esc(l.text)}</text></g>`;
+const skeleton = () => `<defs id="rigDefs"></defs><g id="scene" data-camera=""></g><g id="labels">${LABELS.map(labelSvg).join("")}</g>`;
+
+function variantData(name) {
+  const M = MODELS[name];
+  return { name, label: VARIANTS[name].label, svg: skeleton(), heads: headings(M), captions: captions(M), voice: VOICE?.variants?.[name] ?? null };
+}
+const VARIANT_DATA = Object.fromEntries(Object.keys(VARIANTS).map((n) => [n, variantData(n)]));
+
+// ---------------------------------------------------------------- the machine hooks (run in the page)
+function machine(DATA) {
+  const $ = (id) => document.getElementById(id);
+  const root = $("vz");
+  const clamp = (u) => Math.max(0, Math.min(1, u));
+  let V = null, model = null, cur = null, F = null, stage = null, lastAt = null, lastFocus = { focus: null, lit: [] };
+
+  // The table t seconds into step k (u: 0..1 through the step's motion): the key's probes one by one,
+  // then the key in its slot.
+  function stateAt(k, u) {
+    const i = DATA.event[k];
+    if (i === null) return { table: Array(model.m).fill(null), key: k ? model.steps[0].key : null, home: null, target: null, probed: [], placed: null };
+    const e = model.steps[i], n = e.probes.length, step = Math.min(n - 1, Math.floor(clamp(u / 0.8) * n));
+    const done = u >= 0.85;
+    return {
+      table: done && e.op === "insert" ? e.table : e.before, key: e.key, home: e.home, target: e.probes[step], probed: e.probes.slice(0, step),
+      placed: done && e.op === "insert" ? e.slot : null, probes: n, filled: (done && e.op === "insert" ? e.table : e.before).filter((x) => x !== null).length,
+    };
+  }
+  const anim = (k) => (V.voice?.[k] ? Math.max(2, 0.8 * V.voice[k].duration) : 0.75 * DATA.plain);
+  const at = (k, t, still, SEG) => {
+    const tt = still ? anim(k) : Math.max(0, t - SEG.lead);
+    return { ...stateAt(k, clamp(tt / anim(k))), k };
+  };
+  const stillAt = (k, SEG) => SEG.lead + anim(k);
+
+  function mount(v, m) {
+    V = v;
+    model = m;
+    F = FIG.figure(model, FIG.cameraFor(model, DATA.box));
+    $("scene").replaceChildren();
+    stage = new FIG.RigStage($("scene"));
+    for (const p of F.parts) stage.add(p.id, p.part, p.svg);
+  }
+  function render(state) {
+    cur = state;
+    const o = F.pose(state);
+    stage.apply(o.items);
+    lastAt = o.at;
+    focusParts();
+    $("r-filled").textContent = String(state.filled ?? state.table.filter((x) => x !== null).length);
+    $("r-probes").textContent = String(state.probed ? state.probed.length + (state.target === null ? 0 : 1) : 0);
+    $("r-load").textContent = (state.table.filter((x) => x !== null).length / model.m).toFixed(2);
+  }
+  function focusParts() {
+    const { focus, lit } = lastFocus, lab = root.hasAttribute("data-lab");
+    stage?.focus((part) => ({ recede: lit.length ? !lit.includes(part) : !lab && focus ? !focus.includes(part) : false, named: lit.includes(part) }));
+  }
+  const focus = (f) => ((lastFocus = f), focusParts());
+
+  // What the camera can frame: a part (data-part), "target" (the slot being looked at) or "run" (the slots
+  // this key has looked at so far).
+  function boundsOf(names) {
+    const scene = $("scene");
+    if (!scene) return null;
+    const inv = scene.getCTM().inverse();
+    let b = null;
+    const add = (x0, y0, x1, y1) => (b = b ? { x0: Math.min(b.x0, x0), y0: Math.min(b.y0, y0), x1: Math.max(b.x1, x1), y1: Math.max(b.y1, y1) } : { x0, y0, x1, y1 });
+    for (const n of names) {
+      if (n === "target") {
+        const p = lastAt?.target, r = 300;
+        if (p) add(p[0] - r, p[1] - r, p[0] + r, p[1] + r);
+        continue;
+      }
+      if (n === "run") {
+        for (const p of lastAt?.run ?? []) add(p[0] - 300, p[1] - 300, p[0] + 300, p[1] + 300);
+        continue;
+      }
+      for (const el of scene.querySelectorAll(`[data-part="${{ rail: "slots", card: "card", probe: "probe" }[n] ?? n}"]`)) {
+        if (el.style.display === "none") continue;
+        const r = el.getBBox();
+        if (!r.width && !r.height) continue;
+        const m = inv.multiply(el.getCTM());
+        const pts = [[r.x, r.y], [r.x + r.width, r.y], [r.x, r.y + r.height], [r.x + r.width, r.y + r.height]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+        add(Math.min(...pts.map((q) => q[0])), Math.min(...pts.map((q) => q[1])), Math.max(...pts.map((q) => q[0])), Math.max(...pts.map((q) => q[1])));
+      }
+    }
+    return b;
+  }
+
+  // The lab: the reader's own key, inserted into the table the story built.
+  function lab(values) {
+    const key = Number(values.key), m = model, h = key % m.m;
+    const r = insert(m.table, key), already = m.table.includes(key);
+    const taken = r.probes.slice(0, -1);
+    const verdict = already ? `${key} is already in slot ${m.table.indexOf(key)}.` : r.slot < 0 ? `The table is full.` : taken.length ? `${key} mod ${m.m} = ${h}: ${taken.length === 1 ? `slot ${taken[0]} is` : `slots ${taken.join(", ")} are`} taken, so ${key} goes in slot ${r.slot}.` : `${key} mod ${m.m} = ${h}: slot ${r.slot} is free, so ${key} goes there.`;
+    return {
+      ok: true, verdict,
+      rows: [`Home slot: ${key} mod ${m.m} = ${h}.`, `Slots looked at: ${r.probes.length}.`, `Full slots after: ${r.table.filter((x) => x !== null).length} of ${m.m}.`],
+      state: { table: r.table, key, home: h, target: r.slot < 0 ? null : r.slot, probed: taken, placed: r.slot < 0 ? null : r.slot, lab: true },
+    };
+  }
+
+  // Now you try: questions made from the model.
+  function question(n, r) {
+    const m = model, kind = n % 3, key = [3, 9, 14, 17, 22, 30, 37, 45][Math.floor(r() * 8)];
+    const res = insert(m.table, key), look = lookup(m.table, key);
+    if (kind === 0) {
+      const wrong = [(res.slot + 1) % m.m, (res.slot + 2) % m.m].map(String);
+      return { q: `The table holds ${m.table.map((v, i) => (v === null ? null : `${v} in slot ${i}`)).filter(Boolean).join(", ")}. Which slot does ${key} go into?`, choices: [`Slot ${res.slot}`, `Slot ${wrong[0]}`, `Slot ${wrong[1]}`], explain: `${key} mod ${m.m} = ${key % m.m}; ${res.probes.length > 1 ? `slots ${res.probes.slice(0, -1).join(", ")} are taken, so it goes on to slot ${res.slot}` : `that slot is free`}.` };
+    }
+    if (kind === 1) {
+      const right = look.probes.length, a = right + 1, b = right + 2;
+      return { q: `Looking up ${key} in this table (${m.table.map((v) => (v === null ? "·" : v)).join(" ")}), how many slots does it look at?`, choices: [String(right), String(a), String(b)], explain: `It starts at slot ${key % m.m} and stops at ${look.found ? "the key" : "the first empty slot"}, slot ${look.slot}: ${right} ${right === 1 ? "slot" : "slots"}.` };
+    }
+    return { q: `A lookup for ${key} reaches an empty slot. What does that tell you?`, choices: [`${key} is not in the table`, `${key} is in the next slot`, "The table is full"], explain: "An insert would have stopped at that empty slot, so the key cannot be further on." };
+  }
+
+  return {
+    model: (v) => MODELS_IN_PAGE[v.name],
+    mount, at, stillAt, render, focus, anchors: () => lastAt, lab, question, boundsOf, clearArea: () => DATA.camera.clear,
+    heading: (k) => V.heads[k] ?? null,
+    info: () => (cur ? { target: cur.target, placed: cur.placed } : {}),
+  };
+}
+
+// ---------------------------------------------------------------- page
+const bundle = buildSync({ entryPoints: [join(HERE, "figure.mjs")], bundle: true, format: "iife", globalName: "FIG", write: false, minify: true, legalComments: "none" }).outputFiles[0].text;
+if (/<\/script/i.test(bundle)) throw new Error("the figure bundle contains </script");
+const modelSrc = readFileSync(join(HERE, "model.mjs"), "utf8").replace(/^export /gm, "") + "\nconst MODELS_IN_PAGE = MODELS;\n";
+const BASE = Object.keys(VARIANTS)[0], M0 = MODELS[BASE], std = VARIANT_DATA[BASE];
+
+const DATA = {
+  box: BOX, plain: 8, event: EVENT,
+  base: BASE,
+  steps: STEPS.map((s, k) => ({ heading: headings(M0)[k], focus: s.focus, ...(s.shot ? { shot: s.shot } : {}) })),
+  camera: { clear: CLEAR, items: {}, alias: { target: ["slots"], rail: ["slots"], run: ["slots"], card: ["arrow"] }, around: {}, subject: Object.fromEntries(STEPS.flatMap((s, k) => (s.subject ? [[k, s.subject]] : []))) },
+  alias: {},
+  predict: {
+    step: PRED_STEP,
+    question: `${M0.steps[1].key} is next, and its home slot may already hold a key. Where does it go?`,
+    choices: ["Its home slot if free, else the next free slot after it", "Over the key already there", "Nowhere: the table turns it away"],
+    answer: 0,
+    explanation: Object.fromEntries(Object.entries(MODELS).map(([k, m]) => [k, `${m.steps[1].key} mod ${m.m} = ${m.steps[1].home}, and it goes in slot ${m.steps[1].slot}: the first free slot at or after its home slot.`])),
+    locked: "Locked in. Press play to place it.",
+  },
+  lab: {
+    button: "Try a key",
+    title: "Insert your own key",
+    heading: "Where does your key go?",
+    intro: "Pick a key to insert into the table the story built.",
+    inputs: [{ id: "key", label: "Key", min: 0, max: 99, step: 1, value: 37 }],
+  },
+  variants: VARIANT_DATA,
+};
+
+const CSS = `
+${readFileSync(new URL("__ROOT__/src/rig/rig.css", import.meta.url), "utf8")}
+.label text{font-size:${FS}px;font-weight:500;fill:var(--ink);paint-order:stroke;stroke:var(--stage);stroke-width:48px;stroke-linejoin:round}
+.leader{fill:none;stroke:var(--ink);stroke-width:.5}
+.ldot{fill:var(--ink)}
+.vz-step-heading{text-shadow:0 0 6px var(--stage),0 0 12px var(--stage),0 0 18px var(--stage)}
+#fig{overflow:visible}
+.vz[data-practice] #fig .label{visibility:hidden}
+.rig-arrow{--rig-arrow:var(--orange)}
+`;
+
+const HTML = drawingPage({
+  title: "__TITLE__",
+  about: "A key's remainder picks its slot; a taken slot sends it on to the next.",
+  scene: "__NAME__",
+  steps: STEPS,
+  stageLabel: "__TITLE__, drawn as solid parts. Left and right arrows step through the explanation; space plays and pauses.",
+  viewBox: `0 0 ${VBW} ${VBH}`,
+  figLabel: "A row of slots on a board, with a key card in front and an arrow to the slot it is placed in",
+  concept: std.voice ? std.voice[0].text : std.captions[0],
+  setup: std.captions[0],
+  whatIf: { label: "Table", variants: Object.entries(VARIANTS).map(([k, v]) => [k, v.label]) },
+  totals: `            <span><b id="r-filled">0</b> slots full</span>
+            <span><b id="r-probes">0</b> slots looked at</span>
+            <span><b id="r-load">0.00</b> load</span>`,
+  readoutNote: "Readouts are computed by the model on this page",
+  legend: [["var(--orange)", "The key being placed, and the slot it lands in"], ["var(--t-bad)", "A slot it found taken"]],
+  facts: [`Keys go in by their remainder after dividing by the table's size. Not covered here: deleting a key without breaking lookups, which needs tombstones.`],
+  css: CSS,
+  modelSrc,
+  scripts: bundle,
+  machine,
+  audit: {
+    models: Object.values(MODELS),
+    claims: CLAIMS,
+    coverage: COVERAGE,
+    reviewFile: join(HERE, "review.json"),
+    report: out.replace(/\.html$/, ".audit.json"),
+  },
+  data: DATA,
+});
+
+mkdirSync(dirname(out), { recursive: true });
+writeFileSync(out, HTML);
+console.log(`wrote ${out} (${(HTML.length / 1024 / 1024).toFixed(2)} MB)`);

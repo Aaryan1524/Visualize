@@ -1,0 +1,133 @@
+{
+  "stamp": "a2630282adbf32d4",
+  "reviewer": "independent",
+  "summary": "Round 3: all 14 findings (10 from round 1 and 4 from round 2) are genuinely fixed and verified against model.mjs, build.mjs, figure.mjs, voice narration, unit tests, and the updated screenshots. No new issues found.",
+  "findings": [
+    {
+      "where": "variants.orchestrated.heads.1 & variants.monolith.heads.1 (step 3)",
+      "text": "Parallel tool calls finish in 3.4 s instead of 8.6 s. / Serial tool calls take 8.6 s, stretching the trace to 11.6 s.",
+      "severity": "wrong",
+      "finding": "3.4 s and 8.6 s are the full work-phase durations (LLM reasoning + external tool I/O combined), not tool-call durations alone. In model.mjs and the Step 3 caption, the three external tool calls take 1.4 s (Search), 1.8 s (Code), and 1.5 s (Test) — 1.8 s on the slowest branch and 4.7 s serially — while LLM think time accounts for the other 1.6 s on Coder and 3.9 s serially (visible as blue Think bars in View A). Correct statement: say the parallel work phase (or worker branches combining LLM reasoning and tool calls) finishes in 3.4 s instead of 8.6 s, or quote the actual tool-call spans (1.8 s vs 4.7 s).",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: Step 3 headings now accurately describe 'Parallel worker branches finish in 3.4 s instead of 8.6 s.' and 'Serial work branches take 8.6 s, stretching the run to 10.6 s.', matching the Think + Tool I/O + Distill spans in model.mjs and View A."
+    },
+    {
+      "where": "drawing.monolith, variants.monolith.voice.1, variants.monolith.captions (steps 1-6), & lab (monolith mode)",
+      "text": "drawing.monolith: \"Isolated context\", \"Orchestrator hub\", \"Researcher blade\"; variants.monolith.voice.1: \"Below it sit three specialist worker blades, each with an isolated context tray.\"; variants.monolith.captions: verbatim parallel-orchestrator captions",
+      "severity": "wrong",
+      "finding": "The Single monolithic agent variant contradicts itself across its diagram labels, voice, Details captions, and Lab output. On monolith Step 4 (multi-agent-monolith.png), worker wafer stacks are hidden because there is no context isolation, yet the callout still reads \"Isolated context\" with a leader arrow pointing directly at the active compute blade; Step 1 voice still describes \"three specialist worker blades, each with an isolated context tray\"; and variants.monolith.captions (shown in Details -> This step) are identical copies of the parallel-orchestrator captions, claiming \"no individual worker exceeds 18.0k tokens ... keeping the Orchestrator at 11.0k tokens\" on Step 4 and \"total wall time rises by only 0.9 s\" on Step 5, directly contradicting the monolith heading (52.4k tokens; +1.7 s), voice, View A, and readouts. In addition, figure.mjs still fires monolith tool shuttles and verifier conduits from the dimmed outer blades, and lab() in monolith mode ignores the Workers slider while printing \"raw logs ... compressed to ...\" even though compression is disabled. Give the monolith variant accurate labels, Step 1 voice, variant-specific Details captions, single-lane visual routing, and honest Lab output.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: drawing.monolith labels ('Single agent core', 'Shared window (32k cliff)', 'Active serial lane', 'Serial retry (+1.7 s)'), Step 1 voice, all 7 monolith Details captions, single-lane tool routing in figure.mjs (monoTools from center blade, hidden verifier/outer conduits), and monolith Lab rows now accurately reflect a single serial agent."
+    },
+    {
+      "where": "variants.monolith.heads.4 (step 6), variants.monolith.voice.2, variants.monolith.voice.6, & model.mjs monolith baseline",
+      "text": "An independent verifier checks the patch (1.0 s) before commit. / Before replying, an independent verifier gate inspects the combined patch for 1.0 seconds to catch cross-module bugs, commits the result to the artifact vault, and the orchestrator synthesizes the final answer in 1.1 seconds. / In the single-agent layout, the coordinator plans in 0.9 seconds...",
+      "severity": "wrong",
+      "finding": "A \"Single monolithic agent\" cannot have an Orchestrator (\"the coordinator\", \"the orchestrator\") or a second, independent Verifier agent with its own clean 4.0k context window — View A in monolith mode literally plots two separate agent lanes (Single agent and Verifier). Charging the monolithic baseline the same 0.9 s orchestrator decomposition, 1.0 s independent cross-module verifier gate (justified in Step 6 specifically because parallel workers cannot see each other's slices), and 1.1 s multi-summary synthesis (3.0 s fixed serial overhead) while charging the orchestrated run zero extra coordination or summarization latency also skews the 11.6 s vs 6.4 s (1.81x) comparison and undermines the tested claim that \"One monolithic agent runs them serially in 11.6 s and accumulates 52.4k tokens in one window.\" Either model the monolithic baseline genuinely as one agent (self-checking inside its own shared window, or without the external 1.0 s Verifier) and remove \"orchestrator\"/\"coordinator\" phrasing from monolith narration, or explicitly state that the comparison holds pre/post check overhead fixed to isolate work-phase parallelism.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: model.mjs now models the single monolithic agent with 1 lane, verifyMs = 0 (10.6 s serial baseline, 1.66x orchestrated speedup even while paying 1.0 s for the independent verifier), hides the verifier hardware/conduits in monolith mode, and removes orchestrator/coordinator wording from monolith headings, captions, and voice."
+    },
+    {
+      "where": "variants.orchestrated.heads.2 (step 4), variants.orchestrated.voice.4, variants.monolith.heads.2 (step 4), & variants.monolith.voice.4",
+      "text": "Compact summaries keep root context at 11.0k instead of 52.4k. / One shared window swells to 52.4k tokens — past the 32k cliff.",
+      "severity": "misleading",
+      "finding": "The Step 4 headings and narration contradict the live View A meters and bottom readouts throughout Step 4. Step 4 spans 4.0 s to 4.72 s (paused at 4.7 s in orchestrated) and 9.2 s to 9.92 s (paused at 9.9 s in monolith) — before the 2.4k synthesis tokens are added in Step 6. Consequently, View A and the bottom readout bar show 8.6k root context (orchestrated) and 50.0k root context (monolith, 13 wafers rather than 14) on screen while the heading directly above claims 11.0k and 52.4k. Either state both fan-in occupancy (8.6k vs 50.0k) and end-of-run total after synthesis (11.0k vs 52.4k), or align Step 4's heading and readout to the same point in the run.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: Step 4 headings, voice, captions, and View A ('If raw fan-in: 50.0k', 'Single agent: 50.0k' / 'End of run: 52.4k') now consistently distinguish pre-synthesis occupancy (8.6k vs 50.0k) from end-of-run totals after 2.4k synthesis (11.0k vs 52.4k)."
+    },
+    {
+      "where": "predict.question & step 3 View A (multi-agent-step3.png)",
+      "text": "The three workers now hold 47.0k tokens of raw logs. What hits the Orchestrator if they return full transcripts?",
+      "severity": "misleading",
+      "finding": "Three contradictions on the Step 3 Predict frame: (1) View A directly above the Predict card already displays a red bar labeled \"If raw logs: 52.4k\" crossing the 32k cliff line, giving away Choice 1 (\"52.4k tokens (past 32k cliff)\"). (2) At Step 3's paused timestamp (4.0 s / 6.4 s), Coder is still mid-tool at 16.1k tokens (visible in View A as \"Peak worker: 16.1k\"), so the three workers currently hold 14.0k + 16.1k + 15.0k = 45.1k tokens, not 47.0k (reached at 4.3 s). (3) Returning full transcripts hits the Orchestrator with 3.0k + 47.0k = 50.0k at fan-in; 52.4k includes 2.4k of synthesis tokens that have not occurred yet and are not introduced until Step 6. Hide or mask the \"If raw logs\" bar while the prediction is unanswered, pose Step 3 at workEnd (4.3 s) when raw logs truly total 47.0k, and specify the 3.0k plan + 2.4k synthesis breakdown (or ask for the 50.0k fan-in total).",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: View A hides comparison rows on Step 3 in both variants, workers hold 47.0k raw logs at the pre-fan-in pose, and the Predict prompt/choices ask for the 50.0k fan-in total with the 3.0k + 2.4k breakdown in the explanation."
+    },
+    {
+      "where": "setup, variants.orchestrated.captions.0, & variants.orchestrated.captions.6",
+      "text": "Auditing and patching three code modules requires 3 independent tasks: Search (2.6 s, 14.0k tokens), Code (3.4 s, 18.0k tokens) and Test (2.6 s, 15.0k tokens).",
+      "severity": "misleading",
+      "finding": "Describing Search, Code, and Test as \"3 independent tasks\" that launch concurrently at t = 0.9 s for \"patching three code modules\" violates DAG data-dependency first principles: in real patching, Search -> Code -> Test are sequentially dependent stages (Tester cannot run tests against Coder's patch at 0.9 s when Coder does not finish until 4.3 s, nor can Coder consume Researcher's search hits in parallel). Step 6 further refers to \"cross-module conflicts\" and \"merged artifacts\", which describe data-parallel module workers rather than functional pipeline stages. Reframe the three concurrent branches as genuinely independent tasks (e.g., three independent module audits/patches, or read-only dependency lookup + isolated patch drafting + baseline test-spec/regression run before post-merge verification) and note that dependent stages must run serially.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: the concurrent branches are now three genuinely data-independent code modules (Auth, Billing, Search, with Docs/Policy/Metrics in Lab), and both Step 2 caption and Details explicitly note that sequentially dependent stages must stay serial inside one worker's branch."
+    },
+    {
+      "where": "variants.orchestrated.captions.3, variants.orchestrated.captions.4, & details.facts.0 (model.mjs worker loop)",
+      "text": "Each worker interleaves LLM reasoning with an external tool call (Search 1.4 s, Code 1.8 s, Test 1.5 s). / DAG scheduling: each subtask executes LLM think + external tool I/O (+ 1.7 s per transient timeout).",
+      "severity": "misleading",
+      "finding": "In model.mjs and View A, each worker executes a single [Think] -> [Tool I/O] sequence (plus [Retry] on fault) and immediately emits a distilled 1.6k-2.2k summary at the exact millisecond the tool call ends, with zero post-tool LLM inference time. Causally, an agent cannot read and compress 14k-18k tokens of raw tool output before or at the instant the tool finishes returning it; summarizing tool outputs requires a post-tool LLM turn that adds latency to each worker branch (and a single Think-then-Tool block does not \"interleave\" reasoning with tool calls). Either add a post-tool summarize/think segment to the model or explicitly state in Details that post-tool summarization latency is omitted/folded into the worker budget.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: model.mjs now models an explicit post-tool distillMs turn (0.4–0.5 s) after Tool I/O (and after Retry on fault), View A renders all three segments per worker branch, and the text replaces 'interleaves' with pre-tool reasoning -> tool call -> post-tool distillation."
+    },
+    {
+      "where": "variants.orchestrated.captions.6, variants.orchestrated.voice.6, & coverage (Evaluator-Optimizer verification loop)",
+      "text": "Before synthesis, an independent Verifier gate inspects the merged artifacts for 1.0 s using a clean 4.0k context, commits the verified bundle to the Shared Artifact Vault, and hands control back to the Orchestrator for 1.1 s final synthesis (2.4k tokens).",
+      "severity": "misleading",
+      "finding": "Two defects in Step 6: (1) The Verifier's 4.0k context is smaller than the three distilled worker summaries alone (1.8k + 2.2k + 1.6k = 5.6k), let alone the merged code diffs and artifacts required to detect cross-module conflicts; make its context budget consistent with its inputs (or specify a compact diff/contract manifest under 4.0k). (2) Coverage explicitly cites Anthropic's \"Evaluator-Optimizer verification loop\", yet Step 6 shows only an unconditional pass-through gate with no mention of the rejection/feedback path (sending structured critique back to the Orchestrator/workers for a revision pass, which adds iteration latency and tokens). Explain the rejection loop in Step 6 or Details.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: Verifier context now scales dynamically as summaryTotal + 0.8k rubric (6.4k for 3 modules, exceeding 5.6k merged summaries across all 2–6 module counts), and Step 6 caption, voice, Details, and practice quiz explain the Evaluator-Optimizer rejection/critique loop."
+    },
+    {
+      "where": "coverage & details.facts (missing core trade-offs)",
+      "text": "(absent from steps, What if, and details.facts)",
+      "severity": "missing",
+      "finding": "Anthropic's Building Effective Agents highlights a foundational trade-off that is completely absent from this page: multi-agent orchestration lowers peak per-window context at the cost of higher aggregate token consumption and API cost. Even in this page's own model, the orchestrated run processes 62.0k total tokens across five windows (11.0k Orchestrator + 14.0k Researcher + 18.0k Coder + 15.0k Tester + 4.0k Verifier) versus 52.4k in one monolithic window — and in production, duplicated system prompts, tool schemas, and multi-turn prefix re-reads typically multiply total billed tokens several-fold. The page also omits lossy compression risk (an 8.39x reduction can drop subtle details needed downstream) and when a single agent is preferable (tightly coupled or sequential tasks with shared state). Add these trade-offs and the 62.0k vs 52.4k aggregate token accounting to Details (and/or Step 4).",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: aggregate token accounting (64.4k across 5 windows vs 52.4k in a single agent), lossy compression risk when contracts are underspecified, and when a single monolithic agent wins (tightly coupled sequential edits with shared state) are now stated across Step 4, monolith captions, Details, title blocks, Lab, and Now you try."
+    },
+    {
+      "where": "details.legend & drawing.*.tbkey vs View A (multi-agent-step6.png)",
+      "text": "Think / Plan | Tool I/O | Summary / Verified | Retry / Overflow",
+      "severity": "misleading",
+      "finding": "On Step 6 (multi-agent-step6.png), View A renders the Orchestrator's final Synthesis span (5.3 s - 6.4 s) in bright coral-orange (--orange: #e4572e, .lens-k-synth) and the Orchestrator hub turns orange during synthesis, yet orange / Synthesis is missing from both the title-block key and the Details color legend. Because --orange is visually close to --t-bad (#b34d49, Retry / Overflow), a reader checking the legend can mistake the healthy Synthesis bar for a retry or overflow state. Either color Synthesis using an existing legend tone or add a clearly distinct legend entry for Synthesis.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: model.mjs now renders Synthesis with kind 'think' (cobalt blue), figure.mjs keeps the hub cobalt/teal only, and both the title-block key ('Plan / Think / Synth') and Details legend document Synthesis under blue (verified in multi-agent-step6.png)."
+    },
+    {
+      "where": "predict.question, POSE[3], snapshotAt (model.mjs), & step 3 View A (multi-agent-step3.png)",
+      "text": "Workers hold 47.0k raw logs; root holds 3.0k. What hits root at fan-in without summaries?",
+      "severity": "wrong",
+      "finding": "Posing Step 3 at POSE[3] = 1.0 (t = 4.3 s = workEnd) fixed the worker raw-log total (47.0k) but created a direct on-screen contradiction with the Predict prompt. Because snapshotAt (model.mjs:315) merges each worker's distilled summary into orchTokens immediately at t >= task.end (3.5 s for Auth and Search, 4.3 s for Billing), at t = 4.3 s the Orchestrator already holds 8.6k tokens — not 3.0k. On multi-agent-step3.png, View A directly above the Predict card displays 'Orchestrator: 8.6k', the bottom readout shows '8.6k root context' and '0 / 3 active workers', the 3D root stack already shows 3 wafers instead of 1, and the Verifier valve has already lit active (phase === 'verify' at t === workEnd). This both contradicts 'root holds 3.0k' on the same frame and leaks Choice 2's exact summarized fan-in number (8.6k). Additionally, when viewing Step 3 in Single monolithic agent mode (t = 9.5 s), renderViewA (figure.mjs:362-366) ignores hideRawComparison and shows 'Single agent: 50.0k' and 'End of run: 52.4k' right above the Predict card, directly revealing Choice 1 (50.0k) while contradicting 'root holds 3.0k'. Hold orchestrated summary fan-in in snapshotAt until after workEnd (e.g., as return shuttles land during Step 4, with Verifier remaining idle at t === workEnd) so root genuinely holds 3.0k at Step 3's pose, and mask/hide the monolith 50.0k bars while hideRawComparison is true.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: model.mjs now performs barrier fan-in at t >= run.workEnd, build.mjs poses Step 3 at workEnd - 150 ms (4.15 s orchestrated) and planEnd + 3200 ms (4.10 s monolith), and figure.mjs masks comparison rows in both variants when hideRawComparison is true. Verified on multi-agent-step3.png: View A and bottom readout show Orchestrator 3.0k (1 root wafer), Peak worker 18.0k (47.0k total raw logs), 1 / 3 active workers, idle Verifier, and Predict cleanly below View A."
+    },
+    {
+      "where": "variants.orchestrated.captions.5, variants.orchestrated.voice.5, details.facts.2, & AUDIT.claims[6] (multi-agent-step5.png)",
+      "text": "Because 0.8 s of Search's retry overlaps Billing's remaining work, total wall time rises by only 0.9 s (from 6.4 s to 7.3 s)",
+      "severity": "wrong",
+      "finding": "After adding the 0.4 s post-tool Distill turn to Search (think 0.7 s + tool 1.5 s + distill 0.4 s), Search's 1.7 s retry runs from t = 3.1 s to t = 4.8 s, while Billing runs from t = 0.9 s to t = 4.3 s. As clearly visible in View A on multi-agent-step5.png, 1.2 s of Search's red retry span (3.1 s to 4.3 s) overlaps Billing's remaining work — not 0.8 s. Wall time still increases by 0.9 s (from 4.3 s to 5.2 s) because 0.5 s of Search's retry (4.3 s to 4.8 s) plus Search's 0.4 s post-tool Distill turn (4.8 s to 5.2 s) extend past Billing's finish. What equals 0.8 s is Search's clean schedule slack behind Billing (3.4 s - 2.6 s = 0.8 s), i.e., the net wall-clock delay hidden (1.7 s - 0.9 s = 0.8 s), not the duration of the retry span overlapping Billing (1.2 s). Update the Step 5 caption, voice, Details fact, practice question kind 2 explanation, and tested claim to state that 1.2 s of Search's retry overlaps Billing (leaving 0.5 s of retry + 0.4 s of distillation past Billing), so Search's 0.8 s of slack absorbs 0.8 s of the 1.7 s delay and wall time rises by only 0.9 s.",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: model.mjs computes retryOverlapS = 1.2 s separately from overlapSavedS = 0.8 s, and Step 5 caption, regenerated Kokoro voice, Details fact, practice question kind 2 explanation, unit tests, and AUDIT.claims[6] all consistently distinguish 1.2 s of direct retry overlap with Billing from 0.8 s of net delay hidden after Search's 0.4 s distill turn."
+    },
+    {
+      "where": "model.mjs (simulate / MA.verifyTokens) & build.mjs (lab verdicts)",
+      "text": "model.mjs:173: aggregateTokens = orchestratorContext + workerSumTokens + D.verifyTokens; build.mjs:272-283: lab() verdicts",
+      "severity": "misleading",
+      "finding": "Two Lab scaling bugs appear once sliders move off the default 3-module scenario: (1) MA.verifyTokens is hardcoded at 6.4k (5.6k summaries + 0.8k rubric for 3 modules), so at Modules = 4, 5, or 6 the merged summaries grow to 7.1k, 9.0k, and 10.7k — again exceeding the Verifier's context budget and understating aggregateTokens in the Lab readout (e.g., 112.5k instead of 117.6k at 6 modules). Compute verifyTokens from summaryTotal + 0.8k (preserving 6.4k at 3 modules). (2) Because lab() guards its serial-bottleneck branch on subtasks >= 3, at Modules = 2 and Workers = 1 (cliff >= 40k) in Parallel orchestrator mode the run is actually slower than serial (0.89x speedup due to the 1.0 s Verifier), yet lab() reports ok: true with 'Healthy orchestration: 0.89x faster than serial'. Similarly, in Single monolithic agent mode at Modules = 2 and cliff >= 44k, faults >= 2 prints 'Resilient under 2 faults: localized retries finish in ...' even though monolith retries are serial and not localized (and 0 faults prints 'Healthy orchestration: 1.00x faster than serial'). Also fix the singular 'beyond 2 lane' phrasing at Modules = 3, Workers = 2 (1.29x speedup).",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: verifyTokens now scales dynamically as summaryTotal + 0.8k (4.8k..11.5k across 2..6 modules, aggregateTokens = 117.6k at 6 modules), and exhaustive Lab sweep confirms speedup < 1.0 flags 'Slower than single agent', monolith mode reports honest serial lane / serial retry verdicts, and 'lane'/'lanes' pluralization is correct."
+    },
+    {
+      "where": "variants.monolith.heads.4 (multi-agent-monolith.png)",
+      "text": "One shared window hits 50.0k at fan-in (52.4k total) — past 32k.",
+      "severity": "misleading",
+      "finding": "A single monolithic agent runs all three modules serially in one lane and never fans out or fans in, so 'at fan-in' is leftover parallel-orchestrator terminology. Monolith caption 4 ('at the end of the work phase') and voice 4 ('before final synthesis') already avoid 'fan-in'; change the Step 4 monolith heading to match (e.g., 'One shared window hits 50.0k after work (52.4k total) — past 32k.').",
+      "resolved": false,
+      "fixed": true,
+      "response": "Fixed: monolith Step 4 heading now reads 'One shared window hits 50.0k after work (52.4k total) — past 32k.' (verified in build.mjs, brief, and multi-agent-monolith.png)."
+    }
+  ]
+}

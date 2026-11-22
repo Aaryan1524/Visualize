@@ -1,36 +1,84 @@
-/* The rig's look: Visualize tokens for solids drawn by src/rig/draw.ts.
+/* The rig's look: Visualize tokens for solids drawn by src/rig/draw.ts. Rules and reasons: references/look.md.
    Each material is a pair, lit and dark; a face's fill is mixed between them by how square it
    stands to the key light. Outlines are the page's ink: the silhouette heavier than creases.
+   A pair spans a wide value range (lit end below the stage's white, dark end well down), so a top
+   and the wall beside it never land on the same value and every solid reads as a solid.
    --recede (0% to 100%) fades a part toward the stage without making it see-through. */
 .vz{
   --rig-ink:var(--ink);
   --rig-sil-w:1.5px;--rig-crease-w:.7px;--rig-shine:#ffffff;--rig-shine-w:1.1px;
-  --rig-contact:#2b2416;
-  --rig-steel-lit:#ecebe6;--rig-steel-dark:#46443f;
-  --rig-alloy-lit:#ffffff;--rig-alloy-dark:#8d897f;
-  --rig-chain-lit:#77736b;--rig-chain-dark:#1b1a18;
-  --rig-subject-lit:#ffcfae;--rig-subject-dark:#b8461b;
-  --rig-slate-lit:#a9b6c5;--rig-slate-dark:#26303d;
-  --rig-frame-lit:#f3f0e8;--rig-frame-dark:#cbc5b8;
+  --rig-contact:#16181c;
+  /* metals: machined steel (cool, wide range), anodized aluminium (bright, satin), chain (dark oiled steel) */
+  --rig-steel-lit:#e3e5e8;--rig-steel-dark:#3a3e44;
+  --rig-alloy-lit:#f6f7f8;--rig-alloy-dark:#767b82;
+  --rig-chain-lit:#71747a;--rig-chain-dark:#17181b;
+  /* the followed part: anodized orange, the same hue as the page's --orange signal */
+  --rig-subject-lit:#ffad86;--rig-subject-dark:#a83a12;
+  --rig-slate-lit:#a3b0bf;--rig-slate-dark:#232c38;
+  /* context and concept bodies: neutral, recessive, but still a real top-to-side step */
+  --rig-frame-lit:#e9e9e6;--rig-frame-dark:#9c9b95;
+  --rig-cell-lit:#fafaf8;--rig-cell-dark:#a6a59f;--rig-card-lit:#ffffff;--rig-card-dark:#a2a19b;
+  --rig-set-lit:#8b8c8f;--rig-set-dark:#26272a;--rig-set-ink:#ffffff;--rig-good-lit:#bfe3da;--rig-good-dark:#2f7d6d;
+  /* horology: gilt brass, synthetic ruby, heat-blued steel, rhodium plate, graphite, bead-blasted aluminium */
+  --rig-brass-lit:#f2d991;--rig-brass-dark:#7a560f;
+  --rig-ruby-lit:#ec4f74;--rig-ruby-dark:#6e0a24;
+  --rig-cobalt-lit:#b9d2fb;--rig-cobalt-dark:#1c479c;
+  --rig-teal-lit:#a6e3d9;--rig-teal-dark:#0b675d;
+  --rig-amber-lit:#fcd896;--rig-amber-dark:#9a5e0e;
+  --rig-ceramic-lit:#fdfdfc;--rig-ceramic-dark:#b0afa9;
+  --rig-obsidian-lit:#737a85;--rig-obsidian-dark:#1a1e25;
+  --rig-gilt-lit:#f5df9e;--rig-gilt-dark:#86610f;
+  --rig-blued-lit:#8fb2f2;--rig-blued-dark:#12245a;
+  --rig-rhodium-lit:#f1f3f6;--rig-rhodium-dark:#5d636c;
+  --rig-graphite-lit:#868a91;--rig-graphite-dark:#1d1f23;
+  --rig-alu-lit:#eceef0;--rig-alu-dark:#8a9098;
   --recede:0%;
 }
 @media (prefers-color-scheme:dark){.vz:not([data-theme="light"]){
   --rig-shine:#ffffff;--rig-contact:#000000;
-  --rig-steel-lit:#d2d0ca;--rig-steel-dark:#2d2b28;
-  --rig-alloy-lit:#f2f1ec;--rig-alloy-dark:#55524c;
-  --rig-chain-lit:#9b978e;--rig-chain-dark:#262421;
-  --rig-subject-lit:#ffb489;--rig-subject-dark:#8d3311;
-  --rig-slate-lit:#b2c0d0;--rig-slate-dark:#2b3644;
-  --rig-frame-lit:#46433d;--rig-frame-dark:#26241f;
+  --rig-steel-lit:#d0d3d7;--rig-steel-dark:#2a2d32;
+  --rig-alloy-lit:#eef0f2;--rig-alloy-dark:#50545b;
+  --rig-chain-lit:#989ba1;--rig-chain-dark:#232529;
+  --rig-subject-lit:#ffa47a;--rig-subject-dark:#8a2e0c;
+  --rig-slate-lit:#aebccc;--rig-slate-dark:#283342;
+  --rig-frame-lit:#5a5b5f;--rig-frame-dark:#222326;
+  --rig-cell-lit:#5c5d61;--rig-cell-dark:#262729;--rig-card-lit:#e8e9eb;--rig-card-dark:#6a6c70;
+  --rig-set-lit:#d4d5d8;--rig-set-dark:#74767a;--rig-set-ink:#1b1c1f;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
+  --rig-brass-lit:#eed38a;--rig-brass-dark:#5e430c;
+  --rig-ruby-lit:#f4648a;--rig-ruby-dark:#640b23;
+  --rig-cobalt-lit:#a0c2fb;--rig-cobalt-dark:#193a7c;
+  --rig-teal-lit:#8bd6cb;--rig-teal-dark:#0c5249;
+  --rig-amber-lit:#f5d18a;--rig-amber-dark:#784a0c;
+  --rig-ceramic-lit:#505257;--rig-ceramic-dark:#202124;
+  --rig-obsidian-lit:#8c94a1;--rig-obsidian-dark:#1d222a;
+  --rig-gilt-lit:#f0d98f;--rig-gilt-dark:#614509;
+  --rig-blued-lit:#8db0f0;--rig-blued-dark:#15275c;
+  --rig-rhodium-lit:#e4e7eb;--rig-rhodium-dark:#40454d;
+  --rig-graphite-lit:#9a9ea5;--rig-graphite-dark:#232529;
+  --rig-alu-lit:#dfe2e6;--rig-alu-dark:#5e646c;
 }}
 .vz[data-theme="dark"]{
   --rig-shine:#ffffff;--rig-contact:#000000;
-  --rig-steel-lit:#d2d0ca;--rig-steel-dark:#2d2b28;
-  --rig-alloy-lit:#f2f1ec;--rig-alloy-dark:#55524c;
-  --rig-chain-lit:#9b978e;--rig-chain-dark:#262421;
-  --rig-subject-lit:#ffb489;--rig-subject-dark:#8d3311;
-  --rig-slate-lit:#b2c0d0;--rig-slate-dark:#2b3644;
-  --rig-frame-lit:#46433d;--rig-frame-dark:#26241f;
+  --rig-steel-lit:#d0d3d7;--rig-steel-dark:#2a2d32;
+  --rig-alloy-lit:#eef0f2;--rig-alloy-dark:#50545b;
+  --rig-chain-lit:#989ba1;--rig-chain-dark:#232529;
+  --rig-subject-lit:#ffa47a;--rig-subject-dark:#8a2e0c;
+  --rig-slate-lit:#aebccc;--rig-slate-dark:#283342;
+  --rig-frame-lit:#5a5b5f;--rig-frame-dark:#222326;
+  --rig-cell-lit:#5c5d61;--rig-cell-dark:#262729;--rig-card-lit:#e8e9eb;--rig-card-dark:#6a6c70;
+  --rig-set-lit:#d4d5d8;--rig-set-dark:#74767a;--rig-set-ink:#1b1c1f;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
+  --rig-brass-lit:#eed38a;--rig-brass-dark:#5e430c;
+  --rig-ruby-lit:#f4648a;--rig-ruby-dark:#640b23;
+  --rig-cobalt-lit:#a0c2fb;--rig-cobalt-dark:#193a7c;
+  --rig-teal-lit:#8bd6cb;--rig-teal-dark:#0c5249;
+  --rig-amber-lit:#f5d18a;--rig-amber-dark:#784a0c;
+  --rig-ceramic-lit:#505257;--rig-ceramic-dark:#202124;
+  --rig-obsidian-lit:#8c94a1;--rig-obsidian-dark:#1d222a;
+  --rig-gilt-lit:#f0d98f;--rig-gilt-dark:#614509;
+  --rig-blued-lit:#8db0f0;--rig-blued-dark:#15275c;
+  --rig-rhodium-lit:#e4e7eb;--rig-rhodium-dark:#40454d;
+  --rig-graphite-lit:#9a9ea5;--rig-graphite-dark:#232529;
+  --rig-alu-lit:#dfe2e6;--rig-alu-dark:#5e646c;
 }
 /* No ancestor in these selectors: they must also match inside <use> copies. */
 .rig-m-steel{--rig-a:var(--rig-steel-lit);--rig-b:var(--rig-steel-dark)}
@@ -39,6 +87,40 @@
 .rig-m-subject{--rig-a:var(--rig-subject-lit);--rig-b:var(--rig-subject-dark)}
 .rig-m-slate{--rig-a:var(--rig-slate-lit);--rig-b:var(--rig-slate-dark)}
 .rig-m-frame{--rig-a:var(--rig-frame-lit);--rig-b:var(--rig-frame-dark)}
+/* Concept parts (parts.ts): a cell's tone is set by the part's flags, so a value changes without a rebuild:
+   t-set (holds a value), t-hot (the followed part, orange), t-good, t-bad. */
+.rig-m-cell{--rig-a:var(--rig-cell-lit);--rig-b:var(--rig-cell-dark)}
+.rig-m-card{--rig-a:var(--rig-card-lit);--rig-b:var(--rig-card-dark)}
+.rig-part[data-t-set]{--rig-cell-lit:var(--rig-set-lit);--rig-cell-dark:var(--rig-set-dark)}
+.rig-part[data-t-good]{--rig-cell-lit:var(--rig-good-lit);--rig-cell-dark:var(--rig-good-dark)}
+.rig-part[data-t-bad]{--rig-cell-lit:color-mix(in oklab,var(--t-bad) 45%,#ffffff);--rig-cell-dark:var(--t-bad)}
+.rig-part[data-t-hot]{--rig-cell-lit:var(--rig-subject-lit);--rig-cell-dark:var(--rig-subject-dark)}
+.rig-value{font-family:var(--mono,ui-monospace,monospace);font-weight:700;fill:color-mix(in oklab,var(--ink) calc(100% - var(--recede)),var(--stage))}
+/* a value printed on a toned cell takes the tone's dark shade, which reads on its lit top in both themes;
+   a set cell is dark in the light theme and light in the dark one, so its value has its own ink */
+.rig-part[data-t-hot] .rig-value,.rig-part[data-t-good] .rig-value,.rig-part[data-t-bad] .rig-value{fill:color-mix(in oklab,color-mix(in oklab,var(--rig-cell-dark) 70%,#000000) calc(100% - var(--recede)),var(--stage))}
+.rig-part[data-t-set] .rig-value{fill:color-mix(in oklab,var(--rig-set-ink) calc(100% - var(--recede)),var(--stage))}
+/* a value printed on a card: the card is light in both themes, so its ink is dark in both */
+.rig-value.rig-on-card{fill:color-mix(in oklab,#1d1b18 calc(100% - var(--recede)),var(--stage))}
+.rig-index{font-family:var(--mono,ui-monospace,monospace);font-weight:500;fill:var(--ink-2,#625f58)}
+/* the working beside a part (parts.ts workingStrip): a card-coloured tag, upright, in the card's dark ink */
+.rig-working-bg{fill:color-mix(in oklab,var(--rig-card-lit) calc(100% - var(--recede)),var(--stage));stroke:color-mix(in oklab,var(--rig-ink) calc(100% - var(--recede)),var(--stage));stroke-width:1.2px;vector-effect:non-scaling-stroke}
+.rig-working-text{font-family:var(--mono,ui-monospace,monospace);font-weight:500;fill:color-mix(in oklab,#1d1b18 calc(100% - var(--recede)),var(--stage));white-space:pre}
+.rig-arrow-halo{fill:none;stroke:var(--stage);stroke-width:7px;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.rig-arrow-line{fill:none;stroke:var(--rig-arrow,var(--ink));stroke-width:2.4px;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.rig-arrow-head{fill:var(--rig-arrow,var(--ink));stroke:var(--stage);stroke-width:1px;paint-order:stroke}
+.rig-m-brass{--rig-a:var(--rig-brass-lit);--rig-b:var(--rig-brass-dark)}
+.rig-m-ruby{--rig-a:var(--rig-ruby-lit);--rig-b:var(--rig-ruby-dark)}
+.rig-m-cobalt{--rig-a:var(--rig-cobalt-lit);--rig-b:var(--rig-cobalt-dark)}
+.rig-m-teal{--rig-a:var(--rig-teal-lit);--rig-b:var(--rig-teal-dark)}
+.rig-m-amber{--rig-a:var(--rig-amber-lit);--rig-b:var(--rig-amber-dark)}
+.rig-m-ceramic{--rig-a:var(--rig-ceramic-lit);--rig-b:var(--rig-ceramic-dark)}
+.rig-m-obsidian{--rig-a:var(--rig-obsidian-lit);--rig-b:var(--rig-obsidian-dark)}
+.rig-m-gilt{--rig-a:var(--rig-gilt-lit);--rig-b:var(--rig-gilt-dark)}
+.rig-m-blued{--rig-a:var(--rig-blued-lit);--rig-b:var(--rig-blued-dark)}
+.rig-m-rhodium{--rig-a:var(--rig-rhodium-lit);--rig-b:var(--rig-rhodium-dark)}
+.rig-m-graphite{--rig-a:var(--rig-graphite-lit);--rig-b:var(--rig-graphite-dark)}
+.rig-m-alu{--rig-a:var(--rig-alu-lit);--rig-b:var(--rig-alu-dark)}
 .rig-solid{
   --rig-lit:color-mix(in oklab,var(--rig-a) calc(100% - var(--recede)),var(--stage));
   --rig-dark:color-mix(in oklab,var(--rig-b) calc(100% - var(--recede)),var(--stage));
@@ -46,11 +128,48 @@
 }
 .rig-face{stroke:none}
 .rig-sil,.rig-crease,.rig-shine{fill:none;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.rig-sil{stroke:var(--rig-line);stroke-width:var(--rig-sil-w)}
-.rig-crease{stroke:var(--rig-line);stroke-width:var(--rig-crease-w);stroke-opacity:.7}
+.rig-sil{stroke:var(--rig-line,color-mix(in oklab,var(--rig-ink,var(--ink)) calc(100% - var(--recede,0%)),var(--stage)));stroke-width:var(--rig-sil-w)}
+.rig-crease{stroke:var(--rig-line,color-mix(in oklab,var(--rig-ink,var(--ink)) calc(100% - var(--recede,0%)),var(--stage)));stroke-width:var(--rig-crease-w);stroke-opacity:.7}
 .rig-shine{stroke:var(--rig-shine);stroke-width:var(--rig-shine-w);stroke-opacity:calc(.85 - var(--recede) / 100%)}
 .rig-contact{fill:var(--rig-contact);fill-opacity:.16;stroke:var(--rig-contact);stroke-opacity:.07;stroke-width:6px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.rig-part[data-recede]{--recede:50%}
+.rig-part[data-recede]{--recede:42%}
 .rig-part[data-recede] .rig-contact{display:none}
 .rig-part[data-named]{--rig-sil-w:2.4px}
+/* Architectural deck blueprint rules, dial needles and 3D routed conduits */
+.rig-deck-grid{fill:none;stroke:color-mix(in oklab,var(--rig-ink) calc(16% - var(--recede) * .12),var(--stage));stroke-width:.6px;vector-effect:non-scaling-stroke}
+.rig-needle{fill:none;stroke:color-mix(in oklab,var(--orange) calc(100% - var(--recede)),var(--stage));stroke-width:2px;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.rig-conduit-outer{fill:none;stroke:color-mix(in oklab,var(--rig-ink) calc(22% - var(--recede) * .14),var(--stage));stroke-width:5.5px;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.rig-conduit-inner{fill:none;stroke:color-mix(in oklab,var(--rig-ink) calc(35% - var(--recede) * .25),var(--stage));stroke-width:1.4px;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.rig-conduit.is-active .rig-conduit-outer{stroke:color-mix(in oklab,var(--rig-ink) calc(32% - var(--recede) * .2),var(--stage))}
+.rig-conduit.is-active.is-cobalt .rig-conduit-inner{stroke:color-mix(in oklab,var(--blue) calc(100% - var(--recede)),var(--stage));stroke-width:2.4px}
+.rig-conduit.is-active.is-subject .rig-conduit-inner{stroke:color-mix(in oklab,var(--orange) calc(100% - var(--recede)),var(--stage));stroke-width:2.4px}
+.rig-conduit.is-active.is-teal .rig-conduit-inner{stroke:color-mix(in oklab,var(--teal) calc(100% - var(--recede)),var(--stage));stroke-width:2.4px}
+.rig-conduit.is-active.is-amber .rig-conduit-inner{stroke:color-mix(in oklab,#b87418 calc(100% - var(--recede)),var(--stage));stroke-width:2.4px}
+.rig-conduit.is-active.is-ruby .rig-conduit-inner{stroke:color-mix(in oklab,var(--t-bad) calc(100% - var(--recede)),var(--stage));stroke-width:2.6px;stroke-dasharray:6 5}
+/* Synchronized View A inspector lens for concepts */
+.lens-bg{fill:color-mix(in oklab,var(--stage) 95%,var(--ink))}
+.lens-border{fill:none;stroke:var(--ink);stroke-width:1.1px;vector-effect:non-scaling-stroke}
+.lens-rule{fill:none;stroke:var(--ink);stroke-width:.55px;stroke-opacity:.5;vector-effect:non-scaling-stroke}
+.lens-title{font:600 116px var(--sans);letter-spacing:.07em;fill:var(--ink)}
+.lens-sub{font:500 104px var(--mono);fill:var(--ink-2)}
+.lens-grid{fill:none;stroke:var(--ink);stroke-width:.5px;stroke-opacity:.16;stroke-dasharray:3 4;vector-effect:non-scaling-stroke}
+.lens-lane-rule{fill:none;stroke:var(--ink);stroke-width:.5px;stroke-opacity:.12;vector-effect:non-scaling-stroke}
+.lens-lane-name{font:500 118px var(--sans);fill:var(--ink)}
+.lens-tick{font:500 104px var(--mono);fill:var(--ink-2)}
+.lens-val{font:600 116px var(--mono);fill:var(--ink)}
+.lens-val.is-over{fill:var(--t-bad)}
+.lens-bar-ghost{fill:color-mix(in oklab,var(--stage) 86%,var(--ink));stroke:color-mix(in oklab,var(--ink) 22%,var(--stage));stroke-width:.7px;vector-effect:non-scaling-stroke}
+.lens-bar{stroke:var(--ink);stroke-width:.8px;vector-effect:non-scaling-stroke}
+.lens-k-think,.lens-k-cobalt{fill:color-mix(in oklab,var(--blue) 74%,var(--stage))}
+.lens-k-tool,.lens-k-amber{fill:color-mix(in oklab,#d08622 78%,var(--stage))}
+.lens-k-retry,.lens-k-ruby{fill:color-mix(in oklab,var(--t-bad) 84%,var(--stage))}
+.lens-k-verify,.lens-k-teal{fill:color-mix(in oklab,var(--teal) 76%,var(--stage))}
+.lens-k-synth,.lens-k-subject{fill:color-mix(in oklab,var(--orange) 82%,var(--stage))}
+.lens-playhead{fill:none;stroke:var(--orange);stroke-width:1.8px;vector-effect:non-scaling-stroke}
+.lens-playhead-dot{fill:var(--orange);stroke:var(--stage);stroke-width:1px;vector-effect:non-scaling-stroke}
+.lens-cap-line{fill:none;stroke:var(--t-bad);stroke-width:1.4px;stroke-dasharray:5 4;vector-effect:non-scaling-stroke}
+.lens-cap-label{font:600 102px var(--mono);fill:var(--t-bad)}
 @media (prefers-reduced-motion:reduce){.rig-part{transition:none}}
+
+/* a centre line through an axle or screw in an exploded view (mech.ts centreLines): dash-dot, as a drawing marks an axis */
+.rig-axis{fill:none;stroke:color-mix(in oklab,var(--rig-ink,var(--ink)) calc(100% - var(--recede,0%)),var(--stage));stroke-width:.9px;stroke-opacity:.8;stroke-dasharray:9 3 2 3;stroke-linecap:butt;vector-effect:non-scaling-stroke}
