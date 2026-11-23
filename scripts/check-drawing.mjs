@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 // Check a built Drawing page (a technical cutaway, see references/drawing.md) in headless Chrome.
 //
-//   node scripts/check-drawing.mjs dist/escalator.html
+//   node scripts/check-drawing.mjs dist/escalator.html [--fast]
+//
+// With --fast: checks only 1440×900, only the first What if variant, skips the 60 fps playback
+// timing loop (allowing omitted voice / omitted extra What if variants), and prints
+// `drawing: passed (fast)`. Without --fast, behavior and output are unchanged.
 //
 // The page contract: window.__viz with steps, predictStep, variants, seekStep(k), seek(ms), state(),
 // variant(name), answer(i), practice(n), question(n), lab(values), labInputs() and closeLab();
@@ -59,9 +63,11 @@ import { pathToFileURL } from "node:url";
 import { drawingPageProblem, launch } from "./lib/browser.mjs";
 import { LOOK, inFaces, inLeaders, inTurnSweep, inVisible, longestSameRun, oklabL, partContrast, turns } from "./lib/look.mjs";
 
-const page = process.argv[2];
+const argv = process.argv.slice(2);
+const FAST = argv.includes("--fast");
+const page = argv.find((a) => !a.startsWith("--"));
 if (!page) {
-  console.error("usage: node scripts/check-drawing.mjs <built page>");
+  console.error("usage: node scripts/check-drawing.mjs <built page> [--fast]");
   process.exit(2);
 }
 const url = pathToFileURL(resolve(page)).href;
@@ -326,7 +332,8 @@ async function lookChecks() {
   await wait(300);
   if (PLANT) await p.waitForFunction(() => window.__viz?.__planted, { timeout: 4000 });
   const info = await p.evaluate(() => ({ rig: !!document.querySelector("#fig .rig-part"), variants: window.__viz.variants ?? [], steps: window.__viz.steps, cam: window.__viz.camera?.() ?? null }));
-  const variants = info.variants.length ? info.variants : [null];
+  const allVariants = info.variants.length ? info.variants : [null];
+  const variants = FAST ? [allVariants[0]] : allVariants;
   const report = [];
 
   // 1. Turns: a thick solid turned by one 2D transform shows a wrong side; RigStage records the error
@@ -454,7 +461,7 @@ const browser = await launch();
   }
 }
 try {
-  for (const [w, h] of ONLY_PLAYBACK || ONLY_CAMERA || ONLY_LOOK ? [] : [[1440, 900], [1280, 800]]) {
+  for (const [w, h] of ONLY_PLAYBACK || ONLY_CAMERA || ONLY_LOOK ? [] : FAST ? [[1440, 900]] : [[1440, 900], [1280, 800]]) {
     const p = await browser.newPage();
     await p.setViewport({ width: w, height: h });
     await p.evaluateOnNewDocument(fakeAudio);
@@ -482,7 +489,7 @@ try {
     if (!au) fail(`${at}: the page carries no correctness audit; build it with drawingPage({ audit })`);
     else if (!au.ok) for (const q of au.problems) fail(`audit: ${q}`);
     if (contract.ids.length) fail(`${at}: missing #${contract.ids.join(", #")}`);
-    if (!contract.voice) fail(`${at}: no recorded voice is embedded (run the example's voice script)`);
+    if (!FAST && !contract.voice) fail(`${at}: no recorded voice is embedded (run the example's voice script)`);
     // A rig figure without the rig's look draws every solid black, and every other check still passes
     // (the scaffold's first build did): its material tokens must resolve.
     const look = await p.evaluate(() => {
@@ -504,10 +511,11 @@ try {
     for (const q of preds) if (!(q >= 1 && q < steps - 1)) fail(`${at}: the prediction step (${q}) must sit before the step that answers it`);
     // A deep page (12 steps or more) asks again in every chapter; one question for a long story leaves most of it untested.
     if (steps - 1 >= 12 && preds.length < Math.floor((steps - 1) / 8)) fail(`${at}: ${steps - 1} steps with ${preds.length} prediction(s); a long page asks one a chapter (at least one every 8 steps)`);
-    if (variants.length < 2) fail(`${at}: What if needs at least two real variants, found ${variants.length}`);
+    if (!FAST && variants.length < 2) fail(`${at}: What if needs at least two real variants, found ${variants.length}`);
 
-    // Every step of every variant.
-    for (const v of variants.length ? variants : [null]) {
+    // Every step of every variant (or only the first variant in --fast mode).
+    const checkVariants = variants.length ? (FAST ? [variants[0]] : variants) : [null];
+    for (const v of checkVariants) {
       if (v && has("variant")) await p.evaluate((v) => window.__viz.variant(v), v);
       let lastT = -1;
       for (let k = 0; k < steps; k++) {
@@ -570,7 +578,7 @@ try {
 
     // The lab survives a What if switch (its heading and panel stay) and closes when the reader
     // drags the timeline, so the story frame is never drawn under a stale lab.
-    if (variants.length > 1) {
+    if (!FAST && variants.length > 1) {
       const labHead = await p.evaluate(() => (window.__viz.lab({}), document.getElementById("heading").textContent));
       await p.evaluate((v) => window.__viz.variant(v), variants[1]);
       const kept = await p.evaluate(() => ({ open: !document.getElementById("lab").hidden && !!window.__viz.state().lab, head: document.getElementById("heading").textContent }));
@@ -599,20 +607,22 @@ try {
     await p.evaluate(() => document.getElementById("try").click());
 
     // The narrated tour (stand-in audio) runs step to step and stops at the prediction.
-    await p.evaluate(() => {
-      window.__viz.answer(null);
-      window.__viz.seekStep(0);
-      if (document.getElementById("voice").getAttribute("aria-pressed") === "false") document.getElementById("voice").click();
-      document.getElementById("play").click();
-    });
-    const tourEnd = Date.now() + 15000;
-    let st = null;
-    while (Date.now() < tourEnd) {
-      await wait(200);
-      st = await p.evaluate(() => window.__viz.state());
-      if (!st.touring) break;
+    if (!FAST || contract.voice) {
+      await p.evaluate(() => {
+        window.__viz.answer(null);
+        window.__viz.seekStep(0);
+        if (document.getElementById("voice").getAttribute("aria-pressed") === "false") document.getElementById("voice").click();
+        document.getElementById("play").click();
+      });
+      const tourEnd = Date.now() + 15000;
+      let st = null;
+      while (Date.now() < tourEnd) {
+        await wait(200);
+        st = await p.evaluate(() => window.__viz.state());
+        if (!st.touring) break;
+      }
+      if (st.touring || st.step !== pred) fail(`${at}: the narrated tour did not stop at the prediction (step ${st.step} of ${steps - 1}, ${st.touring ? "still touring" : "stopped"})`);
     }
-    if (st.touring || st.step !== pred) fail(`${at}: the narrated tour did not stop at the prediction (step ${st.step} of ${steps - 1}, ${st.touring ? "still touring" : "stopped"})`);
 
     // Play near the end, voice off, stops at the end instead of looping.
     const max = await p.evaluate(() => Number(document.getElementById("scrub").max));
@@ -641,7 +651,8 @@ try {
     await wait(300);
     const cam0 = await p.evaluate(() => window.__viz.camera?.() ?? null);
     if (cam0?.active) {
-      const variants = await p.evaluate(() => window.__viz.variants ?? []);
+      const allVariants = await p.evaluate(() => window.__viz.variants ?? []);
+      const variants = FAST ? (allVariants.length ? [allVariants[0]] : []) : allVariants;
       const near = (a, b) => Math.abs(a.s - b.s) < 1e-6 && Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01;
       const show = (m) => `s ${m.s.toFixed(4)} x ${m.x.toFixed(1)} y ${m.y.toFixed(1)}`;
       // how far the picture moves from camera a to camera b: the largest move of the figure points
@@ -772,7 +783,7 @@ try {
       };
       let shots = 0, spoken = 0, led = 0, subjects2 = 0;
       const subjects = [], boundsSeen = new Map();
-      for (const [w, h] of [[1440, 900], [1280, 800]]) {
+      for (const [w, h] of FAST ? [[1440, 900]] : [[1440, 900], [1280, 800]]) {
         await p.setViewport({ width: w, height: h });
         await wait(150);
         for (const v of variants.length ? variants : [null]) {
@@ -825,7 +836,7 @@ try {
           }
         }
       }
-      console.log(`camera framing: ${shots} step shots, ${spoken} spoken names, ${led} voice-led shots and ${subjects2} steps whose heading's parts stay in frame through the step, at 1440×900 and 1280×800, every What if`);
+      console.log(`camera framing: ${shots} step shots, ${spoken} spoken names, ${led} voice-led shots and ${subjects2} steps whose heading's parts stay in frame through the step, at ${FAST ? "1440×900, first What if" : "1440×900 and 1280×800, every What if"}`);
       console.log(`camera subjects (1440×900; centre across, down the clear area; span of its shorter side; lit share of the parts in focus): ${subjects.join(" | ")}`);
       console.log(`camera bounds (figure units, ${variants[0] ?? ""}): ${[...boundsSeen.values()].join(", ")}`);
       await p.setViewport({ width: 1440, height: 900 });
@@ -943,8 +954,8 @@ try {
     await p.close();
   }
   if (!ONLY_PLAYBACK && !ONLY_CAMERA) await lookChecks();
-  // Playback: every frame of the story, for every variant, at 1440 x 900.
-  if (!ONLY_CAMERA && !ONLY_LOOK) {
+  // Playback: every frame of the story, for every variant, at 1440 x 900 (skipped in --fast mode).
+  if (!ONLY_CAMERA && !ONLY_LOOK && (!FAST || ONLY_PLAYBACK)) {
     // The machine: the same kind of work as a frame of the rig (set a transform on a few hundred <g>
     // holding a <use>, read the layout), timed here, in a blank page of the same browser and size.
     const cal = await browser.newPage();
@@ -1048,4 +1059,4 @@ if (fails.length) {
   console.log(`drawing: ${fails.length} failure${fails.length > 1 ? "s" : ""}`);
   process.exit(1);
 }
-console.log("drawing: passed");
+console.log(FAST ? "drawing: passed (fast)" : "drawing: passed");

@@ -1,0 +1,104 @@
+// __TITLE__: the story (mode: __MODE__), in one place: steps, headings, captions, narration, claims,
+// and coverage. Plain college-level English backed by real numbers from model.mjs.
+
+import { cycleState } from "./model.mjs";
+
+// 5 steps: Step 0 is the concept (no tab) + 4 causal steps.
+// `shot` frames the active part; `subject` lists what the heading names so it stays in view.
+export const STEPS = [
+  { tab: null, focus: null },
+  { tab: "Primed", focus: null, subject: ["bottle", "nozzle"] },
+  { tab: "Press", focus: null, shot: ["nozzle"], subject: ["nozzle"] },
+  { tab: "Spray", focus: null, shot: ["nozzle", "spray"], subject: ["nozzle", "spray"] },
+  { tab: "Refill", focus: null, shot: ["liquid", "tube"], subject: ["liquid", "tube"] },
+];
+
+export const PRED_STEP = 2;
+export const STAGE = ["rest", "rest", "press", "spray", "refill"];
+
+const ONES = [
+  "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+  "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+];
+const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+const words = (n) => {
+  if (n < 20) return ONES[n];
+  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? "-" + ONES[n % 10] : "");
+  if (n < 1000) {
+    const h = Math.floor(n / 100), rem = n % 100;
+    return `${ONES[h]} hundred${rem ? ` ${words(rem)}` : ""}`;
+  }
+  return String(n);
+};
+
+/** Step headings, generated from the model in plain English. */
+export const headings = (M) => [
+  "How does pressing a pump bottle turn liquid into fine mist?",
+  `A ${M.v.bottleMl} mL bottle holds ${M.totalSprays} sprays, with one ${M.v.doseMl.toFixed(1)} mL dose waiting in the pump.`,
+  `Pressing down seals the bottom valve and pushes chamber pressure to ${M.v.openPressure} times room air.`,
+  `The top valve opens and forces ${M.v.doseMl.toFixed(1)} mL through the tiny nozzle as fine mist.`,
+  `Letting go lifts the plunger, lowers pressure, and draws a fresh ${M.v.doseMl.toFixed(1)} mL dose up the dip tube.`,
+];
+
+/** Step captions for the Details drawer (contain every claim word for word). */
+export const captions = (M) => [
+  `A pump bottle works like a tiny syringe with two one-way valves. Each full press pushes ${M.v.doseMl.toFixed(1)} mL out of a ${M.v.bottleMl} mL bottle (${M.totalSprays} sprays in all).`,
+  `At rest, the dip tube sits in the ${M.v.bottleMl} mL liquid reservoir and the small chamber beneath the orange plunger already holds one primed ${M.v.doseMl.toFixed(1)} mL dose at room air pressure.`,
+  `Pressing the plunger seals the bottom valve and builds pressure inside the chamber. Because the bottom valve blocks the dip tube, squeezing the chamber raises pressure up to ${M.v.openPressure} times room air instead of pushing liquid back into the bottle.`,
+  `Once pressure passes the nozzle threshold, the top valve opens and forces one dose out as fine mist. The tiny nozzle hole breaks the fast-moving ${M.v.doseMl.toFixed(1)} mL stream into droplets, leaving ${M.afterOne.remainingMl.toFixed(1)} mL (${M.afterOne.spraysLeft} sprays) in the bottle.`,
+  `Releasing the plunger creates low pressure that draws a fresh dose up the dip tube. As the return spring lifts the plunger, outside air pushes liquid up the straw until the chamber is primed again for the next spray.`,
+];
+
+/** Spoken narration script, one clip per step. [phrase|part] highlights that part when spoken. */
+export const script = (M) => [
+  `A pump bottle turns liquid into mist without any aerosol gas. Every press squeezes one tiny dose through a narrow nozzle, and the spring refills the chamber when you let go.`,
+  `This ${words(M.v.bottleMl)} milliliter bottle holds ${words(M.totalSprays)} sprays. [The dip tube|tube] sits in [the liquid|liquid], and one dose waits inside the chamber under [the orange plunger|nozzle].`,
+  `Push [the orange plunger|nozzle] down. Pressing the plunger seals the bottom valve and builds pressure inside the chamber, climbing to ${words(M.v.openPressure)} times room air.`,
+  `Once pressure passes the nozzle threshold, the top valve opens and forces one dose out as [fine mist|spray] from [the nozzle|nozzle], breaking the fast stream into tiny droplets.`,
+  `Now let go. Releasing the plunger creates low pressure that draws a fresh dose up [the dip tube|tube] from [the liquid|liquid] below, leaving the bottle primed for the next press.`,
+];
+
+/** Verifiable cause-and-effect claims: exact wording on the page + test against every variant's model. */
+export const CLAIMS = [
+  {
+    text: "Pressing the plunger seals the bottom valve and builds pressure inside the chamber",
+    test: (m) => {
+      const press = m.steps[1];
+      return press.stage === "press" && press.bottomValveOpen === false && press.pressureRatio > 1;
+    },
+  },
+  {
+    text: "Once pressure passes the nozzle threshold, the top valve opens and forces one dose out as fine mist",
+    test: (m) => {
+      const spray = m.steps[2];
+      return (
+        spray.stage === "spray" &&
+        spray.topValveOpen === true &&
+        spray.mistIntensity > 0.5 &&
+        Math.abs(m.v.bottleMl - spray.remainingMl - m.v.doseMl) < 1e-6
+      );
+    },
+  },
+  {
+    text: "Releasing the plunger creates low pressure that draws a fresh dose up the dip tube",
+    test: (m) => {
+      const mid = cycleState(m.v, "refill", 0.2, 0);
+      const end = m.steps[3];
+      return mid.pressureRatio < 1 && mid.bottomValveOpen === true && end.chamberFill === 1;
+    },
+  },
+];
+
+/** Core topics the explanation covers, paired with where each appears on the page. */
+export const COVERAGE = {
+  source: "everyday fluid-pump mechanics (positive-displacement hand sprayers: check valves, atomizing orifice, atmospheric refill)",
+  topics: [
+    { topic: "primed chamber and dip tube reservoir", where: "step:1" },
+    { topic: "one-way bottom valve seals during compression", where: "step:2" },
+    { topic: "high pressure forces liquid through the tiny nozzle as mist", where: "step:3" },
+    { topic: "spring return lowers chamber pressure so outside air refills it", where: "step:4" },
+    { topic: "bottle size and dose volume set total sprays", where: "whatif" },
+    { topic: "liquid level after repeated presses", where: "lab" },
+    { topic: "swirl chamber geometry inside the nozzle tip", core: false, where: "deferred", why: "fine internal nozzle channels are noted in Details to keep the cutaway uncluttered" },
+  ],
+};

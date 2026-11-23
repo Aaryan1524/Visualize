@@ -43,3 +43,83 @@ test("review-brief includes conceptual sanity, studio visual rubric, auto-detect
   assert.match(out, /"visual": "pass \| fail"/);
   assert.match(out, /"stamp": "abc12345def67890"/);
 });
+
+function makeFixture() {
+  const dir = mkdtempSync(join(tmpdir(), "vz-brief-mode-"));
+  const auditFile = join(dir, "demo.audit.json");
+  const reviewFile = join(dir, "review.json");
+  writeFileSync(
+    auditFile,
+    JSON.stringify({
+      title: "Mechanical Watch",
+      stamp: "1122334455667788",
+      coverage: { source: "Watchmaking", topics: [{ topic: "escapement", where: "step:1" }] },
+      claims: ["balance wheel regulates release"],
+      texts: [{ where: "data.steps.0.heading", text: "How does a watch keep steady time?" }],
+    }),
+  );
+  return { auditFile, reviewFile };
+}
+
+test("review-brief defaults to everyday mode with plain-English and real-object checks", () => {
+  const { auditFile, reviewFile } = makeFixture();
+  const outDefault = execFileSync(process.execPath, [BRIEF, auditFile, reviewFile], { encoding: "utf8" });
+  const outExplicit = execFileSync(process.execPath, [BRIEF, auditFile, reviewFile, "--mode", "everyday"], { encoding: "utf8" });
+  assert.equal(outDefault, outExplicit);
+  assert.match(outDefault, /# Independent review: Mechanical Watch \(mode: everyday\)/);
+  assert.match(outDefault, /"mode": "everyday"/);
+  assert.match(outDefault, /Plain-English \/ College-Level Check/);
+  assert.match(outDefault, /N·mm/);
+  assert.match(outDefault, /Real-Object Representation Check/);
+  assert.match(outDefault, /abstract boxes\/cells/);
+  assert.match(outDefault, /Part 2 — Studio visual consistency/);
+  assert.match(outDefault, /"reviewer": "independent"/);
+});
+
+test("review-brief --mode fast focuses on sanity checks and waives fast-mode omissions", () => {
+  const { auditFile, reviewFile } = makeFixture();
+  const out = execFileSync(process.execPath, [BRIEF, auditFile, reviewFile, "--mode", "fast"], { encoding: "utf8" });
+  assert.match(out, /# Independent review: Mechanical Watch \(mode: fast\)/);
+  assert.match(out, /"mode": "fast"/);
+  assert.match(out, /fast sanity check/i);
+  assert.match(out, /Real-Object Representation Check/);
+  assert.match(out, /Do NOT fail/i);
+  assert.match(out, /omitted What-if variants/);
+  assert.match(out, /omitted (?:recorded )?voice/);
+  assert.match(out, /"reviewer": "independent"/);
+});
+
+test("review-brief --mode technical demands full engineering rigor", () => {
+  const { auditFile, reviewFile } = makeFixture();
+  const out = execFileSync(process.execPath, [BRIEF, auditFile, reviewFile, "--mode", "technical"], { encoding: "utf8" });
+  assert.match(out, /# Independent review: Mechanical Watch \(mode: technical\)/);
+  assert.match(out, /"mode": "technical"/);
+  assert.match(out, /full engineering rigor/i);
+  assert.match(out, /SI\/domain units/);
+  assert.match(out, /conservation laws/);
+  assert.match(out, /multi-variant What-if/i);
+  assert.match(out, /"reviewer": "independent"/);
+});
+
+test("review-brief --mode deep audits multi-chapter structure and per-chapter Predict checkpoints", () => {
+  const { auditFile, reviewFile } = makeFixture();
+  const out = execFileSync(process.execPath, [BRIEF, auditFile, reviewFile, "--mode", "deep"], { encoding: "utf8" });
+  assert.match(out, /# Independent review: Mechanical Watch \(mode: deep\)/);
+  assert.match(out, /"mode": "deep"/);
+  assert.match(out, /4–6 substantive chapters/);
+  assert.match(out, /Per-Chapter Predict Checkpoints/);
+  assert.match(out, /core mechanism → failure\/edge cases → engineering trade-offs → real variants/);
+  assert.match(out, /"reviewer": "independent"/);
+});
+
+test("review-brief rejects invalid --mode with exit code 2", () => {
+  const { auditFile, reviewFile } = makeFixture();
+  assert.throws(
+    () => execFileSync(process.execPath, [BRIEF, auditFile, reviewFile, "--mode", "invalid"], { encoding: "utf8", stdio: "pipe" }),
+    (err) => err.status === 2 && /invalid --mode/i.test(err.stderr),
+  );
+  assert.throws(
+    () => execFileSync(process.execPath, [BRIEF, auditFile, reviewFile, "--mode"], { encoding: "utf8", stdio: "pipe" }),
+    (err) => err.status === 2 && /missing value for --mode/i.test(err.stderr),
+  );
+});
