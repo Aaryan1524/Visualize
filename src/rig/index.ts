@@ -18,3 +18,4 @@ export * from "./contacts.ts";
 export * from "./parts.ts";
 export * from "./concept.ts";
 export * from "./mech.ts";
+export * from "./objects.ts";
