@@ -1,0 +1,60 @@
+// node --test model.test.mjs
+//
+// Independent reference check + planted fault test for the spring pump bottle model.
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { MODELS, VARIANTS, cycleState, pumpAfter } from "./model.mjs";
+
+// Separately written reference calculation (no shared helpers with model.mjs)
+function referencePump(bottleMl, doseMl, sprays) {
+  const maxSprays = Math.floor(bottleMl / doseMl + 1e-9);
+  const clamped = sprays < 0 ? 0 : sprays > maxSprays ? maxSprays : Math.round(sprays);
+  const used = Math.round(clamped * doseMl * 100) / 100;
+  const left = Math.round((bottleMl - used) * 100) / 100;
+  return { strokes: clamped, dispensedMl: used, remainingMl: left, spraysLeft: maxSprays - clamped };
+}
+
+for (const [name, M] of Object.entries(MODELS)) {
+  test(`${name}: liquid volume and spray counts match independent reference`, () => {
+    const v = VARIANTS[name];
+    for (const s of [-3, 0, 1, 5, 25, Math.floor(M.totalSprays / 2), M.totalSprays, M.totalSprays + 10]) {
+      const got = pumpAfter(v, s);
+      const ref = referencePump(v.bottleMl, v.doseMl, s);
+      assert.equal(got.strokes, ref.strokes);
+      assert.equal(got.dispensedMl, ref.dispensedMl);
+      assert.equal(got.remainingMl, ref.remainingMl);
+      assert.equal(got.spraysLeft, ref.spraysLeft);
+      assert.ok(Math.abs(got.dispensedMl + got.remainingMl - v.bottleMl) < 1e-6, "volume must be conserved");
+      assert.equal(got.strokes + got.spraysLeft, M.totalSprays, "spray counts must sum to bottle capacity");
+    }
+  });
+
+  test(`${name}: four-stage pump cycle obeys pressure, valve, and mist causality`, () => {
+    const [rest, press, spray, refill] = M.steps;
+    assert.equal(rest.pressureRatio, 1);
+    assert.equal(rest.mistIntensity, 0);
+    assert.equal(press.bottomValveOpen, false);
+    assert.equal(press.pressureRatio, M.v.openPressure);
+    assert.equal(press.mistIntensity, 0);
+    assert.equal(spray.topValveOpen, true);
+    assert.ok(spray.mistIntensity > 0.5, "spray stage must emit visible mist");
+    assert.equal(spray.strokes, 1);
+    assert.ok(M.refillLow.pressureRatio < 1, "spring return must pull chamber pressure below room air");
+    assert.equal(refill.bottomValveOpen, true);
+    assert.equal(refill.chamberFill, 1);
+    assert.equal(refill.remainingMl, M.afterOne.remainingMl);
+  });
+}
+
+test("planted fault test: reference check catches a volume-conservation bug", () => {
+  const v = VARIANTS.standard;
+  const buggy = { ...pumpAfter(v, 10), remainingMl: v.bottleMl }; // planted fault: forgot to subtract dispensed liquid
+  const ref = referencePump(v.bottleMl, v.doseMl, 10);
+  assert.throws(
+    () => {
+      assert.equal(buggy.remainingMl, ref.remainingMl);
+    },
+    { name: "AssertionError" },
+  );
+});

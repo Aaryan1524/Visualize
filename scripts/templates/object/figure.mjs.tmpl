@@ -1,0 +1,145 @@
+// __TITLE__: the 3D everyday object figure (mode: __MODE__), built on src/rig/objects.ts.
+// Every static 3D solid is drawn once; each frame places the plunger, updates the cutaway liquid
+// level & mist cone, and renders the upright plain-English explainer card & pressure meter beside it.
+//
+//   const F = figure(M, cam, hudCam)   // once per variant
+//   F.parts                            // static drawings put in #scene once: { id, part, svg }
+//   F.pose(state)                      // each frame: { items, at, explainer }
+
+import {
+  OBJECT_VIEW,
+  axesOf,
+  dipTube,
+  explainerCard,
+  fitCamera,
+  liquidColumn,
+  meterBar,
+  placeAt,
+  plungerNozzle,
+  screenOf,
+  sprayCone,
+  vesselShell,
+} from "__ROOT__/src/rig/index.ts";
+export { RigStage, screenOf } from "__ROOT__/src/rig/index.ts";
+
+export const VIEW = OBJECT_VIEW;
+
+// World dimensions (mm): standing bottle on z = 0, cutaway facing the camera
+export const VESSEL = { r: 13, h: 34, neckR: 4.8, neckH: 6, shoulderH: 7, wall: 1.8 };
+export const NOZZLE = { r: 5.6, h: 7, spoutLen: 4.8 };
+const NECK_TOP = VESSEL.h + VESSEL.neckH; // 40 mm
+const LIQUID_Z0 = 2.2;
+const LIQUID_R = 10.6;
+
+/** Camera fitted cleanly to the bottle, pressable plunger, and mist spray plume. */
+export function cameraFor(M, box) {
+  const ax = axesOf(VIEW.azimuth, VIEW.elevation);
+  const r = ax.right;
+  const pts = [
+    [-r[0] * 15, -r[1] * 15, -2],
+    [r[0] * 34, r[1] * 34, -2],
+    [-r[0] * 15, -r[1] * 15, NECK_TOP + NOZZLE.h + 2],
+    [r[0] * 34, r[1] * 34, NECK_TOP + NOZZLE.h + 2],
+    [0, -14, 20],
+    [0, 14, 20],
+  ];
+  return fitCamera(pts, box, VIEW.azimuth, VIEW.elevation);
+}
+
+export function figure(M, cam, hudCam) {
+  const ax = axesOf(cam.azimuth, cam.elevation);
+  const spoutDir = [ax.right[0], ax.right[1]];
+  const parts = [];
+  const once = (id, part, svg) => parts.push({ id, part, svg });
+
+  // Static 3D solids drawn once
+  once("bottle", "bottle", vesselShell(cam, { ...VESSEL, cutaway: true, material: "glass" }));
+  once("tube", "tube", dipTube(cam, { r: 1.15, z0: 3.2, z1: NECK_TOP, offset: [0, 0], material: "rubber" }));
+  once("nozzle", "nozzle", plungerNozzle(cam, { ...NOZZLE, spoutDir, material: "subject" }));
+
+  // Cache quantized live solids so static frames do zero SVG rebuild work
+  const liquidCache = new Map();
+  const liquidSvg = (h) => {
+    const q = Math.round(Math.max(0, h) * 10) / 10;
+    if (!liquidCache.has(q)) {
+      liquidCache.set(q, liquidColumn(cam, { r: LIQUID_R, h: q, z0: LIQUID_Z0, material: "liquid" }));
+    }
+    return liquidCache.get(q);
+  };
+
+  function pose(st) {
+    const items = [];
+    const nozzleZ = NECK_TOP - (st.plungerTravelMm ?? 0);
+    const spoutTipZ = nozzleZ + NOZZLE.h * 0.56;
+    const spoutReach = NOZZLE.r + NOZZLE.spoutLen;
+    const sprayOrigin = [spoutDir[0] * spoutReach, spoutDir[1] * spoutReach, spoutTipZ];
+
+    items.push({ id: "bottle", key: 10, transform: null });
+    if (st.liquidHeightMm > 0.2) {
+      items.push({ id: "liquid", key: 20, part: "liquid", transform: null, svg: liquidSvg(st.liquidHeightMm) });
+    } else {
+      items.push({ id: "liquid", key: 20, part: "liquid", hidden: true });
+    }
+    items.push({ id: "tube", key: 30, transform: null });
+    items.push({ id: "nozzle", key: 40, transform: placeAt(cam, [0, 0, nozzleZ]) });
+
+    const mist = Math.round((st.mistIntensity ?? 0) * 20) / 20;
+    if (mist > 0.01) {
+      const spraySvg = sprayCone(cam, {
+        origin: sprayOrigin,
+        dir: [spoutDir[0], spoutDir[1], 0.05],
+        length: 22,
+        spreadDeg: 22,
+        intensity: mist,
+        seed: 17,
+        droplets: 26,
+      });
+      items.push({ id: "spray", key: 50, part: "spray", transform: null, svg: spraySvg });
+    } else {
+      items.push({ id: "spray", key: 50, part: "spray", hidden: true });
+    }
+
+    // Callout & camera anchors (each inside its part's screen bounds)
+    const at = {
+      bottle: screenOf(cam, [-ax.right[0] * 10.5, -ax.right[1] * 10.5, 16]),
+      nozzle: screenOf(cam, [-ax.right[0] * 4.5, -ax.right[1] * 4.5, nozzleZ + NOZZLE.h * 0.55]),
+      tube: screenOf(cam, [0, 0, 29]),
+      liquid: screenOf(cam, [-ax.right[0] * 7.5, -ax.right[1] * 7.5, LIQUID_Z0 + Math.max(2, st.liquidHeightMm * 0.5)]),
+      spray: screenOf(cam, [spoutDir[0] * (spoutReach + 11), spoutDir[1] * (spoutReach + 11), spoutTipZ + 0.5]),
+    };
+
+    // Upright side explainer card + live pressure gauge (rendered outside #scene, never receded)
+    const tone = st.stage === "spray" || st.pressureRatio >= 2.2 ? "hot" : st.stage === "refill" ? "good" : "neutral";
+    const valveRow = st.topValveOpen
+      ? "Valves: bottom shut, top open"
+      : st.bottomValveOpen
+        ? "Valves: bottom open, top shut"
+        : "Valves: both shut (sealed)";
+    const explainer =
+      explainerCard(hudCam, {
+        at: [0, 0, 0],
+        title: "Inside the pump",
+        badge: st.statusLabel,
+        tone,
+        width: 39,
+        rows: [
+          `Chamber: ${st.chamberLabel}`,
+          valveRow,
+          `Bottle: ${st.remainingMl.toFixed(1)} mL (${st.spraysLeft} left)`,
+        ],
+      }) +
+      meterBar(hudCam, {
+        at: [0, 0, -16],
+        w: 39,
+        h: 1.9,
+        fraction: st.pressureFrac,
+        label: "Chamber pressure",
+        valueText: st.pressureLabel,
+        tone,
+      });
+
+    return { items, at, explainer };
+  }
+
+  return { parts, pose };
+}

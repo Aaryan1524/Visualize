@@ -1,14 +1,15 @@
-# Figures: the recipe for every page, machine or concept
+# Figures: the recipe for every page — everyday object, machine, or concept
 
-Every new page is a Drawing page on the rig: a tested model, a figure of shaded solids drawn once and moved, a camera shot per step, a recorded voice, the audit's claims and topics, a lab and Now you try, put together by `drawingPage()` (`src/drawing/page.mjs`) and checked by `check-drawing`, `check-arithmetic` and `shoot-steps`. Machines and concepts take the same route; only the parts differ.
+Every new page is a Drawing page on the rig: a tested model, a figure of shaded solids drawn once and moved, a camera shot per step, a recorded voice (unless `--fast`), the audit's claims and topics, a lab and Now you try, put together by `drawingPage()` (`src/drawing/page.mjs`) and checked by `check-drawing`, `check-arithmetic` and `shoot-steps`. Everyday physical objects, precision machines, and abstract concepts all take the same route; only the parts and mode depth differ.
 
-Five pages show the studio bar: `examples/derailleur/`, `examples/automatic-watch/` (14-step `--deep` exploded calibre on `src/rig/mech.ts`), and `examples/differential/` (cutaway meshed train on `src/rig/mech.ts`) for machines; `examples/bloom/` (`src/rig/parts.ts`) and `examples/multi-agent/` (3-tier Concept Plate on `src/rig/concept.ts`) for concepts. Their earlier versions failed in the ways listed at the end. Each failure now has a check, and each check is in the scaffold and enforced by `check-drawing` + the mandatory independent review.
+Six pages show the studio bar: `examples/perfume-atomizer/` (everyday physical object + side explainer on `src/rig/objects.ts`); `examples/derailleur/`, `examples/automatic-watch/` (14-step `--deep` exploded calibre on `src/rig/mech.ts`), and `examples/differential/` (cutaway meshed train on `src/rig/mech.ts`) for machines; `examples/bloom/` (`src/rig/parts.ts`) and `examples/multi-agent/` (3-tier Concept Plate on `src/rig/concept.ts`) for concepts. Their earlier versions failed in the ways listed at the end. Each failure now has a check, and each check is in the scaffold and enforced by `check-drawing` + the mandatory independent review.
 
 Start with the scaffold, then replace its parts in order:
 
 ```sh
-node <skill>/scripts/new-figure.mjs <name> --kind machine --dir <folder>   # a gear pair
-node <skill>/scripts/new-figure.mjs <name> --kind concept --dir <folder>   # a hash table: slots, a key card, an arrow, a marker
+node <skill>/scripts/new-figure.mjs <name> --kind object  --mode everyday|fast|technical|deep --dir <folder>   # everyday 3D cutaway object + side explainer
+node <skill>/scripts/new-figure.mjs <name> --kind machine --mode everyday|fast|technical|deep --dir <folder>   # a gear pair
+node <skill>/scripts/new-figure.mjs <name> --kind concept --mode everyday|fast|technical|deep --dir <folder>   # a hash table: slots, a key card, an arrow, a marker
 ```
 
 Each builds and passes `check-drawing` as generated, all but the review (which only a fresh reviewer can give). Each writes:
@@ -24,11 +25,24 @@ Each builds and passes `check-drawing` as generated, all but the review (which o
 
 | Subject | Figure | Example |
 |---|---|---|
-| A machine whose parts move in depth (sideways and in the side plane at once, or in layers) | **Rig solids** from `src/rig/mech.ts` and `src/rig/` meshes (`plate`, `turned`, `rod`, `sprocket`) | `examples/derailleur/` (cage and parallelogram), `examples/automatic-watch/` (exploded layered calibre), `examples/differential/` (meshed bevel and spur train) |
+| An everyday physical object or phenomenon (perfume bottle, wristwatch, coffee maker, battery, syringe, wing, lungs) | **Everyday 3D cutaway + side explainer** from `src/rig/objects.ts` (`--kind object`, `references/objects.md`) — **default for real physical objects** | `examples/perfume-atomizer/` (cutaway bottle, liquid column, dip tube, nozzle, mist cone, side `explainerCard` + `meterBar`) |
+| A precision machine whose parts move in depth or meshed trains (especially with `--technical` or `--deep`) | **Rig solids** from `src/rig/mech.ts` and `src/rig/` meshes (`plate`, `turned`, `rod`, `sprocket`) | `examples/derailleur/` (cage and parallelogram), `examples/automatic-watch/` (exploded layered calibre), `examples/differential/` (meshed bevel and spur train) |
 | An abstract concept: a data structure, an algorithm, a protocol, a mechanism in a paper | **Rig solids** from `src/rig/parts.ts` or `src/rig/concept.ts`, in the shape the field already draws | `examples/bloom/` (bit cells, word card, hash arrows), `examples/multi-agent/` (3-tier Concept Plate with trace lens) |
 | A machine that works in one plane, where a section shows the cause | **The flat cutaway** (`references/drawing.md`): a Drawing page too, with the same page, player and checks | `examples/escalator/`, `examples/lock/` |
 
 The scene.ts route (the Unfold stage, `look: "drawing"` or `"clay"`, `verify.mjs`) is **legacy**: it is kept so `examples/lru/`, `retries/`, `attention/` and `lru-3d/` still build, and it is not chosen for a new page. The Drawing checks refuse its pages with a message saying so.
+
+## Everyday object parts (`src/rig/objects.ts`) & 4 composable modes
+
+For real physical objects and everyday learners, use `--kind object` and read [`references/objects.md`](objects.md) for the full API (`OBJECT_VIEW`, `vesselShell`, `liquidColumn`, `dipTube`, `plungerNozzle`, `sprayCone`, `watchCaseDial`, `watchHand`, `coiledSpring`, `explainerCard`, `meterBar`), everyday materials (`glass`, `liquid`, `mist`, `rubber`, `wood`), and plain-English guidelines.
+
+All three lanes (`object`, `machine`, `concept`) share four composable modes passed via `--mode` or natural-language cues:
+- **`everyday`** *(default)*: recognizable studio visual + side explainer, plain college-level English backed by a real tested model, voice ON, 5–7 steps, Predict + Lab, `review-brief.mjs --mode everyday`.
+- **`--fast`**: quick 4–5 step visual (~3–4 min), no voice (`--no-voice`), no What-if variants, `check-drawing.mjs --fast`, `shoot-steps.mjs --fast`, `review-brief.mjs --mode fast`.
+- **`--technical`**: exact SI units, equations / `workingStrip`s on stage, multi-variant What-if, strict `review-brief.mjs --mode technical` audit.
+- **`--deep`**: 4–6 chapters, 14–20 steps, highest visual detail, full voice, per-chapter Predict checkpoints, `review-brief.mjs --mode deep`.
+
+Flags compose (for example `--deep --technical` for a multi-chapter engineering breakdown).
 
 ## Concept parts
 
@@ -80,7 +94,7 @@ Use the reusable mechanical kit in `src/rig/mech.ts` instead of hand-rolling gea
 
 `references/look.md` defines the studio palette, OKLab value-contrast spans, and line/type rules.
 
-- **Materials** are token pairs in `src/rig/rig.css` (steel, alloy, chain, slate, subject, frame, brass, ruby, blued, rhodium, graphite, ceramic, cell, card, etc.), in both themes.
+- **Materials** are token pairs in `src/rig/rig.css` (`steel`, `alloy`, `chain`, `slate`, `subject`, `frame`, `brass`, `ruby`, `blued`, `rhodium`, `graphite`, `ceramic`, `cell`, `card`, plus everyday materials `glass`, `liquid`, `mist`, `rubber`, `wood`), in both themes.
   - Put the page's CSS after `rig.css`. Without it every solid draws black, yet every other check still passes. `check-drawing` fails a figure whose solids have no colours.
 - **One followed part, in orange** (`subject`): the part the story is about, such as the derailleur's cage and pulleys, or the scaffold's driving gear. Everything else is neutral metal or the material the real part is made of. Context (frame, wheel, base plate) is `frame`, quiet.
 - **Weights and shadows:** the silhouette is drawn heavier than the creases, and metal edges that catch the key light get a specular line (`drawMesh(…, { shine: true })`). For shadows laid toward the part behind, use `plateShadow` (the part's true outline with holes kept open) on concave or holed parts such as rotors, levers and bridges, and `contactShadow` only on convex slabs.

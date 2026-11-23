@@ -19,6 +19,13 @@
   --rig-frame-lit:#e9e9e6;--rig-frame-dark:#9c9b95;
   --rig-cell-lit:#fafaf8;--rig-cell-dark:#a6a59f;--rig-card-lit:#ffffff;--rig-card-dark:#a2a19b;
   --rig-set-lit:#8b8c8f;--rig-set-dark:#26272a;--rig-set-ink:#ffffff;--rig-good-lit:#bfe3da;--rig-good-dark:#2f7d6d;
+  --rig-bad-lit:#f3b8b2;--rig-bad-dark:#a62b26;
+  /* everyday physical materials: glass, liquid, mist, rubber, wood */
+  --rig-glass-lit:#e4f1f8;--rig-glass-dark:#82a8c0;
+  --rig-liquid-lit:#f8d47c;--rig-liquid-dark:#a8640b;
+  --rig-mist-lit:#d8edf8;--rig-mist-dark:#6d9bb8;
+  --rig-rubber-lit:#676b72;--rig-rubber-dark:#1c1e22;
+  --rig-wood-lit:#dfc094;--rig-wood-dark:#784c20;
   /* horology: gilt brass, synthetic ruby, heat-blued steel, rhodium plate, graphite, bead-blasted aluminium */
   --rig-brass-lit:#f2d991;--rig-brass-dark:#7a560f;
   --rig-ruby-lit:#ec4f74;--rig-ruby-dark:#6e0a24;
@@ -44,6 +51,12 @@
   --rig-frame-lit:#5a5b5f;--rig-frame-dark:#222326;
   --rig-cell-lit:#5c5d61;--rig-cell-dark:#262729;--rig-card-lit:#e8e9eb;--rig-card-dark:#6a6c70;
   --rig-set-lit:#d4d5d8;--rig-set-dark:#74767a;--rig-set-ink:#1b1c1f;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
+  --rig-bad-lit:#d97b74;--rig-bad-dark:#732320;
+  --rig-glass-lit:#8ab4cc;--rig-glass-dark:#2b4a5e;
+  --rig-liquid-lit:#f0c45e;--rig-liquid-dark:#784408;
+  --rig-mist-lit:#9bc8e2;--rig-mist-dark:#325870;
+  --rig-rubber-lit:#858a92;--rig-rubber-dark:#24272c;
+  --rig-wood-lit:#cfa978;--rig-wood-dark:#5a3715;
   --rig-brass-lit:#eed38a;--rig-brass-dark:#5e430c;
   --rig-ruby-lit:#f4648a;--rig-ruby-dark:#640b23;
   --rig-cobalt-lit:#a0c2fb;--rig-cobalt-dark:#193a7c;
@@ -67,6 +80,12 @@
   --rig-frame-lit:#5a5b5f;--rig-frame-dark:#222326;
   --rig-cell-lit:#5c5d61;--rig-cell-dark:#262729;--rig-card-lit:#e8e9eb;--rig-card-dark:#6a6c70;
   --rig-set-lit:#d4d5d8;--rig-set-dark:#74767a;--rig-set-ink:#1b1c1f;--rig-good-lit:#8fd2c1;--rig-good-dark:#2c6f61;
+  --rig-bad-lit:#d97b74;--rig-bad-dark:#732320;
+  --rig-glass-lit:#8ab4cc;--rig-glass-dark:#2b4a5e;
+  --rig-liquid-lit:#f0c45e;--rig-liquid-dark:#784408;
+  --rig-mist-lit:#9bc8e2;--rig-mist-dark:#325870;
+  --rig-rubber-lit:#858a92;--rig-rubber-dark:#24272c;
+  --rig-wood-lit:#cfa978;--rig-wood-dark:#5a3715;
   --rig-brass-lit:#eed38a;--rig-brass-dark:#5e430c;
   --rig-ruby-lit:#f4648a;--rig-ruby-dark:#640b23;
   --rig-cobalt-lit:#a0c2fb;--rig-cobalt-dark:#193a7c;
@@ -93,7 +112,7 @@
 .rig-m-card{--rig-a:var(--rig-card-lit);--rig-b:var(--rig-card-dark)}
 .rig-part[data-t-set]{--rig-cell-lit:var(--rig-set-lit);--rig-cell-dark:var(--rig-set-dark)}
 .rig-part[data-t-good]{--rig-cell-lit:var(--rig-good-lit);--rig-cell-dark:var(--rig-good-dark)}
-.rig-part[data-t-bad]{--rig-cell-lit:color-mix(in oklab,var(--t-bad) 45%,#ffffff);--rig-cell-dark:var(--t-bad)}
+.rig-part[data-t-bad]{--rig-cell-lit:var(--rig-bad-lit);--rig-cell-dark:var(--rig-bad-dark)}
 .rig-part[data-t-hot]{--rig-cell-lit:var(--rig-subject-lit);--rig-cell-dark:var(--rig-subject-dark)}
 .rig-value{font-family:var(--mono,ui-monospace,monospace);font-weight:700;fill:color-mix(in oklab,var(--ink) calc(100% - var(--recede)),var(--stage))}
 /* a value printed on a toned cell takes the tone's dark shade, which reads on its lit top in both themes;
@@ -121,6 +140,11 @@
 .rig-m-rhodium{--rig-a:var(--rig-rhodium-lit);--rig-b:var(--rig-rhodium-dark)}
 .rig-m-graphite{--rig-a:var(--rig-graphite-lit);--rig-b:var(--rig-graphite-dark)}
 .rig-m-alu{--rig-a:var(--rig-alu-lit);--rig-b:var(--rig-alu-dark)}
+.rig-m-glass{--rig-a:var(--rig-glass-lit);--rig-b:var(--rig-glass-dark)}
+.rig-m-liquid{--rig-a:var(--rig-liquid-lit);--rig-b:var(--rig-liquid-dark)}
+.rig-m-mist{--rig-a:var(--rig-mist-lit);--rig-b:var(--rig-mist-dark)}
+.rig-m-rubber{--rig-a:var(--rig-rubber-lit);--rig-b:var(--rig-rubber-dark)}
+.rig-m-wood{--rig-a:var(--rig-wood-lit);--rig-b:var(--rig-wood-dark)}
 .rig-solid{
   --rig-lit:color-mix(in oklab,var(--rig-a) calc(100% - var(--recede)),var(--stage));
   --rig-dark:color-mix(in oklab,var(--rig-b) calc(100% - var(--recede)),var(--stage));
@@ -173,3 +197,31 @@
 
 /* a centre line through an axle or screw in an exploded view (mech.ts centreLines): dash-dot, as a drawing marks an axis */
 .rig-axis{fill:none;stroke:color-mix(in oklab,var(--rig-ink,var(--ink)) calc(100% - var(--recede,0%)),var(--stage));stroke-width:.9px;stroke-opacity:.8;stroke-dasharray:9 3 2 3;stroke-linecap:butt;vector-effect:non-scaling-stroke}
+
+/* Everyday physical object primitives (objects.ts): spray, glass sheen, watch dial ticks, explainer cards, meters */
+.rig-spray-cone{fill:color-mix(in oklab,var(--rig-mist-lit) 76%,var(--stage));fill-opacity:.42;stroke:color-mix(in oklab,var(--rig-mist-dark) 60%,var(--stage));stroke-width:.9px;stroke-dasharray:4 4;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.rig-spray-drop{fill:var(--rig-mist-lit);stroke:var(--rig-mist-dark);stroke-width:.75px;vector-effect:non-scaling-stroke}
+.rig-glass-sheen{fill:none;stroke:#ffffff;stroke-opacity:.72;stroke-width:1.4px;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.rig-dial-tick{fill:none;stroke:color-mix(in oklab,var(--rig-ink,var(--ink)) calc(100% - var(--recede,0%)),var(--stage));stroke-width:1.1px;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.rig-dial-tick.is-major{stroke-width:1.9px}
+.rig-explainer-bg{fill:color-mix(in oklab,var(--stage) 96%,var(--ink));stroke:color-mix(in oklab,var(--ink) 26%,var(--stage));stroke-width:1.15px;vector-effect:non-scaling-stroke}
+.rig-explainer[data-tone="good"] .rig-explainer-bg{stroke:color-mix(in oklab,var(--t-good) 68%,var(--stage))}
+.rig-explainer[data-tone="bad"] .rig-explainer-bg{stroke:color-mix(in oklab,var(--t-bad) 68%,var(--stage))}
+.rig-explainer[data-tone="hot"] .rig-explainer-bg{stroke:color-mix(in oklab,var(--orange) 72%,var(--stage))}
+.rig-explainer-title{font-family:var(--sans,ui-sans-serif,system-ui,sans-serif);font-weight:650;fill:var(--ink)}
+.rig-explainer-row{font-family:var(--sans,ui-sans-serif,system-ui,sans-serif);font-weight:450;fill:var(--ink-2)}
+.rig-explainer-badge{fill:color-mix(in oklab,var(--ink) 10%,var(--stage));stroke:color-mix(in oklab,var(--ink) 24%,var(--stage));stroke-width:.85px;vector-effect:non-scaling-stroke}
+.rig-explainer[data-tone="good"] .rig-explainer-badge{fill:color-mix(in oklab,var(--t-good) 16%,var(--stage));stroke:var(--t-good)}
+.rig-explainer[data-tone="bad"] .rig-explainer-badge{fill:color-mix(in oklab,var(--t-bad) 16%,var(--stage));stroke:var(--t-bad)}
+.rig-explainer[data-tone="hot"] .rig-explainer-badge{fill:color-mix(in oklab,var(--orange) 16%,var(--stage));stroke:var(--orange)}
+.rig-explainer-badge-text{font-family:var(--mono,ui-monospace,monospace);font-weight:600;fill:var(--ink)}
+.rig-explainer[data-tone="good"] .rig-explainer-badge-text{fill:var(--t-good)}
+.rig-explainer[data-tone="bad"] .rig-explainer-badge-text{fill:var(--t-bad)}
+.rig-explainer[data-tone="hot"] .rig-explainer-badge-text{fill:color-mix(in oklab,var(--orange) 86%,var(--ink))}
+.rig-meter-track{fill:color-mix(in oklab,var(--ink) 11%,var(--stage));stroke:color-mix(in oklab,var(--ink) 26%,var(--stage));stroke-width:.9px;vector-effect:non-scaling-stroke}
+.rig-meter-fill{fill:color-mix(in oklab,var(--ink) 78%,var(--stage));stroke:none}
+.rig-meter[data-tone="good"] .rig-meter-fill{fill:var(--t-good)}
+.rig-meter[data-tone="bad"] .rig-meter-fill{fill:var(--t-bad)}
+.rig-meter[data-tone="hot"] .rig-meter-fill{fill:var(--orange)}
+.rig-meter-label{font-family:var(--sans,ui-sans-serif,system-ui,sans-serif);font-weight:600;fill:var(--ink)}
+.rig-meter-value{font-family:var(--mono,ui-monospace,monospace);font-weight:600;fill:var(--ink-2)}

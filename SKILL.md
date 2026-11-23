@@ -1,56 +1,77 @@
 ---
 name: visualize
-description: Build step-through visual explanations whose picture is checked against an executable model, with a narrating voice, a prediction, a hands-on lab and practice questions. Real machines and physical systems (an escalator, an engine, a lock, a derailleur) and abstract concepts (a Bloom filter, a hash table, a cache, a protocol) are both drawn as bold shaded 3D solids on one rig, in the shape the field already draws, with a camera that frames each step's subject. Use whenever someone wants a machine or device (how an escalator, lock or engine works), an algorithm, data structure, protocol, distributed-system behaviour, ML mechanism or paper method explained visually, animated or step by step, even if they never say "visualize". Outputs a standalone HTML page, checked in headless Chrome.
+description: Build step-through visual explanations whose picture is checked against an executable model, with a narrating voice, a prediction, a hands-on lab and practice questions. Everyday physical objects (a perfume bottle, a watch, a coffee maker, a battery, a syringe), precision machines (an escalator, an engine, a lock, a derailleur) and abstract concepts (a Bloom filter, a hash table, a cache, a protocol) are all drawn as bold shaded 3D solids on one rig, showing the real recognizable object or canonical diagram with a camera that frames each step's subject. Use whenever someone wants an everyday object, physical phenomenon, machine or device, algorithm, data structure, protocol, distributed-system behaviour, ML mechanism or paper method explained visually, animated or step by step, even if they never say "visualize". Outputs a standalone HTML page, checked in headless Chrome.
 license: MIT
 compatibility: Works in Claude Code, Codex and Antigravity. Needs Node.js 24+ (runs TypeScript directly) and Google Chrome or Chromium for the checks. Run `npm install` (or `pnpm install`) once in this folder.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Visualize
 
 A figure here is a model you can watch. You write a small executable model of the idea, a figure of solid parts that the model's states move, and the words a reader sees and hears. The page shows the model's numbers, the audit checks the words against the model, and the checks drive the built page in Chrome to prove it frames, plays and reads as intended.
 
-## One route for every page
+## One route, 3 visual lanes (show the real thing first!)
 
-**Every new page, machine or concept, is a Drawing page on the rig.** The model, the figure, the story and the hooks go to `drawingPage()` (`src/drawing/page.mjs`), which gives every page the same player, camera, voice, prediction, What if, lab, Now you try and title block, and the same checks. `references/figures.md` is the recipe for both kinds.
+**Every new page — everyday object, machine, or abstract concept — is a Drawing page on the rig.** The model, the figure, the story and the hooks go to `drawingPage()` (`src/drawing/page.mjs`), which gives every page the same player, camera, voice, prediction, What if, lab, Now you try and title block, and the same checks. Pick the visual lane that matches the subject:
+
+1. **`--kind object` — Everyday Physical Object + Side Explainer** (`src/rig/objects.ts`, `references/objects.md`): **DEFAULT whenever the prompt names a real physical object or phenomenon** (perfume bottle, watch, coffee maker, battery, syringe, wing, lungs, microwave). Draw the **actual recognizable 3D object** front-and-center with a cutaway showing how it works inside, paired with a crisp plain-English `explainerCard` / `meterBar` beside it. **NEVER** draw abstract boxes with numbers for a physical object.
+2. **`--kind machine` — Precision Mechanical Cutaway** (`src/rig/mech.ts`, `references/figures.md`): meshed gears, linkages, exploded calibres, differentials, derailleurs — use for intricate drivetrains/clockwork or when `--technical` / `--deep` asks for full mechanical engineering detail.
+3. **`--kind concept` — Canonical Abstract Diagram** (`src/rig/parts.ts`, `src/rig/concept.ts`, `references/figures.md`): algorithms, data structures, protocols, distributed systems, and ML mechanisms, drawn in the shape the field already draws.
 
 Start from the scaffold, which builds and passes `check-drawing` as generated (all but the independent review):
 
 ```sh
-node <skill>/scripts/new-figure.mjs <name> --kind concept --dir <folder>   # a hash table: slots, a key card, an arrow, a marker
-node <skill>/scripts/new-figure.mjs <name> --kind machine --dir <folder>   # a gear pair
+node <skill>/scripts/new-figure.mjs <name> --kind object  --mode everyday|fast|technical|deep --dir <folder>
+node <skill>/scripts/new-figure.mjs <name> --kind machine --mode everyday|fast|technical|deep --dir <folder>
+node <skill>/scripts/new-figure.mjs <name> --kind concept --mode everyday|fast|technical|deep --dir <folder>
 ```
 
 Open the closest example before starting:
+- `examples/perfume-atomizer/`: everyday physical object page on `src/rig/objects.ts` (`vesselShell`, `liquidColumn`, `dipTube`, `plungerNozzle`, `sprayCone`, `explainerCard`, `meterBar`) in plain college-level English.
 - `examples/bloom/`: concept page on `src/rig/parts.ts`. Sixteen bit cells in two rows, a word card, one arrow a hash function, the camera on each word's bits, a lab where the reader types any word, and the deletion trap.
 - `examples/derailleur/`: machine page on `src/rig/`. Bold shaded solids, each drawn once and then moved, so it reads as 3D and plays at 60 fps.
 - `examples/automatic-watch/`: 14-step `--deep` exploded horological calibre built on `src/rig/mech.ts` (`explodedStack` and `centreLines`).
 - `examples/differential/`: open differential built from `src/rig/mech.ts` (meshed gears, cutaway housing, and turning shafts).
 - `examples/multi-agent/`: 3-tier Concept Plate (`src/rig/concept.ts`) with per-step camera shots and a synchronized trace lens.
-- `examples/lock/` and `examples/escalator/`: machines that work in one plane, drawn as flat technical cutaways to scale (`references/drawing.md`) on the same page and player. The lock opens with the problem, ends with the second idea (picking) and lets the reader cut their own key.
+- `examples/lock/` and `examples/escalator/`: machines that work in one plane, drawn as flat technical cutaways to scale (`references/drawing.md`) on the same page and player.
 
 **Legacy, not for new pages:** `examples/lru/`, `retries/`, `attention/`, `lru-3d/` and `test/fixtures/gallery-*` are scene.ts pages on the older Unfold stage, checked by `scripts/verify.mjs`. They still build. Their references (`authoring.md`, `kit.md`, `verify.md`) are marked legacy, and the Drawing checks refuse their pages with a message saying so.
 
+## 4 Composable Modes
+
+Choose the mode from explicit flags or natural-language cues in the user's request. **Flags compose** — e.g. `--deep --technical` produces a full multi-chapter engineering masterclass, and `--fast --technical` builds a quick equation-focused diagram.
+
+| Mode | Trigger flags / phrases | Scope & Visuals | Voice & Interactivity | Checks & Review |
+|---|---|---|---|---|
+| **`everyday`** *(default)* | *(no flag)* | Best **real-object** studio visual + side `explainerCard`/`meterBar`, **5–7 steps**. Real tested model underneath; intuitive, college-level plain English (no unrequested `N·mm`, `isochronism`, or raw academic formulas). | **Voice ON** by default. 1 core variant (What-if optional), Predict pause, interactive Lab, Now you try. | Full `check-drawing`, `check-arithmetic`, light/dark `shoot-steps`, `review-brief.mjs --mode everyday`. |
+| **`--fast`** | `--fast`, *"quick"*, *"fast"*, *"brief"* | Quick less-detailed visual diagram (~3–4 min build), **4–5 steps**, core cause-and-effect cleanly shown. | **No voice** (`--no-voice`), no What-if variants, compact Lab + Predict. | `check-drawing.mjs --fast`, `shoot-steps.mjs --fast`, `review-brief.mjs --mode fast`. |
+| **`--technical`** | `--technical`, *"technical"*, *"engineering"*, *"exact math"*, *"with equations"* | Concept & engineering rigor: exact SI units, equations and `workingStrip`s on stage, `--kind machine` for intricate mechanisms. | **Voice ON** (unless `--fast`), multi-variant What-if comparing real parameter regimes, Predict + Lab. | Full checks + strict `review-brief.mjs --mode technical` domain/unit audit. |
+| **`--deep`** | `--deep`, *"in depth"*, *"deep dive"*, *"lengthy"*, *"thoroughly"* | **4–6 chapters, 14–20 steps**, highest visual detail (exploded assemblies, failure modes, trade-offs, variants, edge cases). | **Full voice**, per-chapter Predict checkpoints (`DATA.predict` list), multi-variant What-if, saved "Resume at step k". | Full checks on every step + `review-brief.mjs --mode deep` (prefer 2-agent parallel review). |
+
 ## The one idea that matters
 
-**The model is the truth, and the page is checked against it.** Never type a number, an order or an outcome into the figure or the words. Compute it in the model, pose the figure from it, and write the words from it. The audit fails a number the model does not have.
+**The model is the truth, and the page is checked against it.** Never type a number, an order or an outcome into the figure or the words. Compute it in the model, pose the figure from it, and write the words from it. The audit fails a number the model does not have. Even in `everyday` mode where the prose stays jargon-free, a real tested `model.mjs` drives every level, pressure, motion, and readout underneath.
 
-**One causal moment per step, and the camera goes to it.** Each step has a shot: the parts it is about, framed and lit, while the rest recedes in tone. Make the change itself visible at rest: a bit that turns to 1, a key that walks on past a taken slot, a pulley ahead of its chain. A step where nothing visible changes teaches nothing.
+**One causal moment per step, and the camera goes to it.** Each step has a shot: the parts it is about, framed and lit, while the rest recedes in tone. Make the change itself visible at rest: a plunger pressed down with mist firing out, a bit that turns to 1, a key that walks on past a taken slot, a pulley ahead of its chain. A step where nothing visible changes teaches nothing.
 
 ## Choose the representation
 
-**Start from what the field already draws.** Write one line in your plan: "A textbook draws <concept> as <shape>." A Bloom filter is a row of bits with k arrows from the item to the bits its hashes pick. A round-robin scheduler is a circle of slots with a pointer going round. Quicksort's partition is a row of cells with i and j marked on it. A hash table is a row of slots with a key walking to the first free one. Build *that shape* from the rig's parts, and say why if you depart from it.
+**Show the real thing first, or what the field already draws.** Write one line in your plan:
+- For physical objects/phenomena (`--kind object`): *"The real object is <recognizable 3D object> cut open to show <internal cause>, beside an explainer card."*
+- For mechanical assemblies (`--kind machine`): *"A precision cutaway draws <machine> as <meshed/exploded parts>."*
+- For abstract concepts (`--kind concept`): *"A textbook draws <concept> as <shape>."*
 
-The evals taught this. Without it, four of five subjects came out as a straight rail of slots because that was the part at hand, and a plain flat diagram drawn without the skill taught them better each time.
+Build *that shape* from the rig's parts, and say why if you depart from it. Never substitute abstract numbered boxes for a real physical object, and never force every abstract concept into a straight rail of slots.
 
-The parts (`src/rig/`, `references/figures.md`):
-- **Concepts:** `cellDrawing` (a cell or slot, with a printed value by `decalAt` and `valueText`, and a tone by flag), `railCentres` (a row with indices), `cardDrawing` (a token or key card), `ringSlots` and `turnAt` (a ring of slots), `markerDrawing` (a pointer), `arrow` (a link drawn in the figure's projection, routed with `via`), `workingStrip` (the working beside a part), `boardDrawing` (the floor).
-- **Machines:** `src/rig/mech.ts` (`spokedWheel`, `pinion`, `arbor`, `meshCentres`, `assertMeshed`, `bridge`, `jewelSetting`, `screw`, `cutawayShell`, plus `explodedStack` and `centreLines` for flat layered machines), low-level meshes (`plate`, `turned`, `rod`, `sprocket`, `roundedHull`), `turningPart()` (auto-binned turning solids checked for `< 1 px` skew), `moveInPlane` for flat motion, and `checkContacts` for what drives what.
+The parts (`src/rig/`):
+- **Everyday objects (`src/rig/objects.ts`, `references/objects.md`):** `OBJECT_VIEW`, `vesselShell`, `liquidColumn`, `dipTube`, `plungerNozzle`, `sprayCone`, `watchCaseDial`, `watchHand`, `coiledSpring`, `explainerCard`, `meterBar`, plus studio materials `glass`, `liquid`, `mist`, `rubber`, `wood`.
+- **Precision machines (`src/rig/mech.ts`, `references/figures.md`):** `spokedWheel`, `pinion`, `arbor`, `meshCentres`, `assertMeshed`, `bridge`, `jewelSetting`, `screw`, `cutawayShell`, `explodedStack`, `centreLines`, low-level meshes (`plate`, `turned`, `rod`, `sprocket`, `roundedHull`), `turningPart()`, `moveInPlane`, `checkContacts`.
+- **Abstract concepts (`src/rig/parts.ts`, `src/rig/concept.ts`, `references/figures.md`, `references/concept-rig.md`):** `cellDrawing`, `railCentres`, `cardDrawing`, `ringSlots`, `turnAt`, `markerDrawing`, `arrow`, `workingStrip`, `boardDrawing`, plus Concept Plate instruments (`deckTier`, `hubChassis`, `agentBlade`, `waferStack`, `portValve`, `vaultCore`).
 
-One part per real element, counted true. Draw the cause, not only the states. Do not draw boxes-and-arrows diagrams, and do not invent a decorative machine whose parts mean nothing. A part the subject needs and the rig lacks is a kit gap: build it in `src/rig/`, drawn once and moved, and record it.
+One part per real element, counted true. Draw the cause, not only the states. A part the subject needs and the rig lacks is a kit gap: build it in `src/rig/`, drawn once and moved, and record it.
 
-**Show the working, on stage.** Put the intermediate values where the reader is looking, not only the result: a Bloom filter shows each hash function's row (`h1  2,668,802,083 mod 16 = 3`) in a working strip beside the word card (`workingStrip`), framed with it, and each bit's 0 or 1 on its cell. Captions and lab rows alone hide it. Drawing pages have no flat side panels yet: a short sum goes in a working strip, a longer one in the caption and the lab's rows; a subject that cannot be taught without a sequence diagram or a matrix is a kit gap to report, not a reason to take the legacy route.
+**Show the working, on stage.** In `everyday` mode, pair the cutaway object with a clean plain-English `explainerCard` and `meterBar` beside it so the reader sees *why* without equations cluttering the scene. In `--technical` and concept pages, put the intermediate values where the reader is looking in a `workingStrip` beside the subject (`h1  2,668,802,083 mod 16 = 3`) and each value on its part.
 
 ## Decisions this skill makes
 
@@ -58,75 +79,72 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask o
 
 | Decision | Default | Why |
 |---|---|---|
-| **The scenario** (concept, sizes, values) **ask** if they change the answer | Small readable values (16 bits, 8 slots, 3 keys), chosen so every interesting case happens, each asserted in `model.test.mjs`; stated in Details | Small numbers keep every value legible on a face; a run without the collision explains nothing |
+| **The scenario** (concept, sizes, values) **ask** if they change the answer | Small readable values (16 bits, 8 slots, 3 keys, or realistic everyday dimensions), chosen so every interesting case happens, each asserted in `model.test.mjs`; stated in Details | Small readable values stay legible on stage; a run without the key phenomenon explains nothing |
 | **Output** **ask** if unclear | A standalone HTML page. Drawing pages have no SVG or React export yet; say so if one is asked for | Every output is checked |
-| **What to contrast with** **ask** when "versus what?" is ambiguous | The naive alternative the concept fixes, as a step or a What if | A contrast makes the mechanism visible |
-| Representation | The shape the field draws (write the one line), built from rig parts | A reader recognises the shape they were taught |
-| Pointers and indices | A `markerDrawing` standing on its slot; indices printed on the board in front of each cell | A pointer on a separate lane read as being on the wrong slot |
-| Size | **Standard** (the default): 5–9 steps after the concept, narration of about 3 minutes at most; a short concept can be one minute. **Deep**, only when the request has `--deep` or asks for it in words ("in depth", "deep dive", "everything about", "thoroughly"): see *Deep explanations* below. Larger than deep: propose a short series of linked pages | Past 9 steps a single story loses the reader; the reader who asks for depth gets it in chapters, each a lesson of its own |
-| Depth | **The problem first:** step 0, the concept (no tab), says what the idea must achieve and what makes it hard, before anything moves; a topic it teaches is placed at `"step:0"`. **The second idea:** one step for what the field teaches right after the core (picking for a lock; the deletion trap and counting filters for a Bloom filter). **Hands-on:** every page has a lab (`DATA.lab`), where the reader sets a number or types a word or key and the model answers | In blind evals a plain agent beat the skill on depth by doing exactly these three |
-| Number of systems | One; a contrast goes in What if (the same story with one input changed) or in one step | Two figures halve the size of everything |
-| Prediction | Exactly one, asked on `PRED_STEP` about what the next step shows, the step before the causal moment | Predicting forces the reader to hold the rule; asked on the step itself, the heading gives it away |
-| Camera | A `shot` per step: the parts it is about, centred, lit, at most 2×; every part the heading names stays in frame (`subject`). Choose the viewing angle and elevation from the object's shape (or use an exploded vertical stack for flat layered machines); once chosen, the camera zooms and pans without turning. A step whose subject spans the whole figure has no shot | The reader keeps their bearings while each step is framed |
-| Colour | Neutral parts; one followed part or tone in orange; at most three meanings (set, good, bad), each in the legend | Colour that means everything means nothing |
-| Words | Title of 1–4 words (the concept's name) with `about` as one line under it; one heading a step; callouts of 1–3 words, on the overview only where the camera zooms | Paragraphs get read instead of the figure |
-| Learning | Always `question(n, r)` from the model (three choices or more, answer computed); `whatIf` when one input changes the outcome (k, a size, a fault); the lab | A reader who answers a new case has understood |
-| Voice | Write `script(M)` in `story.mjs`; step 0 explains the concept in two or three spoken sentences before anything moves. `[phrase|part]` lights a part while it is spoken. Never say letters or abbreviations aloud. Record with the page's own `voice.mjs` | A reader who does not know the idea needs it said before the demo |
-| Letters | Text on a face is printed on it (a decal), never floated above it | Floating labels read as detached from what they name |
-| Theme | Light on every system by default; the reader switches with the Dark button or a `#theme=dark` link. Review light first, then dark; both are checked | The builder found dark ugly as a first impression; a value that reads in one theme can vanish in the other |
-| Where files go | In the user's project: the page's folder (model, figure, story, build, voice, tests), the built page in its public folder, shots beside the folder | Keeps the skill folder clean |
+| **What to contrast with** **ask** when "versus what?" is ambiguous | The naive alternative or failure case (as a step or What if) | A contrast makes the mechanism visible |
+| Visual lane | `--kind object` for real physical objects/phenomena; `--kind machine` for intricate/technical mechanisms; `--kind concept` for abstract systems | Readers recognize a real bottle or watch instantly; abstract boxes hide the physical intuition |
+| Mode & tone | **`everyday`** (plain college-level English, real model underneath, voice ON, 5–7 steps). Switch to `--fast`, `--technical`, or `--deep` (or combine them) when flags or wording ask for it | Everyday learners get an intuitive studio visual; engineers get exact SI math on request |
+| Depth | **The problem first:** step 0 (no tab) says what the idea achieves and why it is interesting, before anything moves (`"step:0"`). **The second idea:** one step for what fails or comes next (priming/clogging, picking, deletion trap). **Hands-on:** every page has a live `DATA.lab` | Opening with the problem and closing with a live lab makes the mechanism stick |
+| Number of systems | One; a contrast goes in What if (optional in `everyday`, omitted in `--fast`, standard in `--technical`/`--deep`) or in one step | Two figures halve the size of everything |
+| Prediction | One on `PRED_STEP` (step before the causal moment); in `--deep`, one per chapter (`DATA.predict` list) | Predicting forces the reader to hold the rule; asked on the step itself, the heading gives it away |
+| Camera | A `shot` per step: the parts it is about, centred, lit, at most 2×; every part the heading names stays in frame (`subject`). Pick the angle from the object's shape (`OBJECT_VIEW` for everyday objects, exploded stack for flat layered machines); once chosen, zoom and pan without turning | The reader keeps their bearings while each step is framed |
+| Colour | Neutral or authentic real-object materials (`glass`, `liquid`, `brass`, `steel`); one followed part or tone in `subject` orange; at most three semantic meanings in the legend | Colour that means everything means nothing |
+| Words | Title of 1–4 words with `about` as one line under it; one heading a step; callouts of 1–3 words. Plain English in `everyday`; exact SI units/formulas in `--technical` | Paragraphs get read instead of the figure |
+| Voice | **ON by default** (`everyday`, `--technical`, `--deep`): write `script(M)` in `story.mjs`, `[phrase|part]` lights parts in sync, record with `voice.mjs`. **OFF in `--fast`** (`--no-voice`) | Hearing the explanation while watching the cutaway teaches twice as fast; `--fast` skips recording time |
+| Letters | Text on a face is printed on it (a decal) or set in an upright `explainerCard`/`workingStrip`, never floated loosely in space | Floating labels read as detached from what they name |
+| Theme | Light on every system by default; reader switches with Dark button or `#theme=dark`. Both themes are checked | A value that reads in one theme can vanish in the other |
+| Where files go | In the user's project: page folder (model, figure, story, build, voice, tests), built page in its public folder, shots beside the folder | Keeps the skill folder clean |
 
 ## Deep explanations (`--deep`)
 
-Off by default. Turn it on only when the request says `--deep` or asks in words for depth ("in depth", "deep dive", "explain everything about", "thoroughly"); never because a topic seems big. Then:
+Off by default. Turn it on when the request says `--deep` or asks in words for depth (*"in depth"*, *"deep dive"*, *"lengthy"*, *"thoroughly"*); never because a topic seems big. Composes cleanly with `--technical` or `everyday`. Then:
 
-- **Chapters, each a lesson.** 4 to 6 chapters of 3 to 6 steps: the core idea, then what the field teaches next, typically how it fails (a crash, a slow part, a bad input), the trade-offs (when more of something stops helping, with the number where it turns), the variants used in practice, and the edge cases. Give every step after the concept a `chapter` name; the header shows one tab a chapter.
-- **A prediction in every chapter.** `DATA.predict` is a list, one entry a chapter, each asked on the step before its causal moment and revealed on the next. `check-drawing` fails a page of 12 steps or more with fewer than one prediction every 8 steps.
-- **Practice and What if across the chapters.** Now you try draws questions from every chapter, and What if covers the input each chapter turns on.
-- **Length.** 15 to 30 steps and about 10 to 15 minutes of narration. Step 0 still explains the concept in two or three sentences before anything moves; each chapter's first step says in one sentence what this chapter adds. Past about 6 chapters, make a series: one page a part, each linking to the next.
-- **The same checks on every step.** Depth never relaxes a check: every number still comes from the model, every claim is audited and reviewed, every step is framed.
-- **Long pages remember where the reader stopped.** A page of 12 steps or more offers "Resume at step k" on its opening (kept in the reader's browser only).
+- **Chapters, each a lesson.** 4 to 6 chapters of 3 to 5 steps (14–20 steps total; up to 30 if needed): core idea, how it fails, trade-offs, real-world variants, and edge cases. Give every step after the concept a `chapter` name; the header shows one tab per chapter.
+- **A prediction in every chapter.** `DATA.predict` is a list, one entry per chapter, each asked on the step before its causal moment and revealed on the next. `check-drawing` fails a page of 12+ steps with fewer than one prediction every 8 steps.
+- **Practice and What if across the chapters.** Now you try draws questions from every chapter, and What if covers the key parameter shifts.
+- **The same checks on every step.** Depth never relaxes a check: every number still comes from the model, every claim is audited and reviewed, every step is framed. Pages of 12+ steps offer "Resume at step k".
 
 ## Correctness & mandatory end-of-`/visualize` review
 
 A model checks the picture; `src/claims/audit.mjs` checks the words; and a fresh independent reviewer checks BOTH conceptual soundness and studio visual quality before any page ships. Every page carries four build-time audit checks:
 
-1. **Topics before pictures.** Before any drawing, find what a good reference teaches for the subject (a manual, a textbook, a reference page; search when you can) and write the list with its source: `COVERAGE = { source, topics: [{ topic, where }] }`. Each core topic is placed at a step (`"step:0"` for the concept, `"step:3"`), `"lab"`, `"whatif"` or `"practice"`, or `"deferred"` with a reason that Details also states. At least three in four core topics are taught. The topics decide the number of steps.
-2. **No typed numbers.** Every number in the voice, headings, captions, cards and Details must exist in the model at the precision shown ("about" allows 5%). A number that is not a quantity of the subject (a hash's width in bits) goes in `allow` with a reason.
-3. **Claims.** Each cause-and-effect sentence goes in `CLAIMS` word for word as the page says it, with a test against the model. The audit fails if the sentence is not on the page or the model disagrees.
+1. **Topics before pictures.** Before drawing, identify what a good reference teaches for the subject and write `COVERAGE = { source, topics: [{ topic, where }] }`. Place each core topic at `"step:0"`, `"step:k"`, `"lab"`, `"whatif"`, `"practice"`, or `"deferred"` with a reason. At least three in four core topics are taught.
+2. **No typed numbers.** Every number in the voice, headings, captions, cards and Details must exist in the model at the precision shown ("about" allows 5%). Non-model constants go in `allow` with a reason.
+3. **Claims.** Each cause-and-effect sentence goes in `CLAIMS` word for word as the page says it, with a test against the model.
 4. **Mandatory fresh independent reviewer (every `/visualize`, every model).** Run:
    ```sh
-   node <skill>/scripts/review-brief.mjs <name>.audit.json <dir>/review.json <page> --shots <dir>/shots
+   node <skill>/scripts/review-brief.mjs <name>.audit.json <dir>/review.json <page> --shots <dir>/shots --mode <everyday|fast|technical|deep>
    ```
    Hand the printed brief (along with `model.mjs` and the fresh light & dark PNGs in `<dir>/shots`) to a **fresh-context reviewer who did NOT build the page**:
    - **Claude Code:** spawn a fresh subagent with the `Agent` tool (no prior build context).
    - **Codex:** spawn a fresh reviewer with `spawn_agent` (or a fresh read-only `codex exec` run).
    - **Gemini / Antigravity:** spawn a fresh subagent with `invoke_subagent` (or a fresh swarm worker).
+   - **2-agent parallel independent review (recommended for `everyday`, `--technical`, and `--deep` when subagents are available):** spawn two disjoint fresh reviewers in parallel with zero overlap — **(1) Domain Auditor** checks `model.mjs`, physical direction, cause-and-effect, mode-appropriate language/units, and claims; **(2) Studio Visual Reviewer** inspects the light & dark step PNGs against `references/look.md` and `references/objects.md`/`figures.md` (recognizability, contrast, silhouettes, leaders, card clearance). Merge their findings into `review.json` (`"reviewer": "independent"`, `"checks": { "conceptual": "pass"|"fail", "visual": "pass"|"fail" }`).
    - **No subagent available:** stop and hand the printed brief to the user; **never self-review**.
 
-   The reviewer inspects (a) **conceptual & domain sanity** (`model.mjs` computes real mechanics/math, SI/domain units, physical direction, cause-and-effect, edge/failure cases — not hand-waving), (b) **studio visual consistency** across light & dark shots (`references/look.md`: 3D top-vs-side contrast, clean silhouettes with no bow-tie cutouts or dark-mode CSS bugs, exploded stacks for flat layered machines, one `subject` signal colour, short non-crossing leaders, calm composition), and (c) **cross-consistency** across headings, readouts, captions, voice, lab, practice, and pictures. It writes `review.json` with `"reviewer": "independent"` and `"checks": { "conceptual": "pass"|"fail", "visual": "pass"|"fail" }`. `audit.mjs` rejects missing/self reviews, stale stamps after edits, open findings, or any failing `conceptual`/`visual` check. Fix every finding, rebuild, re-shoot, and re-run the fresh reviewer until both checks pass.
+   `audit.mjs` rejects missing/self reviews, stale stamps after edits, open findings, or any failing `conceptual`/`visual` check. Fix every finding, rebuild, re-shoot, and re-run the fresh reviewer until both checks pass.
 
 ## Workflow
 
 `<skill>` is this folder. A page's folder can live anywhere on the same disk: the scaffold imports the rig and the page from `<skill>/src` by a relative path.
 
-1. **Topics first** (Correctness, 1), then the one line: "A textbook draws <concept> as <shape>."
-2. **Scaffold:** `node <skill>/scripts/new-figure.mjs <name> --kind concept|machine --dir <folder>`. Build it and look at it once, so you know what passing looks like.
-3. **The model** (`model.mjs`): pure functions, no imports (the page inlines it). Test it against a separately written reference and the cases the story needs (`model.test.mjs`).
-4. **The figure** (`figure.mjs`): the field's shape from rig parts (`src/rig/mech.ts` + `turningPart()` for machines; `src/rig/parts.ts` or `src/rig/concept.ts` for concepts), each drawn once in `figure()` and placed in `pose(state)`; values and tones by attribute. **Working draft early:** build and open it before any polish; a wrong shape is cheap to change now.
-5. **The story** (`story.mjs`): steps with their `shot` and `subject`, headings, captions and the narration, all written from the model; `CLAIMS` and `COVERAGE`.
-6. **The hooks** (`build.mjs`): the motion through each step (`at`, `stillAt`), `boundsOf` for each camera name, the lab, `question(n, r)`, What if variants and the prediction.
-7. **Voice and build:** `node <folder>/voice.mjs`, then `node <folder>/build.mjs`.
+1. **Choose lane & mode, then topics first** (Correctness, 1): pick `--kind object|machine|concept` and `--mode everyday|fast|technical|deep` (combining flags if requested), then write the one-line shape plan.
+2. **Scaffold:** `node <skill>/scripts/new-figure.mjs <name> --kind object|machine|concept --mode everyday|fast|technical|deep --dir <folder>`. Build it and look at it once so you know what passing looks like.
+3. **The model** (`model.mjs`): pure functions, no imports (the page inlines it). Test it against an independent reference and the cases the story needs (`model.test.mjs`).
+4. **The figure** (`figure.mjs`): build the real object (`src/rig/objects.ts`), mechanical assembly (`src/rig/mech.ts` + `turningPart()`), or canonical concept (`src/rig/parts.ts` / `src/rig/concept.ts`), drawn once in `figure()` and posed in `pose(state)`. **Working draft early:** build and inspect before polish.
+5. **The story** (`story.mjs`): steps with their `shot` and `subject`, headings, captions, narration (plain English for `everyday`, exact SI/formulas for `--technical`), `CLAIMS` and `COVERAGE`.
+6. **The hooks** (`build.mjs`): `at`, `stillAt`, `boundsOf`, `DATA.lab`, `question(n, r)`, What if variants (as needed for the mode), and `DATA.predict`.
+7. **Voice and build:** run `node <folder>/voice.mjs` (skip when `--fast` / `--no-voice`), then `node <folder>/build.mjs`.
 8. **Check and look**, until each passes:
    - `node --test <folder>/*.test.mjs`
-   - `node <skill>/scripts/check-drawing.mjs <page>`: framing, subjects, the camera's calm and determinism, playback timing, the lab, the prediction, practice, the studio look checks (`references/look.md`: turn error, OKLab contrast, framing variety, subject span, leader length/crossing, and visibility), and the audit;
-   - `node <skill>/scripts/check-arithmetic.mjs <page>`: every printed sum, product, quotient and remainder, redone;
-   - `node <skill>/scripts/shoot-steps.mjs <page> --out <folder>/shots`, then open every light & dark image, then `--check-fresh`. Compare the shots against the studio baseline (`automatic-watch`, `differential`, `multi-agent`, `derailleur`, `bloom`).
-9. **Mandatory independent review:** generate the brief with `review-brief.mjs <audit> <dir>/review.json <page> --shots <folder>/shots` and give it to a fresh reviewer (Correctness, 4). Fix every conceptual or visual finding, rebuild, re-shoot, and re-run the independent reviewer until `review: current` with `checks.conceptual === "pass"` and `checks.visual === "pass"`.
+   - `node <skill>/scripts/check-drawing.mjs <page>` (add `--fast` in `--fast` mode)
+   - `node <skill>/scripts/check-arithmetic.mjs <page>`
+   - `node <skill>/scripts/shoot-steps.mjs <page> --out <folder>/shots` (add `--fast` in `--fast` mode), inspect every light & dark PNG, then `--check-fresh`.
+9. **Mandatory independent review:** run `review-brief.mjs <audit> <dir>/review.json <page> --shots <folder>/shots --mode <mode>` and dispatch to a fresh reviewer (or 2-agent parallel Domain + Visual reviewers). Fix every finding, rebuild, re-shoot, and re-verify until `checks.conceptual === "pass"` and `checks.visual === "pass"`.
 10. **Deliver** with this report, and nothing vaguer:
 
     ```text
-    Built <title>: <n> steps, from <parts>. Model tested against <reference>.
+    Built <title> (<mode>, --kind <kind>): <n> steps, from <parts>. Model tested against <reference>.
     check-drawing: passed. audit: clean (<n> claims, <m> topics, review: independent — conceptual pass, visual pass).
     arithmetic: <n> equations. shots: <n>, <first> to <last>, light & dark inspected.
     Files: <page>, <folder>. Open: <page>#step=<the key step>. Not verified by machine: <whatever you judged only by eye>.
@@ -135,14 +153,15 @@ A model checks the picture; `src/claims/audit.mjs` checks the words; and a fresh
 
 ## Craft rules (studio baseline, every model)
 
-`references/figures.md` gives the reasons, `references/look.md` the tokens, and the failure table the defect behind each.
-- **Bold shaded solids** in the studio materials (`src/rig/rig.css`, `references/look.md`, included before the page's own CSS), with a heavier silhouette than creases and a shine on lit edges. Out-of-focus parts recede by tone, never by opacity.
-- **Machine studio kit (`src/rig/mech.ts` + `turningPart()`):** wrap every turning thick solid in `turningPart()` (`worstErrPx < 0.5 px`; raw `moveInPlane()` on thick rotating solids fails `check-drawing`). Separate flat layered machines (watches, gearboxes, clutches) with `explodedStack()` + `centreLines()`. Use `plateShadow` on concave/holed parts and `{ sort: "face" }` or `drawSpiralRibbon` on coils and spoked cutouts.
-- **Concept studio kit (`src/rig/parts.ts` or `src/rig/concept.ts`):** draw the field's canonical shape (`parts.ts` for data structures & algorithms; `concept.ts` for tiered architectures & multi-stage systems), with live working on stage.
+`references/objects.md`, `references/figures.md`, and `references/look.md` give the reasons, tokens, and failure table.
+- **Bold shaded solids** in the studio materials (`src/rig/rig.css`, included before the page's own CSS), with heavier silhouettes than creases and shine on lit edges. Out-of-focus parts recede by tone, never by opacity.
+- **Everyday object studio kit (`src/rig/objects.ts`):** use `OBJECT_VIEW`, draw the recognizable real 3D object with cutaway internals (`vesselShell`, `liquidColumn`, `dipTube`, `plungerNozzle`, `sprayCone`, `watchCaseDial`, `watchHand`, `coiledSpring`) in real materials (`glass`, `liquid`, `mist`, `rubber`, `wood`), and pair it with a clean, never-receded side `explainerCard` / `meterBar`.
+- **Machine studio kit (`src/rig/mech.ts` + `turningPart()`):** wrap every turning thick solid in `turningPart()` (`worstErrPx < 0.5 px`). Separate flat layered machines with `explodedStack()` + `centreLines()`. Use `plateShadow` on concave/holed parts and `{ sort: "face" }` or `drawSpiralRibbon` on coils and spoked cutouts.
+- **Concept studio kit (`src/rig/parts.ts` or `src/rig/concept.ts`):** draw the field's canonical shape with live working on stage.
 - **Draw once, then move.** A figure rebuilt every frame stutters; `check-drawing` times every frame.
-- **Values are printed on parts** and read in both themes; a toned cell prints in its tone's dark ink.
-- **Arrows end on a face and never cross a printed value or index** (route them over a gap with `via`); `check-drawing` checks it.
-- **Motion means something:** a bit turns as its arrow lands; a key walks to the slot it looks at. Nothing moves for decoration.
+- **Values are printed on parts** (or crisp `explainerCard` / `workingStrip` panels) and read in both themes; dark-mode `data-t-bad` and toned cells keep readable ink.
+- **Arrows end on a face and never cross a printed value or index** (route over a gap with `via`).
+- **Motion means something:** liquid rises as the plunger rebounds, mist fires as pressure peaks, a bit turns as its arrow lands. Nothing moves for decoration.
 - **The figure dominates.** One desktop viewport holds the title, the figure, the heading, the readouts and the controls. One signal colour (`subject` orange) on a calm neutral stage; short, non-crossing callout leaders.
 
 ## Review gates
@@ -151,19 +170,20 @@ A model checks the picture; `src/claims/audit.mjs` checks the words; and a fresh
 |---|---|
 | `pnpm test` | all pass (models against references, the rig, the audit, the arithmetic) |
 | `pnpm typecheck` | no errors |
-| `node scripts/check-drawing.mjs <page>` | `drawing: passed` |
+| `node scripts/check-drawing.mjs <page> [--fast]` | `drawing: passed` |
 | `node scripts/check-arithmetic.mjs <page>` | `arithmetic: passed (<n> equations)` |
-| `node scripts/shoot-steps.mjs <page> --out <dir> --check-fresh` | `shots: all <n> newer than the page`, after looking at them |
+| `node scripts/shoot-steps.mjs <page> --out <dir> [--fast] --check-fresh` | `shots: all <n> newer than the page`, after looking at them |
 | `pnpm check:drawing` | every shipped Drawing page passes (after changing the rig, the page, the player or the checks) |
 
 The legacy scene.ts pages have their own gates (`verify.mjs`, `pnpm verify:controls`, `pnpm check:embed`, `export-svg.mjs`), in `references/verify.md`; run them only when you change those pages or their engine.
 
 ## References
 
-- `references/figures.md`: **the recipe, for machines and concepts**: the scaffold, the concept and machine parts, the look, draw once and move, the camera, the page's prediction, lab and step 0, insets, and every failure with its check.
+- `references/objects.md`: **everyday physical objects (`--kind object`)**: choosing object vs machine vs concept, Object + Side Explainer layout, `src/rig/objects.ts` API & materials, and the plain-English checklist.
+- `references/figures.md`: **the recipe for all three lanes and four modes**: the scaffold, object/machine/concept parts, the look, draw once and move, the camera, predictions, lab, insets, and every failure with its check.
 - `references/look.md`: studio materials, OKLab value contrast, shadows, type, and the look checks enforced by `check-drawing.mjs`.
 - `references/drawing.md`: the Drawing page for real machines: what every page has, the page contract, the flat cutaway for one-plane machines, and the rig's reference.
 - `references/craft.md`: the visual rules, each with the defect that taught it.
-- Legacy (scene.ts pages only): `references/authoring.md`, `references/kit.md`, `references/verify.md`.
 - `references/concept-rig.md`: the concept instruments in `src/rig/concept.ts` (tiers, hubs, conduits, the trace and budget lenses).
+- Legacy (scene.ts pages only): `references/authoring.md`, `references/kit.md`, `references/verify.md`.
 - `evals/evals.json`: held-out prompts for testing the skill on unfamiliar concepts.

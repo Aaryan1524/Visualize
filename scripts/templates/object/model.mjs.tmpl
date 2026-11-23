@@ -1,0 +1,149 @@
+// __TITLE__: the model (mode: __MODE__). REPLACE THIS FIRST. The scaffold's object is a spring pump
+// bottle, so everything around it builds and passes its checks; your physical object goes here, and
+// every number the page prints comes from it (src/claims/audit.mjs fails any un-modeled number).
+//
+// The page inlines this file (its `export` keywords removed), so it must not import anything.
+
+export const VARIANTS = {
+  standard: {
+    label: "Standard bottle",
+    bottleMl: 30,
+    doseMl: 0.2,
+    maxTravelMm: 5,
+    liquidHeightMaxMm: 22,
+    openPressure: 3,
+    refillPressure: 0.6,
+  },
+  travel: {
+    label: "Travel bottle",
+    bottleMl: 10,
+    doseMl: 0.1,
+    maxTravelMm: 4,
+    liquidHeightMaxMm: 20,
+    openPressure: 3,
+    refillPressure: 0.6,
+  },
+};
+
+/** Bottle reservoir state after `sprays` full presses, conserving total liquid volume. */
+export function pumpAfter(v, sprays) {
+  const totalSprays = Math.floor(v.bottleMl / v.doseMl + 1e-9);
+  const count = Math.max(0, Math.min(totalSprays, Math.round(sprays)));
+  const dispensedMl = +(count * v.doseMl).toFixed(2);
+  const remainingMl = +Math.max(0, v.bottleMl - dispensedMl).toFixed(2);
+  const fillFrac = v.bottleMl > 0 ? remainingMl / v.bottleMl : 0;
+  const liquidHeightMm = +(fillFrac * v.liquidHeightMaxMm).toFixed(2);
+  const spraysLeft = Math.max(0, totalSprays - count);
+  return { strokes: count, totalSprays, dispensedMl, remainingMl, fillFrac, liquidHeightMm, spraysLeft };
+}
+
+/**
+ * Physical state at progress `u` (0..1) inside one stage of the pump cycle:
+ *   "rest"   — plunger up, chamber primed with one full dose at room air pressure (1x)
+ *   "press"  — plunger pushed halfway down, bottom valve shuts, pressure builds to `openPressure`
+ *   "spray"  — top valve opens, plunger finishes its stroke, mist plume sprays one dose out
+ *   "refill" — return spring lifts plunger, low pressure draws one fresh dose up the dip tube
+ */
+export function cycleState(v, stage, u, priorSprays = 0) {
+  const t = Math.max(0, Math.min(1, u));
+  const pMin = v.refillPressure;
+  const pMax = v.openPressure;
+  const normP = (p) => Math.max(0, Math.min(1, (p - pMin) / Math.max(0.01, pMax - pMin)));
+
+  let pressFrac = 0;
+  let chamberFill = 1;
+  let pressureRatio = 1;
+  let mistIntensity = 0;
+  let bottomValveOpen = false;
+  let topValveOpen = false;
+  let spraysDone = priorSprays;
+  let statusLabel = "Ready";
+  let chamberLabel = `Primed (${v.doseMl.toFixed(1)} mL)`;
+
+  if (stage === "press") {
+    pressFrac = 0.55 * t;
+    chamberFill = 1;
+    pressureRatio = +(1 + (pMax - 1) * t).toFixed(2);
+    mistIntensity = 0;
+    bottomValveOpen = false;
+    topValveOpen = false;
+    statusLabel = "Building";
+    chamberLabel = "Sealed, squeezing";
+  } else if (stage === "spray") {
+    pressFrac = 0.55 + 0.45 * t;
+    chamberFill = +(1 - t).toFixed(2);
+    pressureRatio = +(pMax - 0.3 * t).toFixed(2);
+    // Keep mist visible from the start of the spray stage through its still frame (u = 1)
+    mistIntensity = +(0.3 + 0.65 * Math.sin(Math.min(1, t * 1.1) * (Math.PI / 2))).toFixed(2);
+    bottomValveOpen = false;
+    topValveOpen = true;
+    spraysDone = priorSprays + (t >= 0.4 ? 1 : 0);
+    statusLabel = "Spraying";
+    chamberLabel = `Emptying ${v.doseMl.toFixed(1)} mL`;
+  } else if (stage === "refill") {
+    pressFrac = 1 - t;
+    chamberFill = +t.toFixed(2);
+    // Pressure dips below room air while the spring lifts the plunger, then equalizes once full
+    pressureRatio = +(pMin + (1 - pMin) * Math.pow(t, 1.4)).toFixed(2);
+    mistIntensity = 0;
+    bottomValveOpen = true;
+    topValveOpen = false;
+    spraysDone = priorSprays + 1;
+    statusLabel = t < 0.85 ? "Refilling" : "Refilled";
+    chamberLabel = t < 0.85 ? "Drawing up tube" : `Refilled (${v.doseMl.toFixed(1)} mL)`;
+  }
+
+  const bottle = pumpAfter(v, spraysDone);
+  const plungerTravelMm = +(pressFrac * v.maxTravelMm).toFixed(2);
+  const pressureLabel = `${pressureRatio.toFixed(1)}× air`;
+  return {
+    stage,
+    u: t,
+    pressFrac,
+    plungerTravelMm,
+    chamberFill,
+    pressureRatio,
+    pressureFrac: +normP(pressureRatio).toFixed(3),
+    mistIntensity,
+    bottomValveOpen,
+    topValveOpen,
+    statusLabel,
+    chamberLabel,
+    pressureLabel,
+    ...bottle,
+  };
+}
+
+export function makeModel(v) {
+  const totalSprays = Math.floor(v.bottleMl / v.doseMl + 1e-9);
+  const stages = ["rest", "press", "spray", "refill"];
+  const steps = stages.map((s) => cycleState(v, s, 1, 0));
+  const refillLow = cycleState(v, "refill", 0.2, 0);
+  const afterOne = pumpAfter(v, 1);
+  const N = {
+    zero: 0,
+    one: 1,
+    restPressure: 1,
+    bottleMl: v.bottleMl,
+    doseMl: v.doseMl,
+    totalSprays,
+    maxTravelMm: v.maxTravelMm,
+    liquidHeightMaxMm: v.liquidHeightMaxMm,
+    openPressure: v.openPressure,
+    refillPressure: v.refillPressure,
+    afterOneMl: afterOne.remainingMl,
+    spraysLeftAfterOne: afterOne.spraysLeft,
+  };
+  return {
+    v,
+    totalSprays,
+    steps,
+    refillLow,
+    afterOne,
+    N,
+    pumpAfter: (sprays) => pumpAfter(v, sprays),
+    cycleState: (stage, u, prior = 0) => cycleState(v, stage, u, prior),
+  };
+}
+
+export const MODELS = Object.fromEntries(Object.entries(VARIANTS).map(([k, v]) => [k, makeModel(v)]));

@@ -5,6 +5,7 @@
 //
 //   node scripts/shoot-steps.mjs dist/<name>.html                 into dist/shots/<name>/
 //   node scripts/shoot-steps.mjs dist/<name>.html --out <dir> --scale 2 --themes light
+//   node scripts/shoot-steps.mjs dist/<name>.html --out <dir> --fast
 //   node scripts/shoot-steps.mjs dist/<name>.html --check-fresh   fail unless every shot is newer than the page
 //
 // Then open the images and look at each one. A check passes a frame that reads wrong (the camera's
@@ -18,10 +19,11 @@ import { reportFreshness, stamp } from "./lib/fresh.mjs";
 const args = process.argv.slice(2);
 const page = args.find((a) => !a.startsWith("--") && !/^\d/.test(a) && a.endsWith(".html"));
 if (!page) {
-  console.error("usage: node scripts/shoot-steps.mjs <built page.html> [--out dir] [--scale n] [--themes light,dark] [--check-fresh]");
+  console.error("usage: node scripts/shoot-steps.mjs <built page.html> [--out dir] [--scale n] [--themes light,dark] [--check-fresh] [--fast]");
   process.exit(2);
 }
 const opt = (k, d) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : d);
+const fast = args.includes("--fast");
 const name = basename(page, ".html");
 const out = resolve(opt("out", join(dirname(page), "shots", name)));
 if (args.includes("--check-fresh")) process.exit(reportFreshness(out, resolve(page)));
@@ -40,46 +42,79 @@ const browser = await launch();
 }
 let n = 0, first = null, last = null, failed = 0;
 try {
-  for (const theme of themes) {
-    const { page: p, errors } = await openPage(browser, resolve(page), { width: 1440, height: 900, theme, scale });
-    const shot = async (label) => {
-      await settle(p);
-      await new Promise((r) => setTimeout(r, 120));
-      // a camera still easing (to the lab's framing) would shoot a frame nobody stops on
-      await p.waitForFunction(() => !window.__viz.camera?.().blending, { timeout: 4000 }).catch(() => {});
-      const file = join(out, `${label}-${theme}.png`);
-      await p.screenshot({ path: file });
-      const t = stamp(file);
-      first ??= t;
-      last = t;
-      n++;
-      console.log(`wrote ${file} at ${t}`);
-    };
+  const shoot = async (p, label, theme) => {
+    await settle(p);
+    await new Promise((r) => setTimeout(r, 120));
+    // a camera still easing (to the lab's framing) would shoot a frame nobody stops on
+    await p.waitForFunction(() => !window.__viz.camera?.().blending, { timeout: 4000 }).catch(() => {});
+    const file = join(out, `${label}-${theme}.png`);
+    await p.screenshot({ path: file });
+    const t = stamp(file);
+    first ??= t;
+    last = t;
+    n++;
+    console.log(`wrote ${file} at ${t}`);
+  };
+
+  if (fast) {
+    const primary = themes.includes("light") ? "light" : themes[0];
+    const secondary = themes.filter((th) => th !== primary);
+    const { page: p, errors } = await openPage(browser, resolve(page), { width: 1440, height: 900, theme: primary, scale });
     const info = await p.evaluate(() => ({ steps: window.__viz.steps, variants: window.__viz.variants ?? [], inputs: window.__viz.labInputs?.() ?? [] }));
-    for (const v of info.variants.length ? info.variants : [null]) {
-      if (v) await p.evaluate((v) => window.__viz.variant(v), v);
-      const tag = v ? `${v}-` : "";
-      for (let k = 0; k < info.steps; k++) {
-        await p.evaluate((k) => window.__viz.seekStep(k), k);
-        await shot(`${tag}step-${k}`);
-      }
-      if (info.inputs.length) {
-        await p.evaluate(() => window.__viz.lab({}));
-        await shot(`${tag}lab`);
-        for (const inp of info.inputs)
-          for (const [end, val] of inp.type === "text" ? (inp.samples ?? []).map((s, i) => [`sample${i + 1}`, s]) : [["min", inp.min], ["max", inp.max]]) {
-            await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, val);
-            await shot(`${tag}lab-${inp.id}-${end}`);
-            await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, inp.value);
-          }
-        await p.evaluate(() => window.__viz.closeLab());
-      }
+    const v0 = info.variants.length ? info.variants[0] : null;
+    if (v0) await p.evaluate((v) => window.__viz.variant(v), v0);
+    for (let k = 0; k < info.steps; k++) {
+      await p.evaluate((k) => window.__viz.seekStep(k), k);
+      await shoot(p, `step-${k}`, primary);
     }
-    if (info.variants.length) await p.evaluate((v) => window.__viz.variant(v), info.variants[0]);
-    await p.evaluate(() => window.__viz.practice(3));
-    await shot("practice");
-    if (errors.length) (failed++, console.log(`console errors (${theme}): ${[...new Set(errors)].join(" | ")}`));
+    if (info.inputs.length) {
+      await p.evaluate(() => window.__viz.lab({}));
+      await shoot(p, "lab", primary);
+      await p.evaluate(() => window.__viz.closeLab());
+    }
+    if (errors.length) (failed++, console.log(`console errors (${primary}): ${[...new Set(errors)].join(" | ")}`));
     await p.close();
+
+    // One sanity shot of the key step in each secondary theme (e.g. dark: step-2-dark.png or step-1-dark.png).
+    const keyStep = info.steps > 2 ? 2 : Math.max(0, info.steps - 1);
+    for (const theme of secondary) {
+      const { page: dp, errors: dErrors } = await openPage(browser, resolve(page), { width: 1440, height: 900, theme, scale });
+      if (v0) await dp.evaluate((v) => window.__viz.variant(v), v0);
+      await dp.evaluate((k) => window.__viz.seekStep(k), keyStep);
+      await shoot(dp, `step-${keyStep}`, theme);
+      if (dErrors.length) (failed++, console.log(`console errors (${theme}): ${[...new Set(dErrors)].join(" | ")}`));
+      await dp.close();
+    }
+  } else {
+    for (const theme of themes) {
+      const { page: p, errors } = await openPage(browser, resolve(page), { width: 1440, height: 900, theme, scale });
+      const shot = (label) => shoot(p, label, theme);
+      const info = await p.evaluate(() => ({ steps: window.__viz.steps, variants: window.__viz.variants ?? [], inputs: window.__viz.labInputs?.() ?? [] }));
+      for (const v of info.variants.length ? info.variants : [null]) {
+        if (v) await p.evaluate((v) => window.__viz.variant(v), v);
+        const tag = v ? `${v}-` : "";
+        for (let k = 0; k < info.steps; k++) {
+          await p.evaluate((k) => window.__viz.seekStep(k), k);
+          await shot(`${tag}step-${k}`);
+        }
+        if (info.inputs.length) {
+          await p.evaluate(() => window.__viz.lab({}));
+          await shot(`${tag}lab`);
+          for (const inp of info.inputs)
+            for (const [end, val] of inp.type === "text" ? (inp.samples ?? []).map((s, i) => [`sample${i + 1}`, s]) : [["min", inp.min], ["max", inp.max]]) {
+              await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, val);
+              await shot(`${tag}lab-${inp.id}-${end}`);
+              await p.evaluate((id, val) => window.__viz.lab({ [id]: val }), inp.id, inp.value);
+            }
+          await p.evaluate(() => window.__viz.closeLab());
+        }
+      }
+      if (info.variants.length) await p.evaluate((v) => window.__viz.variant(v), info.variants[0]);
+      await p.evaluate(() => window.__viz.practice(3));
+      await shot("practice");
+      if (errors.length) (failed++, console.log(`console errors (${theme}): ${[...new Set(errors)].join(" | ")}`));
+      await p.close();
+    }
   }
 } finally {
   await browser.close();
