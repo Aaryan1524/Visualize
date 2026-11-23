@@ -1,200 +1,251 @@
 <h1 align="center">Visualize</h1>
 
-<p align="center"><b>An Agent Skill that turns a one-line request into a step-through explanation you can trust.</b><br>A figure that moves one step at a time (a to-scale technical cutaway for a machine, the same ink-drawing style in 3D for an idea), a voice that explains it, and a reader who predicts and practises.<br>Every number on the page is checked against a running model of the idea.</p>
+<p align="center">
+  <b>Turn a one-line prompt into a narrated, interactive 3D cutaway or explainer you can actually trust.</b><br>
+  To-scale mechanical cutaways for real machines. Matching ink-and-metal 3D figures for algorithms, protocols, and systems.<br>
+  Every number is proved by a running model, checked in headless Chrome, and signed off by an independent reviewer.
+</p>
 
 <p align="center">
-  <a href="https://code.claude.com/docs/en/skills"><img src="https://img.shields.io/badge/Claude_Code-skill-1b1b19?style=flat-square&logo=claude&logoColor=white" alt="Claude Code skill"></a>
-  <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-compatible-1b1b19?style=flat-square" alt="Agent Skills compatible"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1b1b19?style=flat-square" alt="MIT license"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/Claude_Code-skill-1b1b19?style=flat-square&logo=claude&logoColor=white" alt="Claude Code skill"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/Codex-skill-1b1b19?style=flat-square" alt="Codex skill"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/Antigravity-skill-1b1b19?style=flat-square" alt="Antigravity skill"></a>
+  <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-open_standard-1b1b19?style=flat-square" alt="Agent Skills open standard"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2024-1b1b19?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node 24 or later"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.1.0-1b1b19?style=flat-square" alt="Version 1.1.0"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.1.0-c85a17?style=flat-square" alt="Version 1.1.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1b1b19?style=flat-square" alt="MIT license"></a>
   <a href="https://github.com/Aaryan1524/Visualize/actions/workflows/ci.yml"><img src="https://github.com/Aaryan1524/Visualize/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#gallery">Gallery</a> ·
-  <a href="#what-the-reader-gets">What the reader gets</a> ·
+  <a href="#30-second-quick-start">Quick start</a> ·
+  <a href="#built-from-a-one-line-prompt">Showcase</a> ·
+  <a href="#why-it-doesnt-hallucinate">How it works</a> ·
+  <a href="#what-the-reader-gets">Features</a> ·
   <a href="#install">Install</a> ·
-  <a href="#usage">Usage</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="#requirements">Requirements</a> ·
-  <a href="#limits">Limits</a>
+  <a href="#prompts-to-try">Prompts</a> ·
+  <a href="#requirements">Requirements</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Aaryan1524/Visualize/releases/download/v1.0.0/derailleur-tour.mp4"><img src=".github/assets/derailleur.gif" width="760" alt="A page titled Rear Derailleur, playing. A shaded rear derailleur under an eleven-cog cassette shifts the chain from cog to cog while the cage swings to take up slack; a magnified circle follows the guide pulley from behind, and readouts under the drawing (teeth, cable pull, cage swing, chain tension) change with every shift."></a>
+  <a href="https://github.com/Aaryan1524/Visualize/releases/download/v1.0.0/derailleur-tour.mp4"><img src=".github/assets/derailleur.gif" width="780" alt="Rear Derailleur interactive cutaway playing: a shaded rear derailleur under an eleven-cog cassette shifts the chain from cog to cog while the cage swings to take up slack, with a magnified detail lens and live readouts below."></a>
 </p>
 
-<p align="center"><sub><b>Rear Derailleur</b>, made from one line: <code>/visualize explain how a bicycle rear derailleur works</code>. The model solves the spring and chain forces; the voice explains, the reader predicts, and a lab lets them back out the limit screw.<br><a href="https://github.com/Aaryan1524/Visualize/releases/download/v1.0.0/derailleur-tour.mp4"><b>▶ Watch the full narrated tour (MP4, with sound)</b></a></sub></p>
+<p align="center"><sub><b>Rear Derailleur</b> — generated from <code>/visualize explain how a bicycle rear derailleur works</code>.<br>A real spring-and-chain physics model drives the geometry; a local voice narrates each step; a lab lets you back out the limit screw.<br><a href="https://github.com/Aaryan1524/Visualize/releases/download/v1.0.0/derailleur-tour.mp4"><b>▶ Watch the full narrated tour (MP4, with sound)</b></a></sub></p>
 
 ---
 
-Ask for an explanation of an algorithm, a data structure, a protocol or a mechanism, and Visualize builds it in three parts. First comes an executable **model** of the idea, tested against a separately written reference. Next, a **view** draws each state of the model in the shape the field already uses: a ring for anything circular, a tree over its array for a heap, a sequence diagram for timing. Last, **checks** open the page in headless Chrome and prove that every step shows exactly what the model computed.
+## 30-second quick start
 
-The result is a single HTML page. The camera opens on the flat diagram the reader knows, moves to what each step is about, and ends flat again. A recorded voice explains the concept first, then narrates each step and lights each part as it names it. Before the key moment, the reader is asked to predict what happens next. Afterwards they can try the idea on other inputs and answer questions the model writes and marks.
+Works out of the box in **Claude Code**, **Codex**, and **Antigravity** (and any [Agent Skills](https://agentskills.io)-compatible agent).
 
-## Quick start
+**1. Clone into your agent's skills folder & install once:**
 
 ```sh
-git clone https://github.com/Aaryan1524/Visualize.git ~/.claude/skills/visualize
-cd ~/.claude/skills/visualize && npm install
+# Claude Code
+git clone https://github.com/Aaryan1524/Visualize.git ~/.claude/skills/visualize && cd ~/.claude/skills/visualize && npm install
+
+# Codex
+git clone https://github.com/Aaryan1524/Visualize.git ~/.agents/skills/visualize && cd ~/.agents/skills/visualize && npm install
+
+# Antigravity (CLI)
+git clone https://github.com/Aaryan1524/Visualize.git ~/.gemini/config/skills/visualize && cd ~/.gemini/config/skills/visualize && npm install
 ```
 
-Then, in Claude Code:
+*(Using the Antigravity desktop app or want a per-project install? See [Install](#install).)*
+
+**2. Open a new session and ask for anything:**
 
 ```text
-/visualize explain how an LRU cache works
+/visualize explain how a car's open differential works
 ```
 
-That's it. For Codex or Antigravity, clone into that agent's folder instead (see [Install](#install)); in Codex, type `$visualize`.
+*(In Codex, type `$visualize ...`. Want a multi-chapter deep dive? Add `--deep`.)*
 
-## Gallery
+You get **one standalone HTML file** — offline, light & dark themes, interactive 3D camera, voice narration, prediction checkpoints, and an interactive lab.
 
-<p align="center"><img src=".github/assets/lru-cache-predict.jpg" width="720" alt="A page titled LRU Cache in the drawing look. Three keys drawn in ink, B, C and an orange A, sit in a hatched cache tray marked least recent to most recent, with a queue of upcoming requests below and a title block with the legend at the top right. A card asks the reader to predict: D is next, which key leaves? A strip under the figure lists each request as a hit or a miss."></p>
+---
 
-<p align="center"><sub><b>lru-3d</b>, the flagship for concepts: an LRU cache in the drawing look, paused on a prediction before the first eviction.</sub></p>
+## Built from a one-line prompt
 
-<p align="center"><img src=".github/assets/escalator.jpg" width="720" alt="A page titled Escalator: a to-scale side cutaway of an escalator in a hatched building section. A blue chain-wheel track and a green trailer-wheel track run up a 30 degree incline, one step is followed in orange, and Detail A at 2.6 to 1 shows the step's 200 mm rise. Readouts under the drawing give step rise, tread tilt, tread height, speed and step count."></p>
-
-<p align="center"><sub><b>escalator</b>, the flagship for mechanisms: two wheels on two offset tracks keep every tread level. Drawn to scale from a tested model, with a voice, a prediction before the landing and a 30°/35° What if.</sub></p>
-
-<p align="center"><img src=".github/assets/lock.jpg" width="720" alt="A page titled Pin Tumbler Lock, on its Picking step: a to-scale long section of a lock cylinder with five pin stacks. A tension wrench and a pick, in orange, reach into the keyway; two driver pins already sit set on the plug's edge above the blue shear line while the pick lifts a third stack. Section A-A through chamber 3 is shown in a detail circle, with readouts for pins set, allowance and plug turn below."></p>
-
-<p align="center"><sub><b>lock</b>: why only the right key turns, from the problem (one key among about 92,000) to the second idea, picking. The reader can cut a key of their own in the lab and watch each pin land.</sub></p>
+Every image below is an unedited screenshot of a standalone HTML page built from [`examples/`](examples), verified in headless Chrome, and rendered in the v1.1.0 studio rig.
 
 <table>
   <tr>
-    <td width="50%"><img src=".github/assets/lru-cache-evict.jpg" alt="The LRU cache a few steps later in the drawing look: C has been evicted and B enters as the most recent key, in orange. The strip reads 1 hit, 5 misses, 2 evictions."></td>
-    <td width="50%"><img src=".github/assets/lru-cache-clay.jpg" alt="The same LRU cache in the Clay look: soft matte keys on a warm tray with soft shadows, B in solid orange as it enters."></td>
+    <td width="50%"><img src=".github/assets/automatic-watch.jpg" alt="Automatic Watch exploded 6-layer mechanical calibre in studio light theme with chapter tabs and live escapement readouts."></td>
+    <td width="50%"><img src=".github/assets/multi-agent.jpg" alt="Multi-Agent Orchestration 3-tier concept plate with live Gantt Trace, Context Occupancy lens, and interactive Predict card."></td>
   </tr>
   <tr>
-    <td><sub><b>lru-3d</b>: C leaves and B enters. The strip and the counts come from the same model that moves the keys.</sub></td>
-    <td><sub><b>lru-3d, Clay</b>: the same scene in the soft look, on request. The drawing look is the default, so concepts match the machines.</sub></td>
+    <td><sub><b>Automatic Mechanical Watch (<code>--deep</code>, 14 steps · 4 chapters)</b><br><code>/visualize --deep explain how an automatic mechanical watch keeps time</code><br>6-layer exploded calibre on dashed centre lines, live balance-wheel beat, Swiss lever escapement, and mainspring torque curve.</sub></td>
+    <td><sub><b>Multi-Agent Orchestration (<code>--deep</code>, 14 steps · 4 chapters)</b><br><code>/visualize --deep explain multi-agent orchestration</code><br>3-tier Concept Plate with per-step camera moves, live Gantt Trace + Context Occupancy lens, and interactive Predict checkpoints.</sub></td>
   </tr>
   <tr>
-    <td><img src=".github/assets/attention.jpg" alt="Scaled dot-product attention on an isometric board: query, key and value bars for the words the, cat and sat, softmax weights 0.09, 0.77 and 0.13 as gauges, with the equation and the weight grid in linked panels."></td>
-    <td><img src=".github/assets/retries.jpg" alt="Two payment worlds side by side, with no key and with an idempotency key: a terminal retries after a lost reply, a server, a key store and a ledger. A timeline strip lists the events in milliseconds."></td>
+    <td width="50%"><img src=".github/assets/differential.jpg" alt="Open Differential cutaway in light theme showing bevel spider gears, brass sun gears, crown ring gear, and 5-spoke wheels."></td>
+    <td width="50%"><img src=".github/assets/differential-dark.jpg" alt="Open Differential in dark theme on the Glare Ice trap step, showing one wheel spinning freely on translucent blue ice while the other stays parked."></td>
   </tr>
   <tr>
-    <td><sub><b>attention</b>: softmax turns scores into weights that sum to 1. Pointing at a weight lights the vectors it came from.</sub></td>
-    <td><sub><b>retries</b>: a payment retried after a lost reply, run in two synced worlds, without and with an idempotency key.</sub></td>
+    <td><sub><b>Open Differential — Light Theme</b><br><code>/visualize explain how an open differential works</code><br>Cutaway steel carrier, orbiting bevel spiders, brass sun gears, and <code>ω_L + ω_R = 2·ω_ring</code> enforced by the physics model.</sub></td>
+    <td><sub><b>Open Differential — Dark Theme (Glare-Ice Trap)</b><br>Every page ships with a one-click <b>Dark</b> toggle (or <code>#theme=dark</code>). Here, low traction on the left wheel stalls the right wheel at 0 rpm.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src=".github/assets/bloom.jpg" alt="Bloom Filter 16-bit array on studio rig with routed hash arrows, word card, and live modulo arithmetic strip."></td>
+    <td width="50%"><img src=".github/assets/escalator.jpg" alt="Escalator to-scale technical cutaway showing dual offset wheel tracks keeping every tread level with Detail A magnification."></td>
+  </tr>
+  <tr>
+    <td><sub><b>Bloom Filter</b><br><code>/visualize explain how a Bloom filter works</code><br>16-bit array on the Concept Plate rig, routed hash arrows, live <code>h₁/h₂/h₃ mod 16</code> working strip, and false-positive proof.</sub></td>
+    <td><sub><b>Escalator</b><br><code>/visualize explain how an escalator keeps its steps level</code><br>Two wheels on two offset tracks, drawn to scale from a kinematic model, with a 2.6× Detail A lens and a 30°/35° lab.</sub></td>
   </tr>
 </table>
 
-Every screenshot is the light theme of a page built from [`examples/`](examples) with `node scripts/build.mjs` and captured with [`scripts/shoot.mjs`](scripts/shoot.mjs). The escalator and the lock build with their own `build.mjs`.
+<details>
+<summary><b>More examples</b> — Pin Tumbler Lock, LRU Cache (Drawing &amp; Clay), Attention, Idempotent Retries</summary>
+
+<br>
+
+<table>
+  <tr>
+    <td width="50%"><img src=".github/assets/lock.jpg" alt="Pin Tumbler Lock cutaway on its Picking step with tension wrench, pick, five pin stacks, shear line, and Section A-A detail."></td>
+    <td width="50%"><img src=".github/assets/lru-cache-predict.jpg" alt="LRU Cache in drawing look paused on a prediction card before eviction."></td>
+  </tr>
+  <tr>
+    <td><sub><b>Pin Tumbler Lock</b> — why only 1 of ~92,000 keys turns, how picking exploits binding order, and a key-cutting lab.</sub></td>
+    <td><sub><b>LRU Cache</b> — paused on a prediction before the first eviction; hit/miss strip driven directly by the model.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src=".github/assets/attention.jpg" alt="Scaled dot-product attention isometric board with Q/K/V bars, softmax weights, and linked equation panel."></td>
+    <td width="50%"><img src=".github/assets/retries.jpg" alt="Side-by-side payment worlds with and without an idempotency key and millisecond timeline strip."></td>
+  </tr>
+  <tr>
+    <td><sub><b>Scaled Dot-Product Attention</b> — hovering a softmax weight lights the query and key vectors that produced it.</sub></td>
+    <td><sub><b>Idempotent Retries</b> — two synced worlds side by side showing why a lost reply double-charges without a key.</sub></td>
+  </tr>
+</table>
+
+</details>
+
+---
+
+## Why it doesn't hallucinate
+
+Most AI-generated diagrams look pretty for two seconds and break the moment you read the numbers — mismatched gear ratios, floating labels, impossible physics, or prose that contradicts the drawing.
+
+Visualize runs a strict **7-stage engineering pipeline** designed to deliver the same studio-grade result across **Claude, Codex, and Gemini**:
+
+```text
+  Prompt ──▶ 1. PLAN      Pick Machine vs. Concept look, story arc, key moments, and chapters
+         ──▶ 2. SCAFFOLD  `new-figure.mjs` stamps out the studio shell (rig, palette, dark mode, tests)
+         ──▶ 3. MODEL     Write a real executable model + independent reference test (physics or state trace)
+         ──▶ 4. RIG       Draw every frame from model outputs using `mech.ts` / `concept.ts` 3D primitives
+         ──▶ 5. VOICE     Record offline narration that lights up each part in sync as it names it
+         ──▶ 6. CHECKS    Headless Chrome audits: layout, label overlap, contrast, FPS, arithmetic claims
+         ──▶ 7. REVIEW    Mandatory fresh-context reviewer inspects every step PNG, concept truth, and math
+```
+
+- **Zero hand-waved math.** [`check-arithmetic.mjs`](scripts/check-arithmetic.mjs) parses equations and readouts in the built HTML and flags any mismatch against the model.
+- **Zero visual regressions.** [`check-drawing.mjs`](scripts/check-drawing.mjs) opens the page in headless Chrome across light & dark themes, checks label collisions, bounding-box clipping, contrast, and frame pacing.
+- **Zero self-grading.** Before any visualization is marked done, [`review-brief.mjs`](scripts/review-brief.mjs) packages the rendered step screenshots and audit output for a **fresh-context reviewer** (independent subagent or dedicated pass) that can only pass when both the studio craft *and* the underlying domain truth hold up.
+
+---
 
 ## What the reader gets
 
-| | What it is |
+| Capability | What it actually does |
 |---|---|
-| **A checked picture** | Every value, order, size, highlight and caption is declared by the model and read back from the rendered page at every step. Planted faults prove the checks can fail. |
-| **The field's own shape** | A tree over its array, a ring, a stock with its refill and gate, a row with pointers, a sequence diagram for timing. The kit's parts never choose the picture. |
-| **The right look for the subject** | A real machine is a sharp technical cutaway, drawn to scale, with hatched sections, dimensions and a magnified detail for each step. An idea is built from 3D parts in the same style (ink outlines, hatched base plates, the same palette and title block) on a directed stage that opens flat, moves to each step's focus and ends flat. Clay and Paper looks remain on request. |
-| **A voice** | Recorded locally by an open-source voice model, offline after one download. It explains the concept first, then narrates each step in one take and lights each part as it is named. ▶ plays the narrated tour and waits for every sentence. |
-| **Predict, What if, Now you try** | A pause to predict before the key moment, the same idea on other inputs, and questions the model makes and marks. |
-| **A page you own** | One standalone HTML file per scene. It opens in the light theme on every system; a Dark button (or a `#theme=dark` link) switches it. Reduced motion, keyboard control, `#step=` links and a text version of every step. Also an SVG of any step, or a React component. |
+| **Model-verified visuals** | Every position, angle, count, highlight, and caption is computed by a tested model and verified against the live DOM in headless Chrome. |
+| **Machine Cutaways & Concept Plates** | Physical devices render as to-scale 3D technical cutaways (`src/rig/mech.ts` + `parts.ts`). Algorithms, protocols, and architectures render on the matching 3D Concept Plate (`src/rig/concept.ts`) with per-step camera framing. |
+| **Synced voice narration** | Recorded locally via an open-source TTS model (offline after one ~90 MB download). Explains the big idea first, then walks step-by-step and highlights each part the moment it's spoken. |
+| **Active learning built in** | **Predict** cards pause before the twist; **Labs / What if** let the reader change real parameters (cut a key, drop traction to ice, flood a queue); **Now you try** quizzes are generated and graded by the model. |
+| **One standalone HTML file** | Zero external runtime dependencies. Share via Slack, embed in docs, or open offline. Includes Light/Dark theme toggle, keyboard navigation (`←` `→` `Space`), `#step=` deep links, reduced motion, and full text transcripts. Also exports static **SVG** or **React** components. |
+
+---
 
 ## Install
 
-Visualize is a standard [Agent Skill](https://agentskills.io): a folder with a `SKILL.md` at its root. This repository is that folder. Clone it into your agent's skills folder under the name `visualize`, then run `npm install` in it once.
+Visualize follows the open [Agent Skills](https://agentskills.io) standard — this repository *is* the skill folder. Clone it into your agent's skills directory under the name `visualize`, then run `npm install` once.
 
-| Agent | Command | Run it with |
+| Agent | Install command | Invoke with |
 |---|---|---|
 | **Claude Code** | `git clone https://github.com/Aaryan1524/Visualize.git ~/.claude/skills/visualize` | `/visualize …` |
 | **Codex** | `git clone https://github.com/Aaryan1524/Visualize.git ~/.agents/skills/visualize` | `$visualize …` |
-| **Antigravity** (CLI) | `git clone https://github.com/Aaryan1524/Visualize.git ~/.gemini/config/skills/visualize` | `/visualize …` |
-| **Antigravity** (app) | `git clone https://github.com/Aaryan1524/Visualize.git ~/.gemini/antigravity/skills/visualize` | `/visualize …` |
-| **One project, any agent** | clone into `.claude/skills/visualize` or `.agents/skills/visualize` in the project | as above |
+| **Antigravity (CLI)** | `git clone https://github.com/Aaryan1524/Visualize.git ~/.gemini/config/skills/visualize` | `/visualize …` |
+| **Antigravity (App)** | `git clone https://github.com/Aaryan1524/Visualize.git ~/.gemini/antigravity/skills/visualize` | `/visualize …` |
+| **Single project** | Clone into `.claude/skills/visualize` or `.agents/skills/visualize` inside your repo | as above |
 
-Then, in the folder you cloned into:
+Then install dependencies once inside that folder:
 
 ```sh
-npm install
+cd <your-visualize-folder> && npm install
 ```
 
-Each agent picks the skill up in a new session. To update later, `git pull` in that folder.
+Start a new agent session and you're ready. Update anytime with `git pull`.
 
 <details>
-<summary><b>Codex: if the checks can't start Chrome</b></summary>
+<summary><b>Codex: if headless Chrome checks are blocked by the sandbox</b></summary>
 
 <br>
 
-The skill checks every page in headless Chrome. Codex's sandbox can stop Chrome from starting; the page is still built, and only the checks fail, with a message that says so. When Codex asks to run the check outside the sandbox, approve it for that command (this needs the default `approval_policy = "on-request"`). Or run the check yourself in a normal terminal: `node ~/.agents/skills/visualize/scripts/verify.mjs <scene folder>`.
+Visualize checks every built page in headless Chrome. Codex's sandbox can prevent Chrome from launching — the HTML page still builds cleanly, and only the browser check fails with a clear message. Approve running the check command outside the sandbox when prompted (requires default `approval_policy = "on-request"`), or run it directly in your terminal:
+
+```sh
+node ~/.agents/skills/visualize/scripts/verify.mjs <scene-folder>
+```
 
 </details>
 
 <details>
-<summary><b>Antigravity: running without prompts</b></summary>
+<summary><b>Antigravity: running headless (<code>agy -p</code>) without prompts</b></summary>
 
 <br>
 
-In headless mode (`agy -p`), Antigravity can't ask for permission, so it needs allow rules for the skill folder and for `node`. Add them under `permissions.allow` in its `settings.json`, or pass them for one session with `--settings`:
+Add allow rules for the skill folder and `node` under `permissions.allow` in `settings.json` (or pass via `--settings`):
 
 ```json
-{ "permissions": { "allow": [
-  "read_file(~/.gemini/config/skills/visualize)",
-  "command(node ~/.gemini/config/skills/visualize/scripts/)"
-] } }
+{
+  "permissions": {
+    "allow": [
+      "read_file(~/.gemini/config/skills/visualize)",
+      "command(node ~/.gemini/config/skills/visualize/scripts/)"
+    ]
+  }
+}
 ```
 
-Add `read_file` and `write_file` rules for your project folder too. In the interactive app, approve each command when asked.
+Add `read_file` / `write_file` rules for your project directory as well. In the interactive app, simply approve commands when prompted.
 
 </details>
 
-## Usage
+---
 
-Type `/visualize` (in Codex, `$visualize`) and say what the reader should understand:
+## Prompts to try
 
-```text
-/visualize explain how an LRU cache works
-```
-
-You don't have to name the skill. It also loads when you ask for an algorithm, data structure, protocol or mechanism to be explained visually, animated or step by step.
-
-<details>
-<summary><b>More prompts</b>, from the skill's <a href="evals/evals.json">evals</a></summary>
-
-<br>
+You don't even have to type `/visualize` — the skill also triggers automatically when you ask for a machine, algorithm, protocol, or system to be explained visually or step by step.
 
 ```text
-/visualize Explain a token-bucket rate limiter for our API docs: the bucket holds 10 tokens, refills 2 per second, each request takes one token, and requests are rejected when it is empty. Show a burst that drains it and the recovery.
-```
+# Real machines (to-scale 3D cutaways)
+/visualize explain how a car's open differential works
+/visualize explain how a four-stroke internal combustion engine works
+/visualize --deep explain how an automatic mechanical watch keeps time
 
-```text
-/visualize Make an interactive explainer of a ring buffer with capacity 6: writes advance the head, reads advance the tail, and a write to a full buffer overwrites the oldest value.
-```
-
-```text
-/visualize Explain database connection pooling for our Next.js docs: a pool of 4 connections, requests borrow and return them, and extra requests wait in a queue. Give me a React component too.
-```
-
-```text
-/visualize Explain TCP retransmission: a segment is lost, the sender times out and retransmits, and duplicate ACKs trigger fast retransmit. I want an SVG of the key moment for a blog post.
-```
-
-</details>
-
-Want the long version? Add `--deep`, or just ask for it in words ("in depth", "deep dive"):
-
-```text
+# Systems, protocols & ML (3D Concept Plates + live lenses)
 /visualize --deep explain multi-agent orchestration
+/visualize explain how a Bloom filter works with 16 bits and 3 hash functions
+/visualize explain a token-bucket rate limiter: capacity 10, refill 2/s, show a burst draining it and recovery
+/visualize explain TCP fast retransmit: lose a segment, show 3 duplicate ACKs, and export an SVG of the key step
+/visualize explain database connection pooling (pool of 4) and give me a React component for our Next.js docs
 ```
 
-A deep explanation is 4–6 chapters, about 10–15 minutes: the core idea, then how it fails, the trade-offs, the variants used in practice and the edge cases. Each chapter has its own prediction, the header shows one tab a chapter, and the page remembers where you stopped. Every step is still checked against the model.
+### Deep mode (`--deep`)
 
-Three habits get the best pages:
+Add `--deep` (or say *"in depth"* / *"deep dive"*) for a **4–6 chapter, 10–15 minute** interactive tour: core mechanism → failure modes → trade-offs → real-world variants → edge cases. Each chapter gets its own header tab, prediction checkpoint, and saved reading progress.
 
-1. **Give the real numbers.** Capacities, rates, sizes and inputs. The model runs on them, and the reader sees them.
-2. **Say what should happen.** "A burst that drains it", "a write to a full buffer". That becomes the story and the moment the reader predicts.
-3. **Say where it will live.** A standalone page, an SVG for a post, or a React component for your docs.
+**Three tips for the best output:**
+1. **Include real numbers** (capacities, gear teeth, rates, bit counts) — the model runs directly on them.
+2. **Name the dramatic moment** (*"glare ice stalls one wheel"*, *"a burst drains the bucket"*) — it becomes the Predict checkpoint.
+3. **Name the target format** if you want more than standalone HTML (e.g., *"also export an SVG"* or *"give me a React component"*).
+
+---
 
 ## How it works
-
-- **[`SKILL.md`](SKILL.md)** is what the agent reads. It sets the workflow: write and test the model, choose the shape the field draws, assemble the view from finished parts, declare what the reader should see, then build, verify and read the screenshots.
-- **[`src/`](src)** is the engine and the kit. It has the trace and step model, keyed motion, the 3D stage and its looks, the isometric stage, the player, and finished parts (rails, rings, trees, markers, reservoirs, sources, gates, servers, ledgers, cables).
-- **[`references/`](references)** are the long-form guides the agent opens when it needs them: the kit API, authoring (stage, voice, What if, Now you try), craft rules, and every check.
-- **Verification.** [`scripts/verify.mjs`](scripts/verify.mjs) runs the model in Node, separately from the page, and compares it with what Chrome draws. That covers observations, captions, depth order, framing, label overlap and cut-off, text size and contrast, determinism, keyboard, reduced motion and console errors. `--controls` plants faults and fails unless every one is caught.
 
 <details>
 <summary><b>Repository layout</b></summary>
@@ -203,66 +254,78 @@ Three habits get the best pages:
 
 ```text
 visualize/
-├── SKILL.md            the skill: governing idea, decision table, workflow, parts, gates
+├── SKILL.md                 Governing workflow, studio contract, and mandatory review gates
 ├── src/
-│   ├── core/           trace, steps, timeline, keyed interpolation, scene types
-│   ├── unfold/         the 3D stage, directed camera and looks (drawing, Clay, Paper)
-│   ├── iso/            the isometric projection and depth sort
-│   ├── parts/          finished parts: rail, ring, tree, network, flow
-│   ├── drawing/        the Drawing page and player shared by every machine
-│   ├── rig/            the engine for machine figures that read as 3D (the derailleur)
-│   ├── claims/         the audit of what a page says, not only what its model computes
-│   ├── render/         the player, SVG stage, panels, components, styles
-│   └── react/          the React adapter
-├── references/         kit.md, authoring.md, craft.md, verify.md
-├── scripts/            build, verify, voice, shoot, export-svg, new-scene
-├── examples/           derailleur, escalator and lock (machines), lru-3d (concept flagship), lru, attention, retries
-├── test/fixtures/      gallery scenes and the planted faults
-└── evals/evals.json    test prompts and what a good answer contains
+│   ├── rig/                 3D studio projection, shading, lighting (`mech.ts`, `parts.ts`, `concept.ts`)
+│   ├── drawing/             Shared interactive Drawing page, camera easing, player, tabs, dark mode, lab
+│   ├── claims/              Model-vs-prose arithmetic audit (`audit.mjs`, `arithmetic.mjs`)
+│   ├── core/                Trace, steps, timeline, keyed interpolation, scene types
+│   ├── unfold/              Directed 3D stage and looks (Drawing, Clay, Paper)
+│   ├── iso/                 Isometric projection and depth sorting
+│   ├── parts/               Reusable concept parts (rail, ring, tree, network, flow)
+│   ├── render/              SVG stage, panels, player controls, styles
+│   └── react/               React component adapter
+├── references/              Detailed guides (`look.md`, `figures.md`, `kit.md`, `authoring.md`, `craft.md`, `verify.md`)
+├── scripts/
+│   ├── new-figure.mjs       Scaffolds a studio-grade Machine or Concept figure from templates
+│   ├── templates/           Hardened machine & concept starter templates
+│   ├── check-drawing.mjs    Headless Chrome layout, contrast, callout, and FPS checks
+│   ├── check-arithmetic.mjs Verifies every equation and readout against the model
+│   ├── shoot-steps.mjs      Captures light & dark contact sheets of every step
+│   ├── review-brief.mjs     Builds the mandatory fresh-context reviewer brief
+│   ├── voice.mjs            Local offline TTS narration + word-level sync
+│   └── build.mjs / verify.mjs / export-svg.mjs / plant-look.mjs
+├── examples/                automatic-watch, differential, derailleur, escalator, lock,
+│                            multi-agent, bloom, lru-3d, lru, attention, retries
+├── test/fixtures/           Gallery scenes and planted-fault controls
+└── evals/evals.json         Prompt benchmarks and acceptance criteria
 ```
 
 </details>
 
 <details>
-<summary><b>Commands</b>, for working on the kit</summary>
+<summary><b>Developer &amp; kit commands</b></summary>
 
 <br>
 
 ```sh
-pnpm install
-pnpm test                 # models against their references, engine and part tests
-pnpm typecheck
-pnpm build                # dist/<scene>.html, one standalone file each
-pnpm verify               # every example and gallery, checked in headless Chrome
-pnpm verify:controls      # planted faults: proves the checks can fail
-pnpm check:drawing        # machine pages: layout, timeline, callouts and frame time
-node scripts/voice.mjs examples/lru-3d                    # record the narration
-node scripts/shoot.mjs dist/lru-3d.html --out shot.png --step 4 --scale 4
+npm install
+npm test                                    # Model tests, engine tests, arithmetic & scaffold tests
+npm run typecheck                           # TypeScript verification
+npm run build                               # Build standalone dist/<scene>.html pages
+npm run verify                              # Verify concept scenes in headless Chrome
+npm run verify:controls                     # Planted faults: proves checks actually catch bugs
+node scripts/new-figure.mjs <name> --kind=machine|concept   # Scaffold a new studio figure
+node scripts/check-drawing.mjs dist/<name>.html             # Chrome layout/FPS/contrast audit
+node scripts/check-arithmetic.mjs dist/<name>.html          # Prose-vs-model arithmetic audit
+node scripts/shoot-steps.mjs dist/<name>.html               # Step screenshots for review
+node scripts/review-brief.mjs <scene-dir>                   # Assemble fresh-context review brief
+node scripts/voice.mjs <scene-dir>                          # Record synced offline narration
 ```
 
 </details>
 
+---
+
 ## Requirements
 
-| | Needed for | Notes |
+| Requirement | Needed for | Notes |
 |---|---|---|
-| **[Claude Code](https://code.claude.com/docs/en/overview)**, [Codex](https://developers.openai.com/codex/skills) or [Antigravity](https://antigravity.google) | everything | The skill follows the open Agent Skills format, so any agent that reads it can load it. Tested end to end in all three. |
-| **Node.js 24+** | builds, checks | TypeScript runs directly through type stripping. Run `npm install` (or `pnpm install`) once in the skill folder. |
-| **Chrome or Chromium** | the checks | Found in the usual places on macOS, Linux and Windows. Set `CHROME_PATH` for any other binary. |
-| **About 90 MB, once** | the voice | The open-source voice model downloads on first use, then works offline. |
+| **[Claude Code](https://code.claude.com/docs/en/overview)**, **[Codex](https://developers.openai.com/codex/skills)**, or **[Antigravity](https://antigravity.google)** | Everything | Follows the open Agent Skills format; tested end-to-end across all three. |
+| **Node.js 24+** | Builds & checks | Runs TypeScript directly via native type stripping. Run `npm install` once in the skill folder. |
+| **Chrome or Chromium** | Verification | Auto-detected on macOS, Linux, and Windows. Set `CHROME_PATH` for a custom binary. |
+| **~90 MB (once)** | Voice narration | Open-source TTS model downloads on first use, then runs 100% offline. |
 
 ## Limits
 
-- **Desktop first.** Pages work on phones, but the phone layout is not polished yet.
-- **The voice needs one extra step.** After writing the script, run `node scripts/voice.mjs <scene>`. Clips are compressed to AAC on macOS; elsewhere they stay WAV and pages get larger. What if versions are not voiced yet.
-- **The 3D checks are not yet complete.** Sizes, tones, order, highlights, contrast and phone layout are checked on the isometric stage, not yet on the 3D one.
-- **Each machine's drawing is still its own code.** The page, the player, the voice tour, the prediction, the lab and the checks are shared (`src/drawing/`); the drawing and the machine's motion are written per machine, starting from `examples/lock/`. `verify` does not read Drawing pages; `check-drawing` and the model tests do.
-- **Labs are on machine pages only.** On a machine page the reader sets their own values (cut a key, move a step). Concept pages still offer prepared What if inputs.
-- **It is slow on purpose.** A page takes a long session: the model and its reference, the view, the checks, and a read of every screenshot.
+- **Desktop first.** Pages open on phones, though the mobile layout is not yet as polished as desktop.
+- **Voice is an explicit build step.** Run `node scripts/voice.mjs <scene>` after finalizing the script. Audio compresses to AAC on macOS; elsewhere it stays WAV. Prepared *What if* branches are not yet voiced.
+- **Unfold 3D stage checks vs. Drawing checks.** All new studio figures (both Machines and Concepts) use the Drawing page + `rig/` pipeline and are checked by `check-drawing`, `check-arithmetic`, `shoot-steps`, and the independent reviewer. Legacy `unfold/` 3D scenes still have partial check coverage compared to the isometric stage.
+- **Thorough by design.** Building a verified model, 3D rig, voice track, Chrome checks, and independent review takes a real session — not a 3-second SVG dump. That's why the numbers hold up.
 
 ## Contributing
 
-Contributions are welcome, and the most useful one is a [report of a figure that looks wrong or teaches badly](https://github.com/Aaryan1524/Visualize/issues/new?template=figure-problem.yml): every rule in the skill began as one. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the set-up, the rules that keep figures good, and the checks a pull request must pass. Questions and figures you made go in [Discussions](https://github.com/Aaryan1524/Visualize/discussions). Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md); security problems go through [SECURITY.md](SECURITY.md).
+Contributions are welcome! The single most valuable contribution is a [report of a figure that looks wrong or teaches badly](https://github.com/Aaryan1524/Visualize/issues/new?template=figure-problem.yml) — nearly every rule in `SKILL.md` started as one. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and PR gates, [Discussions](https://github.com/Aaryan1524/Visualize/discussions) for sharing pages you built, [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).
 
 ## License
 
