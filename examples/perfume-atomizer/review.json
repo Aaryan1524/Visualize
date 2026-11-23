@@ -1,0 +1,102 @@
+{
+  "stamp": "02e3f8bdaff439c3",
+  "mode": "everyday",
+  "reviewer": "independent",
+  "checks": {
+    "conceptual": "pass",
+    "visual": "pass"
+  },
+  "summary": "All 7 conceptual and everyday-clarity defects are cleanly resolved with zero regressions across the atomizer model, plain-English prose, voice narration, Predict, What if (50 ml vs 10 ml), Lab, and Practice. Studio-grade 3D cutaway perfume bottle passes light and dark craft checks with crisp OKLab material contrast, clean side explainer + live meters, and zero collisions or regressions.",
+  "findings": [
+    {
+      "where": "examples/perfume-atomizer/model.mjs (simulatePresses)",
+      "category": "conceptual",
+      "text": "const chamberFill = primed ? 1 : 0; ... pressFrac: 0, ballOpen: true, nozzleSealed: true",
+      "severity": "wrong",
+      "finding": "Intermediate priming press (press 1 of 2 on 50 ml) keeps chamberFill at 0 while strawFill rises to 0.5 with post-release suction state, verified by model.test.mjs.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/perfume-atomizer/story.mjs (script[4])",
+      "category": "consistency",
+      "text": "shattering into a [fine mist cloud|mist] reaching twenty-five centimeters.",
+      "severity": "wrong",
+      "finding": "Step 4 voice narration matches mistReachCm: 25 and captions (reaching 25 cm).",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/perfume-atomizer/story.mjs (PRED_STEP = 1)",
+      "category": "consistency",
+      "text": "export const PRED_STEP = 1;",
+      "severity": "misleading",
+      "finding": "Prediction is asked on Step 1 (brand-new bottle at rest before pressing) and revealed on Step 2.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/perfume-atomizer/model.mjs (steps 1-5) & story.mjs (captions[4])",
+      "category": "consistency",
+      "text": "fillPct: FULL_FILL_PCT (steps 1..5)",
+      "severity": "misleading",
+      "finding": "Steps 1-5 remain continuous at 100% fill without an unexplained 100-spray drop after priming.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/perfume-atomizer/story.mjs (practice) & build.mjs (render)",
+      "category": "consistency",
+      "text": "unpressed pre-outcome setup state + masked #r-sprays / #r-status",
+      "severity": "misleading",
+      "finding": "All three Practice question types render pre-outcome setup states with neutral HUD labels and masked readouts, eliminating pre-answer spoilers.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/perfume-atomizer/build.mjs (details.facts.3) & story.mjs (COVERAGE)",
+      "category": "consistency",
+      "text": "Not covered in detail here: tiny swirl grooves inside the nozzle cap that help spread the droplets evenly.",
+      "severity": "misleading",
+      "finding": "Details fact and COVERAGE.topics[10] are aligned in plain English with zero internal authoring meta-jargon.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/perfume-atomizer/story.mjs (prediction)",
+      "category": "consistency",
+      "text": "(1 priming press fills this 10 ml bottle).",
+      "severity": "misleading",
+      "finding": "Travel variant Predict explanation uses singular 'fills' when primingPresses === 1.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "practice-light.png, practice-dark.png / Practice mode / top-left stage heading",
+      "category": "visual",
+      "text": "Stale Step 06 heading during Practice mode",
+      "severity": "misleading",
+      "finding": "Stale step heading is hidden during Practice mode with clean unpressed setup state in both light and dark themes.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "standard-step-6-light.png, standard-step-6-dark.png / Step 06 / dip tube straw tip",
+      "category": "visual",
+      "text": "Amber straw tip visually submerged in puddle",
+      "severity": "misleading",
+      "finding": "Dip tube straw renders air-grey to its tip with clear visual separation above the shallow 3% golden perfume puddle in both light and dark themes.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "standard-step-1-light.png, standard-step-1-dark.png, travel-step-1-light.png / Step 01 / Predict card vs plinth",
+      "category": "visual",
+      "text": "Predict card overlaps the right arc of the circular steel plinth",
+      "severity": "wrong",
+      "finding": "Tightened steel plinth radius and updated Step 1 framing keep the full bottle and plinth completely clear of the bottom-right Predict card across light, dark, and travel shots.",
+      "resolved": true,
+      "fixed": true
+    }
+  ]
+}
