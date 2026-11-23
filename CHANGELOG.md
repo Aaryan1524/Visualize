@@ -2,6 +2,23 @@
 
 One version covers the kit and the skill (`package.json` `version` and `SKILL.md` `metadata.version` move together). Each entry names the failure that caused it, so the reason for a rule is never lost.
 
+## [1.2.0] (2026-11-22) — Everyday real-object visuals and composable modes
+
+Everyday learners asking *"how does a perfume bottle spray?"* or *"how does a watch work?"* hit two barriers in 1.1.0: binary `machine` vs `concept` routing pushed physical subjects into abstract data-structure boxes, and engineering-manual defaults forced jargon (`N·mm`, `isochronism`) and 25–30 minute builds onto quick or introductory requests. 1.2.0 introduces a dedicated everyday physical-object lane, four composable modes, and mode-aware checks while remaining backward-compatible with all 1.1.0 pages.
+
+- **Real-object 3D studio kit (`src/rig/objects.ts`, `references/objects.md`, `--kind object`):**
+  - Recognizable physical-object primitives built on `src/rig/shapes.ts` & `draw.ts`: `OBJECT_VIEW`, `vesselShell`, `liquidColumn`, `dipTube`, `plungerNozzle`, `sprayCone`, `watchCaseDial`, `watchHand`, `coiledSpring`, plus upright side-explainer panels (`explainerCard`, `meterBar`).
+  - Five new everyday studio materials in `src/rig/rig.css` (`glass`, `liquid`, `mist`, `rubber`, `wood`) tuned for OKLab contrast across light and dark themes, plus a dark-mode `data-t-bad` ink/fill contrast fix.
+  - New `--kind object` scaffold (`scripts/templates/object/`, `scripts/new-figure.mjs --kind object --mode ...`) so physical subjects default to a real 3D cutaway beside a plain-English explainer card rather than abstract boxes.
+- **4 Composable Modes (flags + natural-language triggers):**
+  - **`everyday` (default):** best real-object studio visual, **voice ON**, simple college-level plain English backed by a real tested model, 5–7 steps, Predict + Lab, full independent review.
+  - **`--fast`** (*"quick"*, *"fast"*, *"brief"*): streamlined 4–5 step visual (~3–4 min), no voice (`--no-voice`), no What-if variants, fast checks and sanity screenshots.
+  - **`--technical`** (*"technical"*, *"engineering"*, *"exact math"*, *"with equations"*): exact SI units, equations/working strips on stage, multi-variant What-if, and strict domain audit.
+  - **`--deep`** (*"in depth"*, *"deep dive"*, *"lengthy"*, *"thoroughly"*): 4–6 chapters, 14–20 steps, highest detail, full voice, and per-chapter Predict checkpoints.
+  - Flags compose cleanly (for example `--deep --technical` for a full multi-chapter engineering masterclass), and `SKILL.md` documents 2-agent parallel independent review (Domain Auditor + Studio Visual Reviewer).
+- **Mode-aware checks & reviews:** `scripts/check-drawing.mjs --fast`, `scripts/shoot-steps.mjs --fast`, and `scripts/review-brief.mjs --mode everyday|fast|technical|deep` align verification depth and review criteria with the chosen mode.
+- **Everyday flagship (`examples/perfume-atomizer/`):** a cutaway glass perfume bottle with live liquid level, dip tube, pressable plunger nozzle, deterministic atomized mist cone, and plain-English side `explainerCard` + `meterBar`, driven by a real tested pressure-and-volume model.
+
 ## 1.1.0 (2026-11-21), studio rig, mechanical kit, deep mode and independent review
 
 A unified studio-grade Drawing rig for both machines and abstract concepts, a reusable mechanical parts kit, automated visual look checks, multi-chapter `--deep` explanations, and a mandatory cross-model independent review gate (Claude Code, Codex and Antigravity). Backward-compatible with 1.0.0 pages and checks.

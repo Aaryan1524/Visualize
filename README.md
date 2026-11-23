@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>Turn a one-line prompt into a narrated, interactive 3D cutaway or explainer you can actually trust.</b><br>
-  To-scale mechanical cutaways for real machines. Matching ink-and-metal 3D figures for algorithms, protocols, and systems.<br>
+  Recognizable 3D cutaways for everyday objects, to-scale assemblies for real machines, and matching 3D figures for algorithms and systems.<br>
   Every number is proved by a running model, checked in headless Chrome, and signed off by an independent reviewer.
 </p>
 
@@ -12,7 +12,7 @@
   <a href="#install"><img src="https://img.shields.io/badge/Antigravity-skill-1b1b19?style=flat-square" alt="Antigravity skill"></a>
   <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-open_standard-1b1b19?style=flat-square" alt="Agent Skills open standard"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2024-1b1b19?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node 24 or later"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.1.0-c85a17?style=flat-square" alt="Version 1.1.0"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.2.0-c85a17?style=flat-square" alt="Version 1.2.0"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1b1b19?style=flat-square" alt="MIT license"></a>
   <a href="https://github.com/Aaryan1524/Visualize/actions/workflows/ci.yml"><img src="https://github.com/Aaryan1524/Visualize/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
@@ -68,32 +68,32 @@ You get **one standalone HTML file** — offline, light & dark themes, interacti
 
 ## Built from a one-line prompt
 
-Every image below is an unedited screenshot of a standalone HTML page built from [`examples/`](examples), verified in headless Chrome, and rendered in the v1.1.0 studio rig.
+Every image below is an unedited screenshot of a standalone HTML page built from [`examples/`](examples), verified in headless Chrome, and rendered in the v1.2.0 studio rig.
 
 <table>
   <tr>
+    <td width="50%"><img src=".github/assets/perfume-atomizer.jpg" alt="Perfume Bottle 3D cutaway glass atomizer spraying fine mist with amber liquid, dip tube, cutaway spring pump chamber, and plain-English side explainer card with live fill bars."></td>
     <td width="50%"><img src=".github/assets/automatic-watch.jpg" alt="Automatic Watch exploded 6-layer mechanical calibre in studio light theme with chapter tabs and live escapement readouts."></td>
-    <td width="50%"><img src=".github/assets/multi-agent.jpg" alt="Multi-Agent Orchestration 3-tier concept plate with live Gantt Trace, Context Occupancy lens, and interactive Predict card."></td>
   </tr>
   <tr>
-    <td><sub><b>Automatic Mechanical Watch (<code>--deep</code>, 14 steps · 4 chapters)</b><br><code>/visualize --deep explain how an automatic mechanical watch keeps time</code><br>6-layer exploded calibre on dashed centre lines, live balance-wheel beat, Swiss lever escapement, and mainspring torque curve.</sub></td>
+    <td><sub><b>Perfume Bottle (Default Everyday Mode · Voice ON)</b><br><code>/visualize explain how a perfume bottle sprays</code><br>Real 3D cutaway glass bottle, pressable spray cap, animated mist cone, and plain college-level side explainer with live fill meters.</sub></td>
+    <td><sub><b>Automatic Mechanical Watch (<code>--deep --technical</code>, 14 steps · 4 chapters)</b><br><code>/visualize --deep --technical explain how an automatic watch keeps time</code><br>6-layer exploded calibre on dashed centre lines, live balance-wheel beat, Swiss lever escapement, and mainspring torque curve.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src=".github/assets/multi-agent.jpg" alt="Multi-Agent Orchestration 3-tier concept plate with live Gantt Trace, Context Occupancy lens, and interactive Predict card."></td>
+    <td width="50%"><img src=".github/assets/bloom.jpg" alt="Bloom Filter 16-bit array on studio rig with routed hash arrows, word card, and live modulo arithmetic strip."></td>
+  </tr>
+  <tr>
     <td><sub><b>Multi-Agent Orchestration (<code>--deep</code>, 14 steps · 4 chapters)</b><br><code>/visualize --deep explain multi-agent orchestration</code><br>3-tier Concept Plate with per-step camera moves, live Gantt Trace + Context Occupancy lens, and interactive Predict checkpoints.</sub></td>
+    <td><sub><b>Bloom Filter</b><br><code>/visualize explain how a Bloom filter works</code><br>16-bit array on the Concept Plate rig, routed hash arrows, live <code>h₁/h₂/h₃ mod 16</code> working strip, and false-positive proof.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src=".github/assets/differential.jpg" alt="Open Differential cutaway in light theme showing bevel spider gears, brass sun gears, crown ring gear, and 5-spoke wheels."></td>
     <td width="50%"><img src=".github/assets/differential-dark.jpg" alt="Open Differential in dark theme on the Glare Ice trap step, showing one wheel spinning freely on translucent blue ice while the other stays parked."></td>
   </tr>
   <tr>
-    <td><sub><b>Open Differential — Light Theme</b><br><code>/visualize explain how an open differential works</code><br>Cutaway steel carrier, orbiting bevel spiders, brass sun gears, and <code>ω_L + ω_R = 2·ω_ring</code> enforced by the physics model.</sub></td>
+    <td><sub><b>Open Differential — Light Theme</b><br><code>/visualize --technical explain how an open differential works</code><br>Cutaway steel carrier, orbiting bevel spiders, brass sun gears, and <code>ω_L + ω_R = 2·ω_ring</code> enforced by the physics model.</sub></td>
     <td><sub><b>Open Differential — Dark Theme (Glare-Ice Trap)</b><br>Every page ships with a one-click <b>Dark</b> toggle (or <code>#theme=dark</code>). Here, low traction on the left wheel stalls the right wheel at 0 rpm.</sub></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src=".github/assets/bloom.jpg" alt="Bloom Filter 16-bit array on studio rig with routed hash arrows, word card, and live modulo arithmetic strip."></td>
-    <td width="50%"><img src=".github/assets/escalator.jpg" alt="Escalator to-scale technical cutaway showing dual offset wheel tracks keeping every tread level with Detail A magnification."></td>
-  </tr>
-  <tr>
-    <td><sub><b>Bloom Filter</b><br><code>/visualize explain how a Bloom filter works</code><br>16-bit array on the Concept Plate rig, routed hash arrows, live <code>h₁/h₂/h₃ mod 16</code> working strip, and false-positive proof.</sub></td>
-    <td><sub><b>Escalator</b><br><code>/visualize explain how an escalator keeps its steps level</code><br>Two wheels on two offset tracks, drawn to scale from a kinematic model, with a 2.6× Detail A lens and a 30°/35° lab.</sub></td>
   </tr>
 </table>
 
@@ -132,11 +132,11 @@ Most AI-generated diagrams look pretty for two seconds and break the moment you 
 Visualize runs a strict **7-stage engineering pipeline** designed to deliver the same studio-grade result across **Claude, Codex, and Gemini**:
 
 ```text
-  Prompt ──▶ 1. PLAN      Pick Machine vs. Concept look, story arc, key moments, and chapters
+  Prompt ──▶ 1. PLAN      Pick Object / Machine / Concept lane, mode (`everyday`, `--fast`, `--technical`, `--deep`), and story arc
          ──▶ 2. SCAFFOLD  `new-figure.mjs` stamps out the studio shell (rig, palette, dark mode, tests)
          ──▶ 3. MODEL     Write a real executable model + independent reference test (physics or state trace)
-         ──▶ 4. RIG       Draw every frame from model outputs using `mech.ts` / `concept.ts` 3D primitives
-         ──▶ 5. VOICE     Record offline narration that lights up each part in sync as it names it
+         ──▶ 4. RIG       Draw every frame from model outputs using `objects.ts` / `mech.ts` / `concept.ts` 3D primitives
+         ──▶ 5. VOICE     Record offline narration that lights up each part in sync as it names it (skipped in `--fast`)
          ──▶ 6. CHECKS    Headless Chrome audits: layout, label overlap, contrast, FPS, arithmetic claims
          ──▶ 7. REVIEW    Mandatory fresh-context reviewer inspects every step PNG, concept truth, and math
 ```
@@ -152,7 +152,7 @@ Visualize runs a strict **7-stage engineering pipeline** designed to deliver the
 | Capability | What it actually does |
 |---|---|
 | **Model-verified visuals** | Every position, angle, count, highlight, and caption is computed by a tested model and verified against the live DOM in headless Chrome. |
-| **Machine Cutaways & Concept Plates** | Physical devices render as to-scale 3D technical cutaways (`src/rig/mech.ts` + `parts.ts`). Algorithms, protocols, and architectures render on the matching 3D Concept Plate (`src/rig/concept.ts`) with per-step camera framing. |
+| **Everyday Objects, Machine Cutaways & Concept Plates** | Everyday objects render as recognizable 3D cutaways beside a plain-English explainer card (`src/rig/objects.ts`). Precision machines render as to-scale technical cutaways (`src/rig/mech.ts`). Algorithms and architectures render on the matching 3D Concept Plate (`src/rig/parts.ts`, `concept.ts`). |
 | **Synced voice narration** | Recorded locally via an open-source TTS model (offline after one ~90 MB download). Explains the big idea first, then walks step-by-step and highlights each part the moment it's spoken. |
 | **Active learning built in** | **Predict** cards pause before the twist; **Labs / What if** let the reader change real parameters (cut a key, drop traction to ice, flood a queue); **Now you try** quizzes are generated and graded by the model. |
 | **One standalone HTML file** | Zero external runtime dependencies. Share via Slack, embed in docs, or open offline. Includes Light/Dark theme toggle, keyboard navigation (`←` `→` `Space`), `#step=` deep links, reduced motion, and full text transcripts. Also exports static **SVG** or **React** components. |
@@ -218,13 +218,29 @@ Add `read_file` / `write_file` rules for your project directory as well. In the 
 
 ## Prompts to try
 
-You don't even have to type `/visualize` — the skill also triggers automatically when you ask for a machine, algorithm, protocol, or system to be explained visually or step by step.
+You don't even have to type `/visualize` — the skill also triggers automatically when you ask for an everyday object, machine, algorithm, protocol, or system to be explained visually or step by step.
+
+### 4 composable modes
+
+Pick the depth and tone that fits your question — by flag or plain English. Flags compose (e.g. `--deep --technical` for a multi-chapter engineering masterclass).
+
+| Mode | Trigger flags / words | Best for | What you get |
+|---|---|---|---|
+| **Default (`everyday`)** | *(no flag)* | Curious learners & students | Best recognizable 3D real-object visual + plain-English side explainer, **voice ON**, 5–7 steps, Predict + Lab, real tested model underneath (no unrequested jargon). |
+| **`--fast`** | `--fast`, *"quick"*, *"fast"*, *"brief"* | Fast intuition (~3–4 min) | Concise 4–5 step visual diagram, **no voice**, no What-if variants, streamlined Chrome checks & light/dark sanity shots. |
+| **`--technical`** | `--technical`, *"engineering"*, *"exact math"*, *"with equations"* | Engineers & coursework | Exact SI units, live equations/working strips on stage, multi-variant What-if comparisons, strict domain & unit audit. |
+| **`--deep`** | `--deep`, *"in depth"*, *"deep dive"*, *"thoroughly"* | Full mastery (10–15 min) | 4–6 chapters, 14–20 steps, highest visual detail, full voice, per-chapter Predict checkpoints, saved reading progress. |
 
 ```text
-# Real machines (to-scale 3D cutaways)
-/visualize explain how a car's open differential works
+# Everyday physical objects (default everyday mode — real 3D cutaway + plain-English explainer)
+/visualize explain how a perfume bottle sprays mist
+/visualize explain how a wristwatch keeps time
+/visualize --fast explain how a bicycle tire pump works
+
+# Real machines (to-scale 3D cutaways & precision assemblies)
+/visualize --technical explain how a car's open differential works
 /visualize explain how a four-stroke internal combustion engine works
-/visualize --deep explain how an automatic mechanical watch keeps time
+/visualize --deep --technical explain how an automatic mechanical watch keeps time
 
 # Systems, protocols & ML (3D Concept Plates + live lenses)
 /visualize --deep explain multi-agent orchestration
@@ -234,14 +250,10 @@ You don't even have to type `/visualize` — the skill also triggers automatical
 /visualize explain database connection pooling (pool of 4) and give me a React component for our Next.js docs
 ```
 
-### Deep mode (`--deep`)
-
-Add `--deep` (or say *"in depth"* / *"deep dive"*) for a **4–6 chapter, 10–15 minute** interactive tour: core mechanism → failure modes → trade-offs → real-world variants → edge cases. Each chapter gets its own header tab, prediction checkpoint, and saved reading progress.
-
 **Three tips for the best output:**
 1. **Include real numbers** (capacities, gear teeth, rates, bit counts) — the model runs directly on them.
 2. **Name the dramatic moment** (*"glare ice stalls one wheel"*, *"a burst drains the bucket"*) — it becomes the Predict checkpoint.
-3. **Name the target format** if you want more than standalone HTML (e.g., *"also export an SVG"* or *"give me a React component"*).
+3. **Add a mode flag if you want one** (`--fast`, `--technical`, `--deep`, or combine `--deep --technical`); otherwise default `everyday` gives you the best real-object visual with voice narration and plain English.
 
 ---
 
@@ -254,9 +266,9 @@ Add `--deep` (or say *"in depth"* / *"deep dive"*) for a **4–6 chapter, 10–1
 
 ```text
 visualize/
-├── SKILL.md                 Governing workflow, studio contract, and mandatory review gates
+├── SKILL.md                 Governing workflow, 3 visual lanes, 4 modes, and mandatory review gates
 ├── src/
-│   ├── rig/                 3D studio projection, shading, lighting (`mech.ts`, `parts.ts`, `concept.ts`)
+│   ├── rig/                 3D studio projection, shading, lighting (`objects.ts`, `mech.ts`, `parts.ts`, `concept.ts`)
 │   ├── drawing/             Shared interactive Drawing page, camera easing, player, tabs, dark mode, lab
 │   ├── claims/              Model-vs-prose arithmetic audit (`audit.mjs`, `arithmetic.mjs`)
 │   ├── core/                Trace, steps, timeline, keyed interpolation, scene types
@@ -265,17 +277,17 @@ visualize/
 │   ├── parts/               Reusable concept parts (rail, ring, tree, network, flow)
 │   ├── render/              SVG stage, panels, player controls, styles
 │   └── react/               React component adapter
-├── references/              Detailed guides (`look.md`, `figures.md`, `kit.md`, `authoring.md`, `craft.md`, `verify.md`)
+├── references/              Detailed guides (`objects.md`, `look.md`, `figures.md`, `concept-rig.md`, `drawing.md`, `craft.md`)
 ├── scripts/
-│   ├── new-figure.mjs       Scaffolds a studio-grade Machine or Concept figure from templates
-│   ├── templates/           Hardened machine & concept starter templates
-│   ├── check-drawing.mjs    Headless Chrome layout, contrast, callout, and FPS checks
+│   ├── new-figure.mjs       Scaffolds a studio-grade Object, Machine, or Concept figure from templates
+│   ├── templates/           Hardened starter templates (`object/`, `machine/`, `concept/`)
+│   ├── check-drawing.mjs    Headless Chrome layout, contrast, callout, and FPS checks (`--fast` supported)
 │   ├── check-arithmetic.mjs Verifies every equation and readout against the model
-│   ├── shoot-steps.mjs      Captures light & dark contact sheets of every step
-│   ├── review-brief.mjs     Builds the mandatory fresh-context reviewer brief
+│   ├── shoot-steps.mjs      Captures light & dark contact sheets of every step (`--fast` supported)
+│   ├── review-brief.mjs     Builds the mandatory fresh-context reviewer brief (`--mode everyday|fast|technical|deep`)
 │   ├── voice.mjs            Local offline TTS narration + word-level sync
 │   └── build.mjs / verify.mjs / export-svg.mjs / plant-look.mjs
-├── examples/                automatic-watch, differential, derailleur, escalator, lock,
+├── examples/                perfume-atomizer, automatic-watch, differential, derailleur, escalator, lock,
 │                            multi-agent, bloom, lru-3d, lru, attention, retries
 ├── test/fixtures/           Gallery scenes and planted-fault controls
 └── evals/evals.json         Prompt benchmarks and acceptance criteria
@@ -295,11 +307,11 @@ npm run typecheck                           # TypeScript verification
 npm run build                               # Build standalone dist/<scene>.html pages
 npm run verify                              # Verify concept scenes in headless Chrome
 npm run verify:controls                     # Planted faults: proves checks actually catch bugs
-node scripts/new-figure.mjs <name> --kind=machine|concept   # Scaffold a new studio figure
-node scripts/check-drawing.mjs dist/<name>.html             # Chrome layout/FPS/contrast audit
+node scripts/new-figure.mjs <name> --kind=object|machine|concept --mode=everyday|fast|technical|deep
+node scripts/check-drawing.mjs dist/<name>.html [--fast]    # Chrome layout/FPS/contrast audit
 node scripts/check-arithmetic.mjs dist/<name>.html          # Prose-vs-model arithmetic audit
-node scripts/shoot-steps.mjs dist/<name>.html               # Step screenshots for review
-node scripts/review-brief.mjs <scene-dir>                   # Assemble fresh-context review brief
+node scripts/shoot-steps.mjs dist/<name>.html [--fast]      # Step screenshots for review
+node scripts/review-brief.mjs <audit> <review> <page> --mode=everyday|fast|technical|deep
 node scripts/voice.mjs <scene-dir>                          # Record synced offline narration
 ```
 
