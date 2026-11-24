@@ -8,20 +8,61 @@
 // Materials and weights are CSS tokens (rig.css), so both themes, and receding parts, follow.
 
 import { axesOf, nearness, screenOf, type Axes, type Camera } from "./camera.ts";
-import { spiralStrip, type FaceSort, type Mesh, type Plane, type SpiralStrip } from "./shapes.ts";
+import { pointOn, spiralStrip, type FaceSort, type Mesh, type Plane, type SpiralStrip } from "./shapes.ts";
 import { add, area2, convexOutline, dot, n1, pathThrough, scale, unit, type P2, type V3 } from "./vec.ts";
+
+export type Finish = "metal" | "satin" | "glass" | "matte";
 
 /** The key light, fixed to the camera: from above, a little to the left and toward the viewer. */
 export function keyLight(ax: Axes): V3 {
   return unit(add(add(scale(ax.up, 0.72), scale(ax.right, -0.45)), scale(ax.toward, 0.55)));
 }
 
+/** Cool secondary studio bounce/rim light from lower-right-behind for sculptural shadow-side wrap. */
+export function rimLight(ax: Axes): V3 {
+  return unit(add(add(scale(ax.right, 0.78), scale(ax.up, -0.25)), scale(ax.toward, -0.35)));
+}
+
 /** How lit a face is, 0 to 1: a floor of ambient light plus the light falling square on it. */
 export const shadeOf = (normal: V3, light: V3): number => 0.16 + 0.84 * Math.max(0, dot(normal, light));
+
+const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
+
+/**
+ * 3-point studio shading: Lambert key diffuse + subtle studio bounce/rim wrap + finish-aware
+ * analytical Blinn-Phong specular highlight, clamped cleanly to [0.12, 1.0].
+ */
+export function studioShade(normal: V3, light: V3, rim: V3, toward: V3, finish: Finish = "satin"): number {
+  const n = unit(normal);
+  const key = Math.max(0, dot(n, light));
+  // Rim bounce wraps softly into shadowed faces without washing out key-lit faces
+  const bounce = Math.max(0, dot(n, rim)) * (1 - key);
+  const half = unit(add(light, toward));
+  const nh = Math.max(0, dot(n, half));
+  let ambient: number, diffuse: number, rimGain: number, specGain: number, specExp: number;
+  switch (finish) {
+    case "metal":
+      ambient = 0.15; diffuse = 0.85; rimGain = 0.06; specGain = 0.22; specExp = 20;
+      break;
+    case "glass":
+      ambient = 0.16; diffuse = 0.80; rimGain = 0.08; specGain = 0.28; specExp = 24;
+      break;
+    case "matte":
+      ambient = 0.16; diffuse = 0.84; rimGain = 0.02; specGain = 0; specExp = 1;
+      break;
+    default: // "satin"
+      ambient = 0.16; diffuse = 0.84; rimGain = 0.02; specGain = 0.03; specExp = 22;
+      break;
+  }
+  const spec = specGain > 0 ? specGain * Math.pow(nh, specExp) : 0;
+  return clamp(ambient + diffuse * key + rimGain * bounce + spec, 0.12, 1);
+}
 
 export interface Look {
   /** a material token family in rig.css: steel, alloy, chain, subject, frame, slate */
   material: string;
+  /** surface finish for 3-point studio shading; defaults from shine / material when omitted */
+  finish?: Finish;
   /** draw the specular line on edges that catch the light (metal) */
   shine?: boolean;
   /** creases sharper than this (degrees between normals) are drawn as edges */
@@ -30,6 +71,9 @@ export interface Look {
   /** override the mesh's own order (see paintGroups): "face" for anything that hides parts of itself */
   sort?: FaceSort;
 }
+
+const resolveFinish = (look: Look): Finish =>
+  look.finish ?? (look.shine ? "metal" : look.material === "glass" ? "glass" : "satin");
 
 const fill = (s: number) => `fill:color-mix(in oklab,var(--rig-lit) ${Math.round(s * 100)}%,var(--rig-dark))`;
 
@@ -43,12 +87,18 @@ const fill = (s: number) => `fill:color-mix(in oklab,var(--rig-lit) ${Math.round
  * caps, ends and holed faces follow far to near, as before; "face" paints every face far to near,
  * merging only neighbours in that order that share a shade, so a coil's near turn covers its far one.
  */
-export function paintGroups(mesh: Mesh, cam: Camera, sort: FaceSort = mesh.sort ?? "bucket"): { groups: number[][]; tier: number[]; shade: number[]; seen: boolean[] } {
+export function paintGroups(
+  mesh: Mesh,
+  cam: Camera,
+  sort: FaceSort = mesh.sort ?? "bucket",
+  finish: Finish = "satin",
+): { groups: number[][]; tier: number[]; shade: number[]; seen: boolean[] } {
   const ax = axesOf(cam.azimuth, cam.elevation);
   const light = keyLight(ax);
+  const rim = rimLight(ax);
   const z = mesh.verts.map((v) => nearness(cam, v, ax));
   const seen = mesh.faces.map((f) => dot(f.normal, ax.toward) > 1e-6);
-  const shade = mesh.faces.map((f) => Math.round(shadeOf(f.normal, light) * 32) / 32);
+  const shade = mesh.faces.map((f) => Math.round(studioShade(f.normal, light, rim, ax.toward, finish) * 32) / 32);
   const seenCaps = mesh.faces.filter((f, i) => seen[i] && f.role === "cap");
   const tier = mesh.faces.map((f) => (f.role === "cap" ? 2 : f.bevel && seenCaps.some((c) => dot(c.normal, f.normal) > 0) ? 1 : 0));
   const depth = (i: number) => {
@@ -94,12 +144,15 @@ export function paintGroups(mesh: Mesh, cam: Camera, sort: FaceSort = mesh.sort 
 
 /** The mesh as an SVG group. */
 export function drawMesh(mesh: Mesh, cam: Camera, look: Look): string {
+  const finish = resolveFinish(look);
   const ax = axesOf(cam.azimuth, cam.elevation);
   const light = keyLight(ax);
+  const rim = rimLight(ax);
   const half = unit(add(light, ax.toward));
+  const rimHalf = unit(add(rim, ax.toward));
   const pts = mesh.verts.map((v) => screenOf(cam, v, ax));
   const sort = look.sort ?? mesh.sort ?? "bucket";
-  const { groups, tier, shade, seen } = paintGroups(mesh, cam, sort);
+  const { groups, tier, shade, seen } = paintGroups(mesh, cam, sort, finish);
 
   const faceSvg = (g: number[]): string => {
     const f0 = mesh.faces[g[0]!]!, s = shade[g[0]!]!;
@@ -132,20 +185,27 @@ export function drawMesh(mesh: Mesh, cam: Camera, look: Look): string {
   const groupOf = new Map<number, number>();
   groups.forEach((g, k) => g.forEach((i) => groupOf.set(i, k)));
   const perGroup = sort === "face";
-  const lines = Array.from({ length: perGroup ? groups.length : 1 }, () => ({ sil: "", crease: "", shine: "" }));
+  const glossy = finish === "metal" || finish === "glass" || Boolean(look.shine);
+  const lines = Array.from({ length: perGroup ? groups.length : 1 }, () => ({ sil: "", crease: "", shine: "", rim: "" }));
   for (const [key, fs] of edges) {
     const nSeen = fs.filter((i) => seen[i]).length;
     if (!nSeen) continue;
     const at = lines[perGroup ? Math.max(...fs.filter((i) => seen[i]).map((i) => groupOf.get(i)!)) : 0]!;
     const [a, b] = key.split("|").map(Number) as [number, number];
     const seg = `M${n1(pts[a]![0])} ${n1(pts[a]![1])}L${n1(pts[b]![0])} ${n1(pts[b]![1])}`;
-    if (nSeen < fs.length || fs.length === 1) at.sil += seg;
-    else if (fs.length === 2 && dot(mesh.faces[fs[0]!]!.normal, mesh.faces[fs[1]!]!.normal) < cosCrease) at.crease += seg;
-    // a metal edge catches the light where the side face beside it turns toward the half vector
-    if (look.shine && fs.some((i) => seen[i] && mesh.faces[i]!.role !== "cap" && mesh.faces[i]!.role !== "end" && dot(mesh.faces[i]!.normal, half) > 0.93)) at.shine += seg;
+    const isSil = nSeen < fs.length || fs.length === 1;
+    const isCrease = !isSil && fs.length === 2 && dot(mesh.faces[fs[0]!]!.normal, mesh.faces[fs[1]!]!.normal) < cosCrease;
+    if (isSil) at.sil += seg;
+    else if (isCrease) at.crease += seg;
+    // metallic & glass edges catch the primary specular highlight and a subtle grazing rim reflection
+    if (glossy) {
+      const catchesKey = fs.some((i) => seen[i] && mesh.faces[i]!.role !== "cap" && mesh.faces[i]!.role !== "end" && dot(mesh.faces[i]!.normal, half) > 0.93);
+      if (catchesKey) at.shine += seg;
+      else if ((isSil || isCrease) && fs.some((i) => seen[i] && mesh.faces[i]!.role !== "cap" && mesh.faces[i]!.role !== "end" && dot(mesh.faces[i]!.normal, rimHalf) > 0.85 && dot(mesh.faces[i]!.normal, ax.toward) < 0.72)) at.rim += seg;
+    }
   }
-  const lineSvg = (l: { sil: string; crease: string; shine: string }) =>
-    `${l.crease ? `<path class="rig-crease" d="${l.crease}"/>` : ""}${l.shine ? `<path class="rig-shine" d="${l.shine}"/>` : ""}${l.sil ? `<path class="rig-sil" d="${l.sil}"/>` : ""}`;
+  const lineSvg = (l: { sil: string; crease: string; shine: string; rim: string }) =>
+    `${l.crease ? `<path class="rig-crease" d="${l.crease}"/>` : ""}${l.rim ? `<path class="rig-rim-shine" d="${l.rim}"/>` : ""}${l.shine ? `<path class="rig-shine" d="${l.shine}"/>` : ""}${l.sil ? `<path class="rig-sil" d="${l.sil}"/>` : ""}`;
   let body = "";
   if (perGroup) groups.forEach((g, k) => (body += faceSvg(g) + lineSvg(lines[k]!)));
   else body = groups.map(faceSvg).join("") + lineSvg(lines[0]!);
@@ -199,4 +259,89 @@ export function linesOn(cam: Camera, segments: readonly (readonly [V3, V3])[], c
   const ax = axesOf(cam.azimuth, cam.elevation);
   const d = segments.map(([a, b]) => pathThrough([screenOf(cam, a, ax), screenOf(cam, b, ax)], false)).join("");
   return d ? `<path class="${className}" d="${d}"/>` : "";
+}
+
+function expandConvex(hull: readonly P2[], pad: number): P2[] {
+  const n = hull.length;
+  if (n < 3 || !(pad > 0)) return [...hull];
+  const sign = area2(hull) >= 0 ? 1 : -1;
+  const edgeNormals: P2[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = hull[i]!, b = hull[(i + 1) % n]!;
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const len = Math.hypot(dx, dy) || 1;
+    edgeNormals.push([(sign * dy) / len, (-sign * dx) / len]);
+  }
+  return hull.map((p, i) => {
+    const n0 = edgeNormals[(i - 1 + n) % n]!, n1v = edgeNormals[i]!;
+    const bx = n0[0] + n1v[0], by = n0[1] + n1v[1];
+    const bLen = Math.hypot(bx, by);
+    const ux = bLen > 1e-6 ? bx / bLen : n1v[0];
+    const uy = bLen > 1e-6 ? by / bLen : n1v[1];
+    const cos = ux * n1v[0] + uy * n1v[1];
+    const miter = Math.min(2, 1 / Math.max(0.5, cos));
+    return [p[0] + ux * pad * miter, p[1] + uy * pad * miter] as P2;
+  });
+}
+
+/**
+ * Layered 2-ring soft studio drop shadow: a faint wider outer penumbra halo plus a tighter inner
+ * contact shadow, using pure SVG paths (zero Gaussian <filter> repaints, stays 60 fps).
+ */
+export function softShadow(mesh: Mesh, cam: Camera, offset: V3): string {
+  if (!mesh.verts.length) return "";
+  const ax = axesOf(cam.azimuth, cam.elevation);
+  const inner = convexOutline(mesh.verts.map((v) => screenOf(cam, add(v, offset), ax)));
+  if (inner.length < 3 || Math.abs(area2(inner)) < 1e-9) return "";
+  const outerOffset = scale(offset, 1.35);
+  const outerBase = convexOutline(mesh.verts.map((v) => screenOf(cam, add(v, outerOffset), ax)));
+  const xs = inner.map((p) => p[0]), ys = inner.map((p) => p[1]);
+  const diag = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const sc = Math.abs(cam.scale);
+  const pad = Math.max(sc * 0.3, Math.min(diag * 0.045, sc * 2.5));
+  const outer = expandConvex(outerBase, pad);
+  return `<g class="rig-shadow"><path class="rig-shadow-outer" d="${pathThrough(outer)}"/><path class="rig-shadow-inner" d="${pathThrough(inner)}"/></g>`;
+}
+
+/**
+ * Projects parallel 45° architectural section-cut hatching lines clipped inside a planar polygon
+ * `outline` on plane `pl`. Returns `<path class="rig-hatch" d="..."/>`, or `""` for degenerate outlines.
+ */
+export function cutawayHatch(cam: Camera, pl: Plane, outline: readonly P2[], spacing = 2.4): string {
+  if (outline.length < 3 || !(spacing > 0) || !Number.isFinite(spacing)) return "";
+  for (const p of outline) if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) return "";
+  if (Math.abs(area2(outline)) < 1e-9) return "";
+  const c = Math.SQRT1_2;
+  const rot: P2[] = outline.map(([a, b]) => [(a + b) * c, (-a + b) * c]);
+  let tMin = Infinity, tMax = -Infinity;
+  for (const [, t] of rot) {
+    if (t < tMin) tMin = t;
+    if (t > tMax) tMax = t;
+  }
+  if (tMax - tMin <= 1e-9) return "";
+  const ax = axesOf(cam.azimuth, cam.elevation);
+  let d = "";
+  const start = Math.floor(tMin / spacing) * spacing + spacing * 0.5;
+  for (let t = start; t < tMax; t += spacing) {
+    if (t <= tMin) continue;
+    const xs: number[] = [];
+    for (let i = 0; i < rot.length; i++) {
+      const [s0, t0] = rot[i]!;
+      const [s1, t1] = rot[(i + 1) % rot.length]!;
+      if ((t0 <= t && t1 > t) || (t1 <= t && t0 > t)) {
+        xs.push(s0 + ((t - t0) / (t1 - t0)) * (s1 - s0));
+      }
+    }
+    if (xs.length < 2) continue;
+    xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const s0 = xs[k]!, s1 = xs[k + 1]!;
+      if (s1 - s0 <= 1e-6) continue;
+      const p0 = screenOf(cam, pointOn(pl, (s0 - t) * c, (s0 + t) * c, 0), ax);
+      const p1 = screenOf(cam, pointOn(pl, (s1 - t) * c, (s1 + t) * c, 0), ax);
+      if (Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) < 1e-3) continue;
+      d += `M${n1(p0[0])} ${n1(p0[1])}L${n1(p1[0])} ${n1(p1[1])}`;
+    }
+  }
+  return d ? `<path class="rig-hatch" d="${d}"/>` : "";
 }
