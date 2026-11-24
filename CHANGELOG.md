@@ -2,6 +2,27 @@
 
 One version covers the kit and the skill (`package.json` `version` and `SKILL.md` `metadata.version` move together). Each entry names the failure that caused it, so the reason for a rule is never lost.
 
+## [2.0.0] (2026-11-23) — The Visual Design Engine
+
+Cross-model testing exposed why LLMs still produced clunky diagrams on multi-part physical subjects: forcing models to hand-guess raw `(x, y, z)` coordinates led to floating unmeshed gears in empty "ashtray" interiors, overlapping wheels, clunky rectangular watch lugs, closed opaque Step 0 dials, missing callouts, and 35,000+ raw SVG paths. 2.0.0 elevates Visualize above any single model into a **3-Layer Visual Design Engine** — backward-compatible with all shipped pages.
+
+- **Layer 1 — Deterministic Spatial Layout Solvers & 6 Figma-Style Spread Presets (`src/rig/layout.ts`, `src/rig/spreads.ts`, `references/layout.md`, `references/spreads.md`):**
+  - `solveGearTrain()` mathematically places compound trains on exact tangent pitch circles with exact ratios & spin signs and runs `assertNoCollisions()` automatically; `checkCavityFill()` catches empty "ashtray" layouts; `layoutFlowSpine()` snaps fluid/energy stages cleanly along an axis; `composeExplodedLayers()` guarantees monotonic vertical separation.
+  - Added **6 Universal Page Spread Presets** (`cutaway-vessel`, `exploded-stack`, `axial-cutaway`, `linked-train`, `concept-plate`, `system-tiers`) plus `spread()`, `distributeCallouts()`, and `renderHudStack()` locking in zero-overlap hero boxes, zoomed clear zones, callout rails, and upper-right HUD stacks across `1440×900` and `1280×800`, wired directly into the `--kind object` scaffold (`scripts/templates/object/`).
+- **Layer 2 — Studio Industrial-Design Renderer, Universal Primitives & Light-Faithful Dark Mode (`src/rig/draw.ts`, `src/rig/objects.ts`, `src/rig/rig.css`, `src/drawing/chrome.css`):**
+  - 3-point studio shading (`studioShade` + `rimLight` + finish-aware Blinn-Phong specular `"metal" | "glass" | "satin" | "matte"`), grazing `.rig-rim-shine` highlights, pure-SVG layered `softShadow()`, architectural 45° `cutawayHatch()`, and a subtle museum spotlight vignette on `.vz-stage` (light & dark).
+  - **Light-faithful dark-mode diagram palette (`src/rig/rig.css`):** 3D solids preserve crisp dark-ink outlines and exact studio material shading on the dark watchmaker's mat instead of inverting to washed-out pale strokes.
+  - Upgraded `watchCaseDial` to a sleek rimless 240° exhibition cutaway default (`lugs: false`, `cutaway: true`, double-stepped chamfer bezel, sapphire sheen, tapered chamfered lugs when requested) and added `calibrePlate` (rhodium mainplate with recessed pockets, ruby jewels, and slotted screws).
+  - Added **6 universal 3D engineering primitives** in `src/rig/objects.ts` (`references/objects.md`): `axialHousing`, `turbineRotor`, `pistonAssembly`, `helicalCoil`, `electrodeStack`, and `flowArrow3D`.
+- **Layer 3 — Visual Compiler Gates, Draft-First Vision Loop & Figma-Ready SVG Export (`scripts/check-drawing.mjs`, `scripts/review-brief.mjs`, `scripts/export-drawing-svg.mjs`, `SKILL.md`):**
+  - `check-drawing.mjs` now rejects unlabeled opening steps (`0` callouts) and excessive live SVG path bloat (`> 25,000` non-`<defs>` paths).
+  - `review-brief.mjs` enforces ruthless Visual Design Director rules across all 4 modes (no closed opaque Step 0s, no floating unmeshed gears, no collisions, no chunky straps/stands >15% of silhouette, vertical separation for layered machines).
+  - `SKILL.md` adds a mandatory **Draft-First Vision Pass** before voice recording.
+  - Added **Figma-ready editable SVG export** (`scripts/export-drawing-svg.mjs`, `npm run export:drawing-svg`), which expands `<use>` templates in the live cascade, bakes CSS variables and `color-mix()` to static hex fills, scales `non-scaling-stroke` widths to viewBox units, and emits clean named `<g id="part-...">` layers ready to paste straight into Figma.
+- **v2.0 Showstoppers (`examples/watch-everyday/` & `examples/turbofan/`):**
+  - `watch-everyday`: 3-layer exhibition cutaway Automatic Watch (`spread("exploded-stack")` + `solveGearTrain` + `calibrePlate`, 0% leader crossings, `0.196` min OKLab contrast, `0.2 ms` median frame time, dual-specialist independent review passed).
+  - `turbofan`: horizontal cutaway Turbofan Jet Engine (`spread("axial-cutaway")` + `axialHousing` + `turbineRotor` + `flowArrow3D`, Airliner `8:1` vs Fighter `1:1` bypass, `0.7 ms` median frame time, dual-specialist independent review passed).
+
 ## [1.2.0] (2026-11-22) — Everyday real-object visuals and composable modes
 
 Everyday learners asking *"how does a perfume bottle spray?"* or *"how does a watch work?"* hit two barriers in 1.1.0: binary `machine` vs `concept` routing pushed physical subjects into abstract data-structure boxes, and engineering-manual defaults forced jargon (`N·mm`, `isochronism`) and 25–30 minute builds onto quick or introductory requests. 1.2.0 introduces a dedicated everyday physical-object lane, four composable modes, and mode-aware checks while remaining backward-compatible with all 1.1.0 pages.

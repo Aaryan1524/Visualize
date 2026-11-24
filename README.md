@@ -12,7 +12,7 @@
   <a href="#install"><img src="https://img.shields.io/badge/Antigravity-skill-1b1b19?style=flat-square" alt="Antigravity skill"></a>
   <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-open_standard-1b1b19?style=flat-square" alt="Agent Skills open standard"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2024-1b1b19?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node 24 or later"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.2.0-c85a17?style=flat-square" alt="Version 1.2.0"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-2.0.0-c85a17?style=flat-square" alt="Version 2.0.0"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1b1b19?style=flat-square" alt="MIT license"></a>
   <a href="https://github.com/Aaryan1524/Visualize/actions/workflows/ci.yml"><img src="https://github.com/Aaryan1524/Visualize/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
@@ -68,9 +68,25 @@ You get **one standalone HTML file** — offline, light & dark themes, interacti
 
 ## Built from a one-line prompt
 
-Every image below is an unedited screenshot of a standalone HTML page built from [`examples/`](examples), verified in headless Chrome, and rendered in the v1.2.0 studio rig.
+Every image below is an unedited screenshot of a standalone HTML page built from [`examples/`](examples), verified in headless Chrome, and rendered in the v2.0.0 Visual Design Engine.
 
 <table>
+  <tr>
+    <td width="50%"><img src=".github/assets/watch-everyday.jpg" alt="Automatic Watch Everyday Edition 3-layer exhibition cutaway in studio light theme with meshed brass gear train, floating orange rotor, sleek exhibition dial, and plain-English side explainer with live meters."></td>
+    <td width="50%"><img src=".github/assets/watch-everyday-dark.jpg" alt="Automatic Watch Everyday Edition 3-layer exhibition cutaway in dark theme showing 3-point metallic studio lighting, blued mainspring, and glowing orange rotor on a dark watchmaker's mat."></td>
+  </tr>
+  <tr>
+    <td><sub><b>Automatic Watch — Everyday Mode (Light · Voice ON)</b><br><code>/visualize explain how an automatic watch works</code><br>3-layer exhibition cutaway solved by <code>solveGearTrain()</code> &amp; <code>composeExplodedLayers()</code> with 3-point studio lighting and plain college-level explanation.</sub></td>
+    <td><sub><b>Automatic Watch — Everyday Mode (Dark Theme)</b><br>Every page ships with one-click <b>Dark</b> mode (or <code>#theme=dark</code>) on a studio watchmaker's mat with light-faithful 3D solids and 0% leader crossings.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src=".github/assets/turbofan.jpg" alt="Turbofan Jet Engine horizontal cutaway nacelle with 45-degree architectural hatching, spinning orange front fan, steel compressor, glowing burner, brass turbine, cobalt bypass airflow arrows, and plain-English side explainer."></td>
+    <td width="50%"><img src=".github/assets/turbofan-dark.jpg" alt="Turbofan Jet Engine Fighter 1:1 bypass variant in dark theme showing blazing double hot exhaust jets and crisp metallic 3D cutaway on a dark studio mat."></td>
+  </tr>
+  <tr>
+    <td><sub><b>Turbofan Jet Engine — Airliner 8:1 Bypass (Light · Voice ON)</b><br><code>/visualize explain how a jet engine works</code><br>Built on <code>spread("axial-cutaway")</code> + <code>axialHousing</code> + <code>turbineRotor</code> + <code>flowArrow3D</code> showing why 80% of airliner push comes from cool bypass air.</sub></td>
+    <td><sub><b>Turbofan Jet Engine — Fighter 1:1 Variant (Dark Theme)</b><br>One-click <b>What if</b> switches between an <code>8:1</code> airliner and a <code>1:1</code> fighter core (65% hot jet push) with live throttle &amp; bypass sliders.</sub></td>
+  </tr>
   <tr>
     <td width="50%"><img src=".github/assets/perfume-atomizer.jpg" alt="Perfume Bottle 3D cutaway glass atomizer spraying fine mist with amber liquid, dip tube, cutaway spring pump chamber, and plain-English side explainer card with live fill bars."></td>
     <td width="50%"><img src=".github/assets/automatic-watch.jpg" alt="Automatic Watch exploded 6-layer mechanical calibre in studio light theme with chapter tabs and live escapement readouts."></td>
@@ -152,10 +168,12 @@ Visualize runs a strict **7-stage engineering pipeline** designed to deliver the
 | Capability | What it actually does |
 |---|---|
 | **Model-verified visuals** | Every position, angle, count, highlight, and caption is computed by a tested model and verified against the live DOM in headless Chrome. |
-| **Everyday Objects, Machine Cutaways & Concept Plates** | Everyday objects render as recognizable 3D cutaways beside a plain-English explainer card (`src/rig/objects.ts`). Precision machines render as to-scale technical cutaways (`src/rig/mech.ts`). Algorithms and architectures render on the matching 3D Concept Plate (`src/rig/parts.ts`, `concept.ts`). |
+| **6 Figma-style Spread Presets** | `src/rig/spreads.ts` locks in 6 proven stage layouts (`cutaway-vessel`, `exploded-stack`, `axial-cutaway`, `linked-train`, `concept-plate`, `system-tiers`) with mathematically guaranteed zero-overlap zones, auto-spaced callout rails (`distributeCallouts`), and upper-right HUD stacks (`renderHudStack`). |
+| **Universal 3D engineering blocks** | Everyday objects (`vesselShell`, open-heart `watchCaseDial`, `calibrePlate`), universal engineering solids (`axialHousing`, `turbineRotor`, `pistonAssembly`, `helicalCoil`, `electrodeStack`, `flowArrow3D`), precision gear trains (`src/rig/mech.ts`), and 3D Concept Plates (`src/rig/parts.ts`, `concept.ts`) all share one 3-point studio rig. |
+| **Light-faithful dark mode** | One-click **Dark** mode (or `#theme=dark`) keeps crisp dark-ink 3D solids and studio materials intact on a dark watchmaker's mat, so gear teeth, bevels, dials, and cutaways stay razor-sharp in both themes. |
 | **Synced voice narration** | Recorded locally via an open-source TTS model (offline after one ~90 MB download). Explains the big idea first, then walks step-by-step and highlights each part the moment it's spoken. |
 | **Active learning built in** | **Predict** cards pause before the twist; **Labs / What if** let the reader change real parameters (cut a key, drop traction to ice, flood a queue); **Now you try** quizzes are generated and graded by the model. |
-| **One standalone HTML file** | Zero external runtime dependencies. Share via Slack, embed in docs, or open offline. Includes Light/Dark theme toggle, keyboard navigation (`←` `→` `Space`), `#step=` deep links, reduced motion, and full text transcripts. Also exports static **SVG** or **React** components. |
+| **Standalone HTML + 1-command Figma-ready SVG** | Zero external runtime dependencies — share via Slack, embed in docs, or open offline with keyboard navigation (`←` `→` `Space`), `#step=` deep links, reduced motion, and transcripts. Export any step as a clean, layered, editable **Figma-ready `.svg`** with `npm run export:drawing-svg` (expands `<use>`, bakes `color-mix()` to static hex, and names every `<g id="part-...">` layer). |
 
 ---
 
@@ -268,7 +286,8 @@ Pick the depth and tone that fits your question — by flag or plain English. Fl
 visualize/
 ├── SKILL.md                 Governing workflow, 3 visual lanes, 4 modes, and mandatory review gates
 ├── src/
-│   ├── rig/                 3D studio projection, shading, lighting (`objects.ts`, `mech.ts`, `parts.ts`, `concept.ts`)
+│   ├── rig/                 3D studio rig, 6 Spread Presets (`spreads.ts`), spatial solvers (`layout.ts`),
+│   │                        universal objects & machines (`objects.ts`, `mech.ts`, `parts.ts`, `concept.ts`)
 │   ├── drawing/             Shared interactive Drawing page, camera easing, player, tabs, dark mode, lab
 │   ├── claims/              Model-vs-prose arithmetic audit (`audit.mjs`, `arithmetic.mjs`)
 │   ├── core/                Trace, steps, timeline, keyed interpolation, scene types
@@ -277,18 +296,19 @@ visualize/
 │   ├── parts/               Reusable concept parts (rail, ring, tree, network, flow)
 │   ├── render/              SVG stage, panels, player controls, styles
 │   └── react/               React component adapter
-├── references/              Detailed guides (`objects.md`, `look.md`, `figures.md`, `concept-rig.md`, `drawing.md`, `craft.md`)
+├── references/              Detailed guides (`spreads.md`, `layout.md`, `objects.md`, `look.md`, `figures.md`, `concept-rig.md`, `drawing.md`, `craft.md`)
 ├── scripts/
 │   ├── new-figure.mjs       Scaffolds a studio-grade Object, Machine, or Concept figure from templates
 │   ├── templates/           Hardened starter templates (`object/`, `machine/`, `concept/`)
 │   ├── check-drawing.mjs    Headless Chrome layout, contrast, callout, and FPS checks (`--fast` supported)
 │   ├── check-arithmetic.mjs Verifies every equation and readout against the model
 │   ├── shoot-steps.mjs      Captures light & dark contact sheets of every step (`--fast` supported)
+│   ├── export-drawing-svg.mjs Exports any Drawing step as a layered, Figma-ready editable SVG
 │   ├── review-brief.mjs     Builds the mandatory fresh-context reviewer brief (`--mode everyday|fast|technical|deep`)
 │   ├── voice.mjs            Local offline TTS narration + word-level sync
 │   └── build.mjs / verify.mjs / export-svg.mjs / plant-look.mjs
-├── examples/                perfume-atomizer, automatic-watch, differential, derailleur, escalator, lock,
-│                            multi-agent, bloom, lru-3d, lru, attention, retries
+├── examples/                watch-everyday, perfume-atomizer, automatic-watch, differential, derailleur,
+│                            escalator, lock, multi-agent, bloom, lru-3d, lru, attention, retries
 ├── test/fixtures/           Gallery scenes and planted-fault controls
 └── evals/evals.json         Prompt benchmarks and acceptance criteria
 ```
@@ -311,6 +331,7 @@ node scripts/new-figure.mjs <name> --kind=object|machine|concept --mode=everyday
 node scripts/check-drawing.mjs dist/<name>.html [--fast]    # Chrome layout/FPS/contrast audit
 node scripts/check-arithmetic.mjs dist/<name>.html          # Prose-vs-model arithmetic audit
 node scripts/shoot-steps.mjs dist/<name>.html [--fast]      # Step screenshots for review
+npm run export:drawing-svg -- dist/<name>.html --out <file.svg> [--step k] [--theme light|dark]
 node scripts/review-brief.mjs <audit> <review> <page> --mode=everyday|fast|technical|deep
 node scripts/voice.mjs <scene-dir>                          # Record synced offline narration
 ```

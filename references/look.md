@@ -6,7 +6,7 @@ These are the rules every Drawing page follows. The tokens are in `src/rig/rig.c
 
 - **One figure, one signal colour.** The followed part is `subject` (orange, the same hue as `--orange`). Everything else is a neutral metal or a material the real object is made of. *Why:* the eye goes to the only saturated thing on the stage. Two of them split the reader's attention.
 - **Leave whitespace around the figure.** Don't fill an empty stage with legends or extra labels. Details belong in the Details drawer. *Why:* a calm stage reads as precise, and a crowded one reads as a dashboard.
-- **Neutral paper, no tint.** The stage is `#fdfdfc` and the page is `#f2f2f0`. In dark mode they are `#141416` and `#0b0b0c`. *Why:* a cream or tinted ground makes light metals look the same as the ground, and it warms every colour placed on it.
+- **Neutral paper & museum stage vignette.** The stage ground is `#fdfdfc` and the page is `#f2f2f0` (`#141416` and `#0b0b0c` in dark mode), framed by a subtle museum radial vignette in `src/drawing/chrome.css` that gently anchors the perimeter without tinting the neutral center. *Why:* a cream or tinted ground makes light metals blend into the background, while a whisper-light edge vignette gives 3D cutaways studio depth in both themes.
 
 ## Materials
 
@@ -37,10 +37,23 @@ Pick the material the real part is made of. If the subject is abstract, pick the
 - **Don't force caps lighter than walls.** Use `rig-cap` and `rig-wall` to measure faces, not to reshade them. *Why:* a side-on figure such as the derailleur has caps that face away from the light, and its walls are correctly the lighter faces.
 - **Measure it.** Read `getComputedStyle(face).fill` for the `.rig-cap` and `.rig-wall` faces, convert each fill to OKLab L, and take the median per material. On a top-down or three-quarter view, a large flat part needs its cap and wall medians at least 0.08 apart (the watch steel is 0.26, the brass 0.19, the frame 0.09). Small domed or turned parts such as jewels, and side-on views where the gap is correctly negative, are exempt. For those, judge the pair by its span instead.
 
-## Receding and shadows
+## 3-Point Studio Shading & Finishes (`src/rig/draw.ts`)
 
-- A receded part mixes 42% toward the stage (`.rig-part[data-recede]`). *Why:* at 50%, light metals dissolved into the ground and the context stopped reading as the same object.
-- Contact shadows are a soft, neutral near-black (`--rig-contact`, `#16181c`) at 16% fill with a 7% feathered edge, laid toward the part behind. Never use a coloured shadow or a hard offset. *Why:* a believable shadow grounds the part without adding a second outline.
+`drawMesh(mesh, cam, look)` lights solids with a **3-point studio lighting rig** (key light from upper-left-front, bounce fill from opposite low angle, and specular highlight) shaped by `look.finish` (auto-defaults to `"metal"` when `shine: true`, `"glass"` when `material === "glass"`, and `"satin"` otherwise):
+
+| `finish` | Surface response | Use for |
+|---|---|---|
+| `"satin"` *(default)* | Smooth diffuse key + soft bounce lift on shadowed faces | Enclosures, mainplates, `ceramic`, `wood`, `rubber`, concept blocks |
+| `"metal"` | Tighter key contrast + specular rim glint (`shine: true`) | Brushed/machined `steel`, `brass`, `gilt`, `rhodium`, `alloy`, `blued` hands & screws |
+| `"glass"` | Crisp rim highlight + translucent crystal feel | Cutaway bottles, watch crystals, lab flasks (`glass`), liquid columns |
+| `"matte"` | Pure diffuse + gentle bounce, zero specular | Chalky/uncoated housings, paper cards, non-reflective context |
+
+## Receding, Shadows & Cutaway Hatching
+
+- **Receding:** a receded part mixes 42% toward the stage (`.rig-part[data-recede]`). *Why:* at 50%, light metals dissolved into the ground and context stopped reading as the same object.
+- **Studio grounding shadows (`softShadow(mesh, cam, offset)`):** lays a feathered neutral grounding shadow beneath the hero object on the stage floor so vessels, watches, and machines feel physically anchored rather than floating in space.
+- **Part-to-part contact shadows (`contactShadow(mesh, cam, offset)` / `plateShadow(mesh, cam, offset)`):** neutral near-black (`--rig-contact`, `#16181c`) at 16% fill with a 7% feathered edge, laid toward the part behind. Use `plateShadow()` on C-shaped, spoked, or holed solids so light passes through holes. Never use a coloured shadow or hard offset.
+- **Cutaway hatching (`cutawayHatch(cam, pl, outline, spacing = 2.4)`):** draws crisp 45° architectural section hatching across a cut cross-section polygon in plane `pl` so sliced solids read immediately as cutaways rather than hollow shells.
 
 ## Lines
 

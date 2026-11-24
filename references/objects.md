@@ -16,15 +16,16 @@ Use this kit so a learner asking *"how does a perfume bottle spray?"* or *"how d
 
 ## Composing the Object + Side Explainer Layout
 
-Every `--kind object` page shares a calm two-zone stage composition:
+Every `--kind object` page shares a calm two-zone stage composition locked in by the **Spread Design System** (`src/rig/spreads.ts`, `references/spreads.md`):
 
-1. **Camera (`OBJECT_VIEW`):** Start from `OBJECT_VIEW = { azimuth: 238, elevation: 22 }` — a natural three-quarter front elevation where cylindrical vessels, cutaway walls, watch dials, and internal tubes/springs read immediately with clean top-vs-side contrast.
-2. **Hero 3D Object (left / center):** Place the recognizable physical object so it dominates the stage. Open cutaways toward the camera (`cutaway` on `vesselShell` or `watchCaseDial`) so the reader sees the liquid column, dip tube, piston chamber, or coiled spring working inside without rotating the camera.
-3. **Side Explainer (`explainerCard` + `meterBar`, right of object):** Place a crisp upright `explainerCard` and optional live `meterBar` cleanly beside the object:
-   - Never overlap the object silhouette or the bottom-right interactive cards (Predict / Lab / Now you try).
+1. **Pick a Spread Preset First (`spread("cutaway-vessel")` or `spread("axial-cutaway")`):** Never hand-guess `VBW`, `BOX`, `CLEAR`, `HUD_CAM`, or raw callout coordinates. Call `spread("cutaway-vessel")` (vertical vessels/bottles/batteries/syringes, `OBJECT_VIEW = { azimuth: 238, elevation: 22 }`) or `spread("axial-cutaway")` (horizontal jet engines/pistons/valves, `{ azimuth: 234, elevation: 22 }`), place callouts with `distributeCallouts()`, and render the upper-right HUD with `renderHudStack()`.
+2. **Solve Layout First (`src/rig/layout.ts`, `references/layout.md`):** Never hand-guess internal coordinates. Snap bottles/pumps/syringes along `layoutFlowSpine`, solve watch/gear interiors with `solveGearTrain` + `assertNoCollisions` + `checkCavityFill`, and separate layered assemblies with `composeExplodedLayers`.
+3. **Hero 3D Object — Open Cutaway on Step 0 (left / center):** Place the recognizable physical object inside `S.box` so it dominates the stage, and **open the cutaway on Step 0** (`cutaway: true`, paired with `<g class="label">` anatomy callouts via `distributeCallouts()`) so the reader immediately sees the liquid column, dip tube, piston chamber, rotor, or coiled spring working inside — never a closed opaque exterior hiding the mechanism. **Ban chunky rectangular lugs, chopped-off watch straps, and oversized decorative stands/pedestals** that waste >15% of the silhouette without teaching anything.
+4. **Side Explainer (`renderHudStack` → `explainerCard` + up to 2 `meterBar`s, upper-right):** Render the HUD inside `<g id="explainer" data-camera-avoid=""></g>` outside `#scene`:
+   - `S.safeZones.hud` guarantees zero overlap with the hero silhouette, right-rail callouts, or bottom-right Predict card at both `1440×900` and `1280×800`.
    - **Never recede the explainer card** when the object is focused — keep it crisp and legible in both light and dark themes.
    - Drive every row value, badge, and meter `fraction` directly from `model.mjs` so `audit.mjs` and `check-arithmetic.mjs` verify every number automatically.
-4. **Per-step camera shots:** Frame the specific part causing each step's change (e.g. the plunger and spray nozzle on the mist step, the dip tube foot on the refill step) while letting unrelated context parts recede by tone (`--recede`), never by opacity.
+5. **Per-step camera shots:** Frame the specific part causing each step's change inside `S.clear` (e.g. the plunger and spray nozzle on the mist step, the dip tube foot on the refill step) while letting unrelated context parts recede by tone (`--recede`), never by opacity.
 
 ```js
 import { makeCamera } from "../../src/rig/camera.ts";
@@ -49,16 +50,30 @@ All 3D primitives return shaded rig drawings / SVG elements built on `src/rig/sh
 | Export | Signature | Use for |
 |---|---|---|
 | `OBJECT_VIEW` | `{ azimuth: 238, elevation: 22 }` | Standard three-quarter front elevation for everyday physical objects |
-| `vesselShell` | `vesselShell(cam, { r, h, neckR?, neckH?, shoulderH?, wall?, cutaway?, material?, segments? })` | Bottles, flasks, syringes, battery casings, cylinders with optional shoulder, neck, wall thickness, and camera-facing cutaway |
+| `vesselShell` | `vesselShell(cam, { r, h, neckR?, neckH?, shoulderH?, wall?, cutaway?, material?, segments? })` | Bottles, flasks, syringes, battery casings, cylinders with optional shoulder, neck, wall thickness, architectural cutaway hatching, and diagonal crystal sheen when `material: "glass"` |
 | `liquidColumn` | `liquidColumn(cam, { r, h, z0?, material?, segments? })` | Fluid levels inside a cutaway vessel (perfume, water, electrolyte, coffee) with shaded meniscus top |
 | `dipTube` | `dipTube(cam, { r, z0, z1, offset?, material? })` | Straw, dip tube, fuel pickup, or internal conduit running vertically between `z0` and `z1` |
 | `plungerNozzle` | `plungerNozzle(cam, { r, h, spoutLen?, spoutDir?, material? })` | Pressable spray heads, pump plungers, and side-spout nozzles that translate along their stroke |
 | `sprayCone` | `sprayCone(cam, { origin, dir, length, spreadDeg?, intensity?, seed?, droplets? })` | Deterministic atomized mist cone and droplet cloud emitted from a nozzle (`seed` guarantees reproducible builds) |
-| `watchCaseDial` | `watchCaseDial(cam, { r, h?, lugs?, cutaway?, bezelMaterial?, dialMaterial? })` | Recognizable wristwatch case, optional lugs, dial face, and cutaway window into the movement |
+| `watchCaseDial` | `watchCaseDial(cam, { r, h?, lugs?, cutaway?, bezelMaterial?, dialMaterial? })` | Sleek wristwatch case with double-stepped brushed chamfer bezel, recessed chapter ring with 12 baton indices, sapphire sheen, **wide 240° open-heart cutaway (`cutaway: true` by default)**, and **`lugs: false` by default** (no chunky straps!) |
+| `calibrePlate` | `calibrePlate(cam, { r, h?, z?, pockets?, jewels?, screws?, material? })` | Sculpted rhodium/brass watch movement mainplate with beveled rim, perlage groove, recessed barrel/balance pockets, synthetic ruby jewel settings, and slotted steel screws |
 | `watchHand` | `watchHand(cam, { len, width?, tail?, z?, material? })` | Hour, minute, or sweeping second hand pivoted cleanly at the dial centre |
 | `coiledSpring` | `coiledSpring(cam, { rInner, rOuter, turns, z?, thickness?, material? })` | Spiral mainspring, hairspring, or flat energy-storage coil sorted cleanly without face-merge artefacts |
 | `explainerCard` | `explainerCard(cam, { at, title, rows, badge?, tone?, width? })` | Upright plain-English callout card beside the object with structured label/value rows and optional status badge |
 | `meterBar` | `meterBar(cam, { at, w, h?, fraction, label, valueText?, tone? })` | Compact live gauge bar (pressure, battery charge, liquid remaining, spring tension) driven by a `[0, 1]` model fraction |
+
+### Universal Physical Engineering Primitives (`src/rig/objects.ts`)
+
+Six general-purpose 3D engineering solids cover jet/turbofan engines, combustion cylinders, coils/solenoids, batteries/fuel cells/chips, and 3D fluid/thermal/current streamlines without writing custom mesh builders from scratch:
+
+| Export | Signature | Use for |
+|---|---|---|
+| `axialHousing` | `axialHousing(cam, { length, rOuter, rInner?, rOuterEnd?, rInnerEnd?, x0?, axis?, origin?, cutaway?, hatch?, material?, finish?, segments? })` | Horizontal or arbitrary-axis cylindrical/conical casings (jet nacelles, turbofan ducts, engine cylinders, hydraulic valves) with a ~140° camera-facing cutaway (`cutaway: true` default) and crisp 45° longitudinal section hatching (`hatch: true` default) |
+| `turbineRotor` | `turbineRotor(cam, { origin?, axis?, rHub, rTip, blades, bladeWidth?, bladeThick?, twistDeg?, noseLen?, rotRad?, material?, hubMaterial? })` | 3D bladed fan, axial compressor, or turbine rotor with pitched airfoil-tapered blades, beveled hub, and optional aerodynamic ogive spinner nose cone (`noseLen`); depth-sorted and ready for `turningPart()` |
+| `pistonAssembly` | `pistonAssembly(cam, { r, height?, z0?, rodLen?, material?, ringMaterial? })` | Machined 3D piston with recessed compression/oil rings, beveled crown, steel wrist-pin bosses, and optional tapered connecting rod + big-end bearing journal (`rodLen`) |
+| `helicalCoil` | `helicalCoil(cam, { r, height, turns, wireR?, z0?, axis?, origin?, material? })` | 3D compression/return spring or electromagnetic induction coil swept with parallel-transport `tube()` along any `axis` (`sort: "face"` so near turns cleanly overlap far turns) |
+| `electrodeStack` | `electrodeStack(cam, { w, d, layerH?, gap?, layers?, origin?, anodeMaterial?, cathodeMaterial?, sepMaterial? })` | Layered battery, fuel-cell, capacitor, or microchip cutaway stack with beveled electrode plates, opposing brass/aluminium current-collector tabs, satin separator sheets, and a soft floor shadow |
+| `flowArrow3D` | `flowArrow3D(cam, { points, width?, headSize?, tone?, dashed? })` | Bold 3D-projected Catmull-Rom streamline arrow (`tone: "subject" \| "cool" \| "good" \| "bad" \| "neutral"`, optional `dashed`) with stage halo for air, heat, fluid, blood, or electric current |
 
 ### Quick usage snippets
 
@@ -77,13 +92,21 @@ const mist = sprayCone(cam, {
 });
 ```
 
-**Everyday watch + side explainer:**
+**Everyday open-heart watch + calibre plate + side explainer (no chunky straps!):**
 ```js
+// Default watchCaseDial opens a 240° exhibition cutaway with lugs: false (clean horological silhouette)
 const watch = watchCaseDial(cam, {
-  r: 42, h: 12, lugs: true, cutaway: true,
+  r: 42, h: 12,
   bezelMaterial: "steel", dialMaterial: "ceramic",
 });
-const spring = coiledSpring(cam, { rInner: 6, rOuter: 22, turns: 4.5, z: 3, thickness: 1.8, material: "blued" });
+const plate = calibrePlate(cam, {
+  r: 33, h: 3.2, z: 2.2,
+  material: "rhodium",
+  pockets: [{ x: -11, y: 5, r: 12 }, { x: 11, y: -9, r: 9.5 }],
+  jewels: [{ x: 0, y: 0 }, { x: 11, y: -9 }, { x: -11, y: 5 }],
+  screws: [{ x: -21, y: -12 }, { x: 21, y: 12 }],
+});
+const spring = coiledSpring(cam, { rInner: 4.5, rOuter: 10.5, turns: 4.5, z: 5.5, thickness: 0.9, material: "blued" });
 const secondHand = watchHand(cam, { len: 34, width: 1.6, tail: 8, z: 12.5, material: "subject" });
 
 const card = explainerCard(cam, {
