@@ -14,7 +14,9 @@
 //
 // What it does, at 1440×900 and 1280×800:
 // - every step of every What if variant: no scroll, the step lands, the timeline runs forward,
-//   callouts are readable, inside the stage, apart from each other and clear of any open card;
+//   callouts are readable, inside the stage, apart from each other and clear of any open card,
+//   opening steps (0–1) show at least one anatomy callout (<g class="label">), and #fig stays
+//   under the SVG path bloat guard (25,000 raw <path> elements);
 // - the prediction: asked on its step, answered on the next, with the callouts clear of the card;
 // - Now you try: eight questions, each with distinct choices and a worked explanation;
 // - the lab: every input at its minimum and its maximum, with a verdict and no callout under it;
@@ -74,6 +76,7 @@ const url = pathToFileURL(resolve(page)).href;
 const fails = [];
 const fail = (msg) => fails.push(msg);
 const MIN_TEXT = 11; // px, rendered, at 1280×800 and above
+const MAX_FIG_PATHS = 25000; // hard SVG path bloat ceiling inside #fig (prevents 30k+ path dumps)
 // Playback: the median frame of the reference workload (below) on the machine the budgets were set on:
 // a MacBook (Apple silicon) running Chrome 1440 x 900, no CPU throttling, measured as the median of the
 // calibration's own median over 20 runs (0.27 to 0.29 ms; the same workload runs at 0.71 ms under 2.5x CPU throttling). The check multiplies its limits by max(1, measured / REFERENCE_MS).
@@ -166,6 +169,7 @@ const measure = () => {
     stage: stage && box(stage),
     labels,
     cards,
+    figPaths: document.querySelectorAll("#fig path").length - document.querySelectorAll("#fig defs path").length,
     broken: (text.match(/\b(NaN|undefined|Infinity)\b/g) || []).length,
     T: Number(document.getElementById("scrub").value),
     step: window.__viz.state().step,
@@ -518,6 +522,8 @@ try {
     for (const v of checkVariants) {
       if (v && has("variant")) await p.evaluate((v) => window.__viz.variant(v), v);
       let lastT = -1;
+      let openingLabels = 0;
+      let maxFigPaths = 0;
       for (let k = 0; k < steps; k++) {
         await p.evaluate((k) => window.__viz.seekStep(k), k);
         await wait(120);
@@ -526,10 +532,14 @@ try {
         if (r.step !== k) fail(`${s}: seekStep(${k}) landed on step ${r.step}`);
         if (r.T <= lastT) fail(`${s}: the timeline goes backwards (${r.T} after ${lastT}); it must run once, start to end`);
         lastT = r.T;
+        if (k === 0 || k === 1) openingLabels = Math.max(openingLabels, r.labels.length);
+        if (r.figPaths > maxFigPaths) maxFigPaths = r.figPaths;
         judge(s, r);
         for (const name of await p.evaluate(arrowsOverValues)) fail(`${s}: an arrow runs across the value ${name}; route it over a gap between parts (arrow's via) or end it on a face`);
         for (const f of await p.evaluate(litOutOfView)) fail(`${s}: ${f}; frame it (the step's shot or subject), or light less`);
       }
+      if (openingLabels === 0) fail(`${at}${v ? ` ${v}` : ""}: opening steps (0–1) show no callout labels (<g class="label">); add anatomy callouts naming the key parts`);
+      if (maxFigPaths > MAX_FIG_PATHS) fail(`${at}${v ? ` ${v}` : ""}: #fig contains ${maxFigPaths} <path> elements, over the ${MAX_FIG_PATHS} bloat limit; reuse <use> templates, lower turningPart() step counts, or simplify procedural geometry`);
       if (!has("answer") || !has("labInputs") || !has("lab")) continue;
       // Every prediction, answered, on the step that reveals it.
       for (const q of preds) {

@@ -112,6 +112,18 @@ test("review-brief --mode deep audits multi-chapter structure and per-chapter Pr
   assert.match(out, /"reviewer": "independent"/);
 });
 
+test("review-brief enforces ruthless visual design director guardrails across all 4 modes", () => {
+  const { auditFile, reviewFile } = makeFixture();
+  for (const mode of ["everyday", "fast", "technical", "deep"]) {
+    const out = execFileSync(process.execPath, [BRIEF, auditFile, reviewFile, "--mode", mode], { encoding: "utf8" });
+    assert.match(out, /No Closed Opaque Step 0/i, `${mode}: must reject closed opaque Step 0`);
+    assert.match(out, /Empty Ashtray/i, `${mode}: must reject floating/unmeshed parts and empty ashtray interiors`);
+    assert.match(out, /No Impossible Layering or Part Collisions/i, `${mode}: must reject impossible layering or collisions`);
+    assert.match(out, /No Clunky Decorative Straps\/Stands/i, `${mode}: must reject chunky straps/lugs/stands`);
+    assert.match(out, /composeExplodedLayers/, `${mode}: must require clean vertical separation for flat layered machines`);
+  }
+});
+
 test("review-brief rejects invalid --mode with exit code 2", () => {
   const { auditFile, reviewFile } = makeFixture();
   assert.throws(

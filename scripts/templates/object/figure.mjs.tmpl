@@ -1,28 +1,28 @@
-// __TITLE__: the 3D everyday object figure (mode: __MODE__), built on src/rig/objects.ts.
+// __TITLE__: the 3D everyday object figure (mode: __MODE__), built on src/rig/objects.ts + spreads.ts.
 // Every static 3D solid is drawn once; each frame places the plunger, updates the cutaway liquid
-// level & mist cone, and renders the upright plain-English explainer card & pressure meter beside it.
+// level & mist cone, and renders the upright plain-English explainer card & pressure meter via renderHudStack().
 //
-//   const F = figure(M, cam, hudCam)   // once per variant
+//   const F = figure(M, cam, spec)     // once per variant
 //   F.parts                            // static drawings put in #scene once: { id, part, svg }
 //   F.pose(state)                      // each frame: { items, at, explainer }
 
 import {
-  OBJECT_VIEW,
   axesOf,
   dipTube,
-  explainerCard,
   fitCamera,
   liquidColumn,
-  meterBar,
   placeAt,
   plungerNozzle,
+  renderHudStack,
   screenOf,
   sprayCone,
+  spread,
   vesselShell,
 } from "__ROOT__/src/rig/index.ts";
 export { RigStage, screenOf } from "__ROOT__/src/rig/index.ts";
 
-export const VIEW = OBJECT_VIEW;
+export const SPREAD = spread("cutaway-vessel");
+export const VIEW = SPREAD.view;
 
 // World dimensions (mm): standing bottle on z = 0, cutaway facing the camera
 export const VESSEL = { r: 13, h: 34, neckR: 4.8, neckH: 6, shoulderH: 7, wall: 1.8 };
@@ -46,7 +46,7 @@ export function cameraFor(M, box) {
   return fitCamera(pts, box, VIEW.azimuth, VIEW.elevation);
 }
 
-export function figure(M, cam, hudCam) {
+export function figure(M, cam, spec = SPREAD) {
   const ax = axesOf(cam.azimuth, cam.elevation);
   const spoutDir = [ax.right[0], ax.right[1]];
   const parts = [];
@@ -108,35 +108,34 @@ export function figure(M, cam, hudCam) {
       spray: screenOf(cam, [spoutDir[0] * (spoutReach + 11), spoutDir[1] * (spoutReach + 11), spoutTipZ + 0.5]),
     };
 
-    // Upright side explainer card + live pressure gauge (rendered outside #scene, never receded)
+    // Upright side explainer card + live pressure gauge (locked into spec.hud outside #scene)
     const tone = st.stage === "spray" || st.pressureRatio >= 2.2 ? "hot" : st.stage === "refill" ? "good" : "neutral";
     const valveRow = st.topValveOpen
       ? "Valves: bottom shut, top open"
       : st.bottomValveOpen
         ? "Valves: bottom open, top shut"
         : "Valves: both shut (sealed)";
-    const explainer =
-      explainerCard(hudCam, {
-        at: [0, 0, 0],
+    const explainer = renderHudStack(
+      spec,
+      {
         title: "Inside the pump",
         badge: st.statusLabel,
         tone,
-        width: 39,
         rows: [
           `Chamber: ${st.chamberLabel}`,
           valveRow,
           `Bottle: ${st.remainingMl.toFixed(1)} mL (${st.spraysLeft} left)`,
         ],
-      }) +
-      meterBar(hudCam, {
-        at: [0, 0, -16],
-        w: 39,
-        h: 1.9,
-        fraction: st.pressureFrac,
-        label: "Chamber pressure",
-        valueText: st.pressureLabel,
-        tone,
-      });
+      },
+      [
+        {
+          label: "Chamber pressure",
+          fraction: st.pressureFrac,
+          valueText: st.pressureLabel,
+          tone,
+        },
+      ],
+    );
 
     return { items, at, explainer };
   }
