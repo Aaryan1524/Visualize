@@ -1,0 +1,18 @@
+{
+  "reviewer": "independent",
+  "round": 2,
+  "htmlSha256": "24536b76504c01a810353fb4e600711437a2b24e1eadbc46306a6bbda8ba0b9c",
+  "sceneId": "venturi-atomizer",
+  "conceptual": {
+    "status": "pass",
+    "summary": "All four audit criteria pass cleanly: Bernoulli/Venturi continuity, hydrostatic lift, and Weber breakup physics are sound and strictly monotonic with zero NaN/Infinity across all bounds; Step 0-5 narration, active variant pill state, telemetry ('-' in No lift, '33 um Fine mist' on Fine Perfume default), and Step 5 tryOut challenge invariants agree 100%.",
+    "blockers": [],
+    "nits": []
+  },
+  "visual": {
+    "status": "pass",
+    "summary": "All four prior defects are cleanly resolved: the 3D matte-clay CAD cutaway, light/dark contrast, framing, chrome clearance, callout anchors, and final-step UI state are now cohesive and publication-grade.",
+    "blockers": [],
+    "nits": []
+  }
+}
