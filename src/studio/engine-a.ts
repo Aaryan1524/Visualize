@@ -147,7 +147,7 @@ export function buildCutawayCylinderGeometry(
   const openDeg = Math.max(0, Math.min(359, opts.openDeg ?? 135));
   const isCutaway = openDeg > 0.01;
   const sweepRad = (360 - openDeg) * DEG2RAD;
-  const segs = Math.max(8, Math.round(opts.segments ?? 48));
+  const segs = Math.max(8, Math.round(opts.segments ?? 84));
 
   // Center the cutaway opening at +45° (front-top toward +Y, +Z camera).
   const thetaStart =
@@ -329,7 +329,7 @@ export function cutawayCylinder(opts: CutawayCylinderOptions): THREE.Group {
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = "cutawayCylinder_shell";
-  configureSolidMesh(mesh, opts.edgeThresholdDeg ?? 18);
+  configureSolidMesh(mesh, opts.edgeThresholdDeg ?? 26);
 
   group.add(mesh);
   group.userData.shellMesh = mesh;
@@ -1029,19 +1029,74 @@ export function combustorRing(opts: CombustorRingOptions): THREE.Group {
     metalness: 0.35,
   });
 
-  // Sculpted teardrop flame core geometry pointing +X
+  // Sculpted volumetric flame plume geometry pointing +X (UV.y = 0 at injector -> 1 at tip)
   const flameProfile: THREE.Vector2[] = [];
-  const fSteps = 12;
+  const fSteps = 18;
   for (let i = 0; i <= fSteps; i++) {
     const t = i / fSteps;
     const rad = Math.max(
-      0.001,
-      flameR * Math.sin(Math.pow(t, 0.55) * Math.PI),
+      0.002,
+      flameR * 1.28 * Math.sin(Math.pow(t, 0.52) * Math.PI),
     );
-    flameProfile.push(new THREE.Vector2(rad, t * flameLen));
+    flameProfile.push(new THREE.Vector2(rad, t * flameLen * 1.12));
   }
-  const flameGeo = new THREE.LatheGeometry(flameProfile, 16);
+  const flameGeo = new THREE.LatheGeometry(flameProfile, 24);
   flameGeo.rotateZ(-Math.PI / 2); // +Y -> +X
+
+  const flameVertexShader = /* glsl */ `
+    varying vec2 vUv;
+    varying vec3 vNormalView;
+    varying vec3 vViewPos;
+    uniform float uTime;
+    uniform float uPhase;
+    uniform float uIntensity;
+    void main() {
+      vUv = uv;
+      vec3 displaced = position;
+      float tip = smoothstep(0.12, 0.95, uv.y);
+      float wobble = sin(uv.y * 14.0 - uTime * 11.0 + uPhase) * 0.018 * tip * uIntensity;
+      float wobble2 = cos(uv.y * 9.5 - uTime * 8.0 + uPhase * 1.7) * 0.014 * tip * uIntensity;
+      displaced.y += wobble;
+      displaced.z += wobble2;
+      vec4 mvPos = modelViewMatrix * vec4(displaced, 1.0);
+      vViewPos = -mvPos.xyz;
+      vNormalView = normalize(normalMatrix * normal);
+      gl_Position = projectionMatrix * mvPos;
+    }
+  `;
+
+  const flameFragmentShader = /* glsl */ `
+    varying vec2 vUv;
+    varying vec3 vNormalView;
+    varying vec3 vViewPos;
+    uniform float uTime;
+    uniform float uPhase;
+    uniform float uIntensity;
+    uniform float uOpacity;
+    void main() {
+      float axial = clamp(vUv.y, 0.0, 1.0);
+      vec3 n = normalize(vNormalView);
+      // Orthographic Fresnel edge falloff: incandescent white-gold heart, fiery amber body, feathered ember tail
+      float coreMask = pow(clamp(abs(n.z), 0.0, 1.0), 0.92);
+      float wisp = 0.76 + 0.24 * sin(axial * 20.0 - uTime * 14.0 + uPhase + vUv.x * 12.566);
+      float wisp2 = 0.85 + 0.15 * cos(axial * 11.0 - uTime * 9.0 + uPhase * 2.1);
+
+      // Physical jet-fuel flame thermal gradient: incandescent gold-white -> vivid jet amber -> deep crimson-ember tail
+      vec3 cWhiteGold = vec3(1.0, 0.94, 0.72);
+      vec3 cAmber = vec3(1.0, 0.44, 0.06);
+      vec3 cEmber = vec3(0.88, 0.16, 0.04);
+      vec3 col = mix(cWhiteGold, cAmber, smoothstep(0.05, 0.36, axial));
+      col = mix(col, cEmber, smoothstep(0.36, 0.88, axial));
+      // Incandescent heart only right at injector core center
+      col = mix(col, cWhiteGold, pow(coreMask, 2.6) * (1.0 - smoothstep(0.08, 0.48, axial)) * 0.68);
+
+      float headFade = smoothstep(0.0, 0.10, axial);
+      float tailFade = 1.0 - smoothstep(0.56, 1.0, axial);
+      float alpha = coreMask * headFade * tailFade * wisp * wisp2 * uOpacity * clamp(0.56 + 0.50 * uIntensity, 0.32, 1.25);
+      if (alpha < 0.01) discard;
+      gl_FragColor = vec4(col * (0.96 + 0.28 * uIntensity), clamp(alpha, 0.0, 0.96));
+    }
+  `;
 
   const flameMeshes: THREE.Mesh[] = [];
 
@@ -1056,22 +1111,28 @@ export function combustorRing(opts: CombustorRingOptions): THREE.Group {
     configureSolidMesh(nozzle, 24);
     group.add(nozzle);
 
-    const flameMat = new THREE.MeshStandardMaterial({
-      color: ACCENT_TOKENS.orange,
-      emissive: ACCENT_TOKENS.ember,
-      emissiveIntensity: 1.65,
-      roughness: 0.35,
-      metalness: 0.0,
+    const flameMat = new THREE.ShaderMaterial({
+      vertexShader: flameVertexShader,
+      fragmentShader: flameFragmentShader,
+      uniforms: {
+        uTime: { value: 0 },
+        uPhase: { value: i * 1.37 },
+        uIntensity: { value: 1.0 },
+        uOpacity: { value: 0.92 },
+      },
       transparent: true,
-      opacity: 0.9,
+      depthWrite: false,
+      side: THREE.DoubleSide,
     });
     flameMat.userData.isFlame = true;
-    flameMat.userData.baseOpacity = 0.9;
+    flameMat.userData.isShaderFlame = true;
+    flameMat.userData.baseOpacity = 0.92;
     flameMat.userData.baseTransparent = true;
 
     const flame = new THREE.Mesh(flameGeo, flameMat);
     flame.name = `combustor_flame_${i}`;
-    flame.position.set(-length * 0.24, cy, cz);
+    flame.position.set(-length * 0.25, cy, cz);
+    flame.renderOrder = 5;
     flame.userData.isFlame = true;
     group.add(flame);
     flameMeshes.push(flame);
@@ -1102,11 +1163,12 @@ export function baseMount(opts: BaseMountOptions): THREE.Group {
   const radius = Math.max(0.5, opts.radius ?? 6);
   const planeSize = radius * 4.5;
 
+  // Whisper-soft directional catch plane (avoids harsh jagged off-screen shadow)
   const shadowGeo = new THREE.PlaneGeometry(planeSize, planeSize);
   shadowGeo.rotateX(-Math.PI / 2);
   const shadowMat = new THREE.ShadowMaterial({
     color: 0x1a1c20,
-    opacity: 0.14,
+    opacity: 0.04,
     depthWrite: false,
   });
   const shadowPlane = new THREE.Mesh(shadowGeo, shadowMat);
@@ -1114,6 +1176,42 @@ export function baseMount(opts: BaseMountOptions): THREE.Group {
   shadowPlane.position.y = opts.y;
   shadowPlane.receiveShadow = true;
   group.add(shadowPlane);
+
+  // Soft studio Gaussian radial contact shadow directly beneath the model
+  const contactGeo = new THREE.PlaneGeometry(radius * 2.25, radius * 1.45);
+  contactGeo.rotateX(-Math.PI / 2);
+  const contactMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(0x181a1f) },
+      uOpacity: { value: 0.2 },
+    },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      varying vec2 vUv;
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      void main() {
+        vec2 p = (vUv - 0.5) * 2.0;
+        float r2 = dot(p, p);
+        float alpha = exp(-r2 * 3.8) * smoothstep(1.0, 0.15, sqrt(r2)) * uOpacity;
+        if (alpha < 0.004) discard;
+        gl_FragColor = vec4(uColor, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+  });
+  const contactShadow = new THREE.Mesh(contactGeo, contactMat);
+  contactShadow.name = "baseMount_contactShadow";
+  contactShadow.position.y = opts.y + 0.001;
+  contactShadow.renderOrder = 1;
+  group.add(contactShadow);
 
   // Subtle architectural ground contact ring
   const ringPts: THREE.Vector3[] = [];
@@ -1132,7 +1230,7 @@ export function baseMount(opts: BaseMountOptions): THREE.Group {
   const ringMat = new THREE.LineBasicMaterial({
     color: ARCHITECTURAL_EDGE_COLOR,
     transparent: true,
-    opacity: 0.11,
+    opacity: 0.09,
     depthWrite: false,
   });
   const ring = new THREE.LineLoop(ringGeo, ringMat);
@@ -1140,6 +1238,7 @@ export function baseMount(opts: BaseMountOptions): THREE.Group {
   group.add(ring);
 
   group.userData.shadowMaterial = shadowMat;
+  group.userData.contactMaterial = contactMat;
   group.userData.ringMaterial = ringMat;
   return group;
 }
@@ -1148,10 +1247,18 @@ export function baseMount(opts: BaseMountOptions): THREE.Group {
 /*  Primitive 8: flowRibbon                                                   */
 /* -------------------------------------------------------------------------- */
 
+export interface FlowRibbonColorStops {
+  start: AccentKey | number;
+  mid?: AccentKey | number;
+  end?: AccentKey | number;
+  midAt?: number;
+}
+
 export interface FlowRibbonOptions {
   curves: [number, number, number][][];
   radius?: number;
   color: AccentKey | number;
+  colorStops?: FlowRibbonColorStops;
   speed?: number;
   particleCount?: number;
   opacity?: number;
@@ -1184,9 +1291,120 @@ function resolveAccentHex(color: AccentKey | number): number {
 }
 
 /**
- * Translucent 3D aerodynamic streamline tubes + glowing animated streaming
- * InstancedMesh streak particles racing smoothly along 3D curves with gentle
- * helical swirl.
+ * Build crossed orthogonal feathered aerodynamic ribbon strips along a 3D spline
+ * using parallel-transport frames (zero Frenet twists, soft tapered ends).
+ */
+function buildAirRibbonGeometry(
+  curve: THREE.CatmullRomCurve3,
+  segments: number,
+  halfWidth: number,
+  curvePhase: number,
+): THREE.BufferGeometry {
+  const segs = Math.max(12, Math.round(segments));
+  const vertsPerStrip = (segs + 1) * 2;
+  const totalVerts = vertsPerStrip * 2; // 2 orthogonal crossed strips
+  const positions = new Float32Array(totalVerts * 3);
+  const normals = new Float32Array(totalVerts * 3);
+  const uvs = new Float32Array(totalVerts * 2);
+  const phases = new Float32Array(totalVerts);
+  const indices: number[] = [];
+
+  const points: THREE.Vector3[] = [];
+  const tangents: THREE.Vector3[] = [];
+  const normA: THREE.Vector3[] = [];
+  const normB: THREE.Vector3[] = [];
+
+  const upRef = new THREE.Vector3(0, 1, 0);
+  const altRef = new THREE.Vector3(1, 0, 0);
+  const prevN = new THREE.Vector3();
+  const curN = new THREE.Vector3();
+  const curB = new THREE.Vector3();
+
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    const p = curve.getPoint(t);
+    const tan = curve.getTangent(t).normalize();
+    points.push(p);
+    tangents.push(tan);
+
+    if (i === 0) {
+      const ref = Math.abs(tan.dot(upRef)) > 0.9 ? altRef : upRef;
+      prevN.crossVectors(tan, ref).normalize();
+    } else {
+      // Parallel transport previous normal onto plane perpendicular to new tangent
+      curN.copy(prevN).addScaledVector(tan, -prevN.dot(tan));
+      if (curN.lengthSq() < 1e-8) {
+        const ref = Math.abs(tan.dot(upRef)) > 0.9 ? altRef : upRef;
+        curN.crossVectors(tan, ref);
+      }
+      curN.normalize();
+      prevN.copy(curN);
+    }
+    curB.crossVectors(tan, prevN).normalize();
+    normA.push(prevN.clone());
+    normB.push(curB.clone());
+  }
+
+  for (let strip = 0; strip < 2; strip++) {
+    const vOffset = strip * vertsPerStrip;
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const p = points[i]!;
+      const side = strip === 0 ? normA[i]! : normB[i]!;
+      const nrm = strip === 0 ? normB[i]! : normA[i]!;
+      // Subtle aerodynamic width taper at intake & exhaust tips
+      const endTaper = 0.68 + 0.32 * Math.sin(t * Math.PI);
+      const w = halfWidth * endTaper;
+
+      const idx0 = vOffset + i * 2;
+      const idx1 = idx0 + 1;
+
+      positions[idx0 * 3] = p.x - side.x * w;
+      positions[idx0 * 3 + 1] = p.y - side.y * w;
+      positions[idx0 * 3 + 2] = p.z - side.z * w;
+      positions[idx1 * 3] = p.x + side.x * w;
+      positions[idx1 * 3 + 1] = p.y + side.y * w;
+      positions[idx1 * 3 + 2] = p.z + side.z * w;
+
+      normals[idx0 * 3] = nrm.x;
+      normals[idx0 * 3 + 1] = nrm.y;
+      normals[idx0 * 3 + 2] = nrm.z;
+      normals[idx1 * 3] = nrm.x;
+      normals[idx1 * 3 + 1] = nrm.y;
+      normals[idx1 * 3 + 2] = nrm.z;
+
+      uvs[idx0 * 2] = t;
+      uvs[idx0 * 2 + 1] = 0;
+      uvs[idx1 * 2] = t;
+      uvs[idx1 * 2 + 1] = 1;
+
+      phases[idx0] = curvePhase;
+      phases[idx1] = curvePhase;
+
+      if (i < segs) {
+        const a = idx0;
+        const b = idx1;
+        const c = idx0 + 2;
+        const d = idx1 + 2;
+        indices.push(a, b, d, a, d, c);
+      }
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geo.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
+  geo.setIndex(indices);
+  geo.computeBoundingBox();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+/**
+ * Feathered 3D aerodynamic airflow ribbons (pure wispy wind-tunnel currents with
+ * smooth axial thermal color gradients) + fine luminous wind-mote speed streaks.
  */
 export function flowRibbon(opts: FlowRibbonOptions): FlowRibbonHandle {
   const group = new THREE.Group();
@@ -1198,6 +1416,23 @@ export function flowRibbon(opts: FlowRibbonOptions): FlowRibbonHandle {
   }
 
   const baseHex = resolveAccentHex(opts.color);
+  const hasColorStops = Boolean(opts.colorStops);
+  const stopStartHex = opts.colorStops
+    ? resolveAccentHex(opts.colorStops.start)
+    : baseHex;
+  const stopMidHex = opts.colorStops?.mid !== undefined
+    ? resolveAccentHex(opts.colorStops.mid)
+    : opts.colorStops
+      ? stopStartHex
+      : baseHex;
+  const stopEndHex = opts.colorStops?.end !== undefined
+    ? resolveAccentHex(opts.colorStops.end)
+    : baseHex;
+  const midStop = Math.max(
+    0.08,
+    Math.min(0.92, opts.colorStops?.midAt ?? 0.5),
+  );
+
   const baseRadius = Math.max(0.005, opts.radius ?? 0.035);
   const baseSpeed = opts.speed ?? 0.55;
   const baseOpacity = opts.opacity ?? 0.28;
@@ -1216,55 +1451,116 @@ export function flowRibbon(opts: FlowRibbonOptions): FlowRibbonHandle {
     );
   });
 
-  // Translucent streamline tubes
-  const tubeMat = new THREE.MeshStandardMaterial({
-    color: baseHex,
-    emissive: baseHex,
-    emissiveIntensity: 0.45,
-    roughness: 0.35,
-    metalness: 0.05,
-    transparent: true,
-    opacity: baseOpacity,
-    depthWrite: false,
-  });
-  tubeMat.userData.isFlowRibbon = true;
-  tubeMat.userData.baseOpacity = baseOpacity;
-  tubeMat.userData.baseTransparent = true;
+  const cStart = new THREE.Color(stopStartHex);
+  const cMid = new THREE.Color(stopMidHex);
+  const cEnd = new THREE.Color(stopEndHex);
 
+  const ribbonVertexShader = /* glsl */ `
+    attribute float aPhase;
+    varying vec2 vUv;
+    varying float vPhase;
+    void main() {
+      vUv = uv;
+      vPhase = aPhase;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `;
+
+  const ribbonFragmentShader = /* glsl */ `
+    varying vec2 vUv;
+    varying float vPhase;
+    uniform float uTime;
+    uniform float uOpacity;
+    uniform vec3 uColorStart;
+    uniform vec3 uColorMid;
+    uniform vec3 uColorEnd;
+    uniform float uMidStop;
+    void main() {
+      float t = clamp(vUv.x, 0.0, 1.0);
+      // Soft Gaussian cross-section: crisp airy core fading smoothly to invisible edges
+      float across = abs(vUv.y - 0.5) * 2.0;
+      float radial = exp(-across * across * 4.4);
+      // Graceful axial intake & exhaust feathering
+      float endFade = smoothstep(0.0, 0.14, t) * (1.0 - smoothstep(0.84, 1.0, t));
+
+      // Multi-harmonic animated aerodynamic wind wisps
+      float wisp1 = 0.52 + 0.48 * sin(t * 15.0 - uTime * 6.8 + vPhase * 6.28318);
+      float wisp2 = 0.62 + 0.38 * sin(t * 27.0 - uTime * 10.6 - vPhase * 4.1);
+      float streak = pow(max(0.0, wisp1 * wisp2), 0.72);
+      float flowPattern = 0.30 + 0.70 * streak;
+
+      // Smooth 3-stop axial thermal gradient: holds pure start color through intake,
+      // warms cleanly through midStop, then shifts decisively into hot end color.
+      float s1 = smoothstep(uMidStop * 0.52, uMidStop, t);
+      float s2 = smoothstep(uMidStop, min(0.96, uMidStop + 0.22), t);
+      vec3 col = mix(uColorStart, uColorMid, s1);
+      col = mix(col, uColorEnd, s2);
+      // Subtle luminous filament highlight right down the center of the air wisp
+      col = mix(col, vec3(1.0), pow(radial, 2.8) * 0.24 * streak);
+
+      float alpha = radial * endFade * flowPattern * uOpacity;
+      if (alpha < 0.008) discard;
+      gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.88));
+    }
+  `;
+
+  const ribbonBaseOpacity = Math.min(0.88, baseOpacity * 1.95 + 0.12);
+  const ribbonMat = new THREE.ShaderMaterial({
+    vertexShader: ribbonVertexShader,
+    fragmentShader: ribbonFragmentShader,
+    uniforms: {
+      uTime: { value: 0 },
+      uOpacity: { value: ribbonBaseOpacity },
+      uColorStart: { value: cStart.clone() },
+      uColorMid: { value: cMid.clone() },
+      uColorEnd: { value: cEnd.clone() },
+      uMidStop: { value: midStop },
+    },
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  ribbonMat.userData.isFlowRibbon = true;
+  ribbonMat.userData.baseOpacity = ribbonBaseOpacity;
+  ribbonMat.userData.baseTransparent = true;
+
+  const ribbonHalfWidth = baseRadius * 2.55;
   const tubeMeshes: THREE.Mesh[] = [];
   for (let i = 0; i < splineCurves.length; i++) {
     const curve = splineCurves[i]!;
-    const tubeGeo = new THREE.TubeGeometry(curve, 56, baseRadius, 10, false);
-    const tube = new THREE.Mesh(tubeGeo, tubeMat);
-    tube.name = `flowRibbon_tube_${i}`;
-    tube.renderOrder = 3;
-    tube.userData.isFlowRibbon = true;
-    group.add(tube);
-    tubeMeshes.push(tube);
+    const ribbonGeo = buildAirRibbonGeometry(
+      curve,
+      84,
+      ribbonHalfWidth,
+      (i * 0.6180339887) % 1,
+    );
+    const ribbonMesh = new THREE.Mesh(ribbonGeo, ribbonMat);
+    ribbonMesh.name = `flowRibbon_tube_${i}`;
+    ribbonMesh.renderOrder = 3;
+    ribbonMesh.userData.isFlowRibbon = true;
+    group.add(ribbonMesh);
+    tubeMeshes.push(ribbonMesh);
   }
 
-  // Animated instanced glowing streak particles
+  // Delicate animated wind-mote speed needles riding inside the feathered air ribbons
   const totalParticles = Math.max(
     splineCurves.length,
     Math.round(opts.particleCount ?? splineCurves.length * 8),
   );
 
-  // Aerodynamic sleek needle/comet streak aligned with +Y local axis
-  const streakGeo = new THREE.SphereGeometry(baseRadius * 0.72, 10, 8);
-  streakGeo.scale(0.62, 4.4, 0.62);
+  // Ultra-sleek aerodynamic speed filament aligned with +Y local axis
+  const streakGeo = new THREE.SphereGeometry(baseRadius * 0.44, 8, 6);
+  streakGeo.scale(0.45, 5.2, 0.45);
 
-  const particleMat = new THREE.MeshStandardMaterial({
-    color: baseHex,
-    emissive: baseHex,
-    emissiveIntensity: 0.85,
-    roughness: 0.22,
-    metalness: 0.05,
+  const particleBaseOpacity = Math.min(0.76, baseOpacity * 1.65 + 0.16);
+  const particleMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
     transparent: true,
-    opacity: Math.min(0.95, baseOpacity * 2.4 + 0.24),
+    opacity: particleBaseOpacity,
     depthWrite: false,
   });
   particleMat.userData.isFlowRibbon = true;
-  particleMat.userData.baseOpacity = particleMat.opacity;
+  particleMat.userData.baseOpacity = particleBaseOpacity;
   particleMat.userData.baseTransparent = true;
 
   const instanced = new THREE.InstancedMesh(
@@ -1305,6 +1601,13 @@ export function flowRibbon(opts: FlowRibbonOptions): FlowRibbonHandle {
   const quat = new THREE.Quaternion();
   const scaleVec = new THREE.Vector3();
   const mat4 = new THREE.Matrix4();
+  const instColor = new THREE.Color();
+  let flowTime = 0;
+
+  const smoothstep = (e0: number, e1: number, x: number): number => {
+    const t = Math.max(0, Math.min(1, (x - e0) / Math.max(1e-6, e1 - e0)));
+    return t * t * (3 - 2 * t);
+  };
 
   const update = (dt: number, updateOpts: FlowRibbonUpdateOptions = {}): void => {
     const safeDt = Number.isFinite(dt) ? Math.max(0, Math.min(dt, 0.25)) : 0;
@@ -1312,11 +1615,21 @@ export function flowRibbon(opts: FlowRibbonOptions): FlowRibbonHandle {
     const opacityScale = Math.max(0, Math.min(2, updateOpts.opacityScale ?? 1));
     const radiusScale = Math.max(0.15, updateOpts.radiusScale ?? 1);
 
+    flowTime += safeDt * baseSpeed * speedScale;
+    (ribbonMat.uniforms.uTime as { value: number }).value = flowTime;
+
     if (updateOpts.colorHex !== undefined) {
-      tubeMat.color.setHex(updateOpts.colorHex);
-      tubeMat.emissive.setHex(updateOpts.colorHex);
-      particleMat.color.setHex(updateOpts.colorHex);
-      particleMat.emissive.setHex(updateOpts.colorHex);
+      if (hasColorStops) {
+        cEnd.setHex(updateOpts.colorHex);
+        (ribbonMat.uniforms.uColorEnd as { value: THREE.Color }).value.copy(cEnd);
+      } else {
+        cStart.setHex(updateOpts.colorHex);
+        cMid.setHex(updateOpts.colorHex);
+        cEnd.setHex(updateOpts.colorHex);
+        (ribbonMat.uniforms.uColorStart as { value: THREE.Color }).value.copy(cStart);
+        (ribbonMat.uniforms.uColorMid as { value: THREE.Color }).value.copy(cMid);
+        (ribbonMat.uniforms.uColorEnd as { value: THREE.Color }).value.copy(cEnd);
+      }
     }
 
     const focusOpacity =
@@ -1329,13 +1642,16 @@ export function flowRibbon(opts: FlowRibbonOptions): FlowRibbonHandle {
         : 1;
     const effOpacity = opacityScale * focusOpacity * revealAlpha;
 
-    tubeMat.opacity = Math.min(1, baseOpacity * effOpacity);
+    (ribbonMat.uniforms.uOpacity as { value: number }).value = Math.min(
+      0.92,
+      ribbonBaseOpacity * effOpacity,
+    );
     particleMat.opacity = Math.min(
-      1,
+      0.85,
       (particleMat.userData.baseOpacity as number) * effOpacity,
     );
 
-    const stretchZ = 0.8 + 0.45 * Math.min(2.5, Math.abs(speedScale));
+    const stretchZ = 0.85 + 0.5 * Math.min(2.5, Math.abs(speedScale));
 
     for (let i = 0; i < particles.length; i++) {
       const p = particles[i]!;
@@ -1363,9 +1679,18 @@ export function flowRibbon(opts: FlowRibbonOptions): FlowRibbonHandle {
       scaleVec.set(s, s * stretchZ, s);
       mat4.compose(pos, quat, scaleVec);
       instanced.setMatrixAt(i, mat4);
+
+      // Match each wind mote's color to the exact axial thermal stop
+      const s1 = smoothstep(midStop * 0.52, midStop, p.phase);
+      const s2 = smoothstep(midStop, Math.min(0.96, midStop + 0.22), p.phase);
+      instColor.copy(cStart).lerp(cMid, s1).lerp(cEnd, s2);
+      instanced.setColorAt(i, instColor);
     }
 
     instanced.instanceMatrix.needsUpdate = true;
+    if (instanced.instanceColor) {
+      instanced.instanceColor.needsUpdate = true;
+    }
   };
 
   // Seed initial matrices cleanly before first frame
@@ -2406,6 +2731,851 @@ export function mistCone(opts: MistConeOptions): MistConeHandle {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Primitive 15: airVolume (Diffused Volumetric fBM Airflow Mist)            */
+/* -------------------------------------------------------------------------- */
+
+export interface AirVolumeOptions {
+  x0: number;
+  length: number;
+  rInner: number;
+  rOuter: number;
+  rInnerEnd?: number;
+  rOuterEnd?: number;
+  intakeFlare?: number;
+  color?: AccentKey | number;
+  secondaryColor?: AccentKey | number;
+  opacity?: number;
+  speed?: number;
+  puffCount?: number;
+  swirl?: number;
+}
+
+export interface AirVolumeUpdateOptions {
+  speedScale?: number;
+  opacityScale?: number;
+  colorHex?: number;
+  darkMode?: boolean;
+}
+
+export interface AirVolumeHandle {
+  group: THREE.Group;
+  update(dt: number, opts?: AirVolumeUpdateOptions): void;
+}
+
+function buildAnnularMistShellGeometry(
+  x0: number,
+  length: number,
+  rStart: number,
+  rEnd: number,
+  intakeFlare: number,
+  axialSegs = 64,
+  radialSegs = 56,
+): THREE.BufferGeometry {
+  const cols = radialSegs + 1;
+  const rows = axialSegs + 1;
+  const positions = new Float32Array(rows * cols * 3);
+  const normals = new Float32Array(rows * cols * 3);
+  const uvs = new Float32Array(rows * cols * 2);
+  const angles = new Float32Array(rows * cols);
+  const indices: number[] = [];
+
+  for (let i = 0; i <= axialSegs; i++) {
+    const t = i / axialSegs;
+    const x = x0 + t * length;
+    // Aerodynamic intake lip contraction + smooth duct taper + gentle wake expansion
+    const intakeCurve = intakeFlare * Math.exp(-Math.pow(t / 0.14, 2.0));
+    const midSwell = Math.sin(t * Math.PI) * 0.05 * rStart;
+    const wakeSpread = Math.pow(Math.max(0, (t - 0.78) / 0.22), 1.6) * 0.14 * rEnd;
+    const r = Math.max(0.02, rStart + (rEnd - rStart) * t + intakeCurve + midSwell + wakeSpread);
+
+    for (let j = 0; j <= radialSegs; j++) {
+      const u = j / radialSegs;
+      const theta = u * Math.PI * 2;
+      const sinT = Math.sin(theta);
+      const cosT = Math.cos(theta);
+      const idx = i * cols + j;
+
+      positions[idx * 3] = x;
+      positions[idx * 3 + 1] = sinT * r;
+      positions[idx * 3 + 2] = cosT * r;
+
+      normals[idx * 3] = 0;
+      normals[idx * 3 + 1] = sinT;
+      normals[idx * 3 + 2] = cosT;
+
+      uvs[idx * 2] = t;
+      uvs[idx * 2 + 1] = u;
+      angles[idx] = theta;
+    }
+  }
+
+  for (let i = 0; i < axialSegs; i++) {
+    for (let j = 0; j < radialSegs; j++) {
+      const a = i * cols + j;
+      const b = a + 1;
+      const c = (i + 1) * cols + j;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geo.setAttribute("aTheta", new THREE.BufferAttribute(angles, 1));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  geo.computeBoundingBox();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+/**
+ * Diffused volumetric aerodynamic air mist: nested seamless 360-degree GLSL fBM
+ * wind-tunnel curtains with optical rim-depth weighting + soft billowing Gaussian
+ * air-wisp sprites. Zero rigid tube/wire silhouettes; adapts cleanly to Light & Dark.
+ */
+export function airVolume(opts: AirVolumeOptions): AirVolumeHandle {
+  const group = new THREE.Group();
+  group.name = "airVolume";
+  group.userData.isAirVolume = true;
+  group.userData.isFlowRibbon = true; // Inherits Dim & Illuminate + Progressive Reveal
+
+  const length = Math.max(0.2, opts.length);
+  const rInner = Math.max(0.02, opts.rInner);
+  const rOuter = Math.max(rInner + 0.04, opts.rOuter);
+  const rInnerEnd = Math.max(0.02, opts.rInnerEnd ?? rInner);
+  const rOuterEnd = Math.max(rInnerEnd + 0.04, opts.rOuterEnd ?? rOuter);
+  const intakeFlare = opts.intakeFlare ?? (rOuter - rInner) * 0.28;
+  const baseHex = resolveAccentHex(opts.color ?? "cobalt");
+  const secHex = resolveAccentHex(opts.secondaryColor ?? 0x7dd3fc);
+  const baseOpacity = opts.opacity ?? 0.34;
+  const baseSpeed = opts.speed ?? 0.72;
+  const swirlStrength = opts.swirl ?? 0.85;
+
+  const shellVert = /* glsl */ `
+    attribute float aTheta;
+    varying vec2 vUv;
+    varying float vTheta;
+    varying vec3 vNormalView;
+    void main() {
+      vUv = uv;
+      vTheta = aTheta;
+      vNormalView = normalize(normalMatrix * normal);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `;
+
+  const shellFrag = /* glsl */ `
+    varying vec2 vUv;
+    varying float vTheta;
+    varying vec3 vNormalView;
+    uniform float uTime;
+    uniform float uOpacity;
+    uniform float uLayerPhase;
+    uniform float uDarkMode;
+    uniform float uSwirl;
+    uniform vec3 uColor;
+    uniform vec3 uSecondary;
+
+    float hash3(vec3 p) {
+      p = fract(p * 0.3183099 + vec3(0.11, 0.17, 0.23));
+      p *= 17.0;
+      return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+    }
+
+    float noise3(vec3 x) {
+      vec3 i = floor(x);
+      vec3 f = fract(x);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(
+        mix(
+          mix(hash3(i + vec3(0,0,0)), hash3(i + vec3(1,0,0)), f.x),
+          mix(hash3(i + vec3(0,1,0)), hash3(i + vec3(1,1,0)), f.x),
+          f.y
+        ),
+        mix(
+          mix(hash3(i + vec3(0,0,1)), hash3(i + vec3(1,0,1)), f.x),
+          mix(hash3(i + vec3(0,1,1)), hash3(i + vec3(1,1,1)), f.x),
+          f.y
+        ),
+        f.z
+      );
+    }
+
+    float fbm(vec3 p) {
+      float v = 0.0;
+      float a = 0.54;
+      for (int i = 0; i < 4; i++) {
+        v += a * noise3(p);
+        p = p * 2.05 + vec3(1.7, 3.1, 2.3);
+        a *= 0.5;
+      }
+      return v;
+    }
+
+    void main() {
+      float t = clamp(vUv.x, 0.0, 1.0);
+      float theta = vTheta + t * uSwirl;
+
+      // Seamless 3D periodic cylindrical coordinates -> zero UV seam!
+      vec3 coord = vec3(
+        t * 3.4 - uTime * 1.15 + uLayerPhase * 2.1,
+        sin(theta) * 1.65 + uLayerPhase,
+        cos(theta) * 1.65 - uLayerPhase
+      );
+      // Domain warp for organic wind-tunnel smoke wisps
+      float w1 = fbm(coord * 0.9);
+      vec3 warped = coord + vec3(w1 * 0.65, (w1 - 0.5) * 0.75, (0.5 - w1) * 0.75);
+      float mist = fbm(warped);
+      // Elongated silk airflow streaks along flow axis
+      float silk = fbm(vec3(t * 2.0 - uTime * 1.65, sin(theta) * 3.4, cos(theta) * 3.4));
+      float density = smoothstep(0.24, 0.84, mist * 0.64 + silk * 0.44);
+
+      // Optical volume thickness: thicker when grazing curved duct walls (top/bottom),
+      // gossamer-clear looking straight through the front cutaway window!
+      float nz = abs(normalize(vNormalView).z);
+      float opticalDepth = mix(1.22, 0.28, pow(nz, 1.15));
+
+      // Smooth axial feather at intake & trailing wake
+      float endFade = smoothstep(0.0, 0.16, t) * (1.0 - smoothstep(0.74, 1.0, t));
+
+      vec3 lightCol = mix(uColor, uSecondary, clamp(silk * 0.52, 0.0, 1.0));
+      vec3 darkCol = mix(uColor, uSecondary, clamp(0.28 + silk * 0.68, 0.0, 1.0)) * 1.18;
+      vec3 col = mix(lightCol, darkCol, uDarkMode);
+
+      float alpha = density * opticalDepth * endFade * uOpacity * mix(1.0, 1.12, uDarkMode);
+      if (alpha < 0.006) discard;
+      gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.52));
+    }
+  `;
+
+  const shellMaterials: THREE.ShaderMaterial[] = [];
+  const shellFracs = [0.22, 0.56, 0.88];
+  const shellWeights = [0.42, 0.58, 0.48];
+  for (let i = 0; i < shellFracs.length; i++) {
+    const f = shellFracs[i]!;
+    const rS = rInner + (rOuter - rInner) * f;
+    const rE = rInnerEnd + (rOuterEnd - rInnerEnd) * f;
+    const geo = buildAnnularMistShellGeometry(
+      opts.x0,
+      length,
+      rS,
+      rE,
+      intakeFlare * (0.45 + 0.55 * f),
+    );
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: shellVert,
+      fragmentShader: shellFrag,
+      uniforms: {
+        uTime: { value: 0 },
+        uOpacity: { value: baseOpacity * shellWeights[i]! },
+        uLayerPhase: { value: i * 1.43 },
+        uDarkMode: { value: 0 },
+        uSwirl: { value: swirlStrength },
+        uColor: { value: new THREE.Color(baseHex) },
+        uSecondary: { value: new THREE.Color(secHex) },
+      },
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    mat.userData.isAirVolume = true;
+    mat.userData.layerWeight = shellWeights[i]!;
+    shellMaterials.push(mat);
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = `airVolume_shell_${i}`;
+    mesh.renderOrder = 3;
+    mesh.userData.isAirVolume = true;
+    group.add(mesh);
+  }
+
+  // Soft billowing Gaussian vapor puffs drifting helically through the duct
+  const puffCount = Math.max(16, Math.round(opts.puffCount ?? 150));
+  const puffPositions = new Float32Array(puffCount * 3);
+  const puffSizes = new Float32Array(puffCount);
+  const puffAlphas = new Float32Array(puffCount);
+
+  interface AirPuffState {
+    phase: number;
+    angle: number;
+    radialFrac: number;
+    speedJitter: number;
+    size: number;
+    wobble: number;
+  }
+
+  const puffs: AirPuffState[] = [];
+  for (let i = 0; i < puffCount; i++) {
+    puffs.push({
+      phase: (i * 0.6180339887) % 1,
+      angle: (i * 2.399963229728653) % (Math.PI * 2),
+      radialFrac: 0.14 + 0.78 * (((i * 7 + 3) * 0.381966) % 1),
+      speedJitter: 0.78 + 0.44 * (((i * 11 + 5) * 0.271828) % 1),
+      size: 46 + 44 * (((i * 13 + 2) * 0.414213) % 1),
+      wobble: (i * 1.73) % (Math.PI * 2),
+    });
+  }
+
+  const puffGeo = new THREE.BufferGeometry();
+  const posAttr = new THREE.BufferAttribute(puffPositions, 3);
+  const sizeAttr = new THREE.BufferAttribute(puffSizes, 1);
+  const alphaAttr = new THREE.BufferAttribute(puffAlphas, 1);
+  puffGeo.setAttribute("position", posAttr);
+  puffGeo.setAttribute("aSize", sizeAttr);
+  puffGeo.setAttribute("aAlpha", alphaAttr);
+
+  const puffVert = /* glsl */ `
+    attribute float aSize;
+    attribute float aAlpha;
+    varying float vAlpha;
+    uniform float uPixelRatio;
+    void main() {
+      vAlpha = aAlpha;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = clamp(aSize * uPixelRatio, 12.0, 150.0);
+    }
+  `;
+
+  const puffFrag = /* glsl */ `
+    varying float vAlpha;
+    uniform float uOpacity;
+    uniform float uDarkMode;
+    uniform vec3 uColor;
+    uniform vec3 uSecondary;
+    void main() {
+      // Wide, ultra-soft velocity-stretched Gaussian vapor wisp (zero blotchy dots)
+      vec2 p = (gl_PointCoord - 0.5) * 2.0;
+      p.x *= 0.62;
+      p.y *= 1.18;
+      float r2 = dot(p, p);
+      if (r2 > 1.0) discard;
+      float soft = exp(-r2 * 2.8) * pow(1.0 - r2, 1.5);
+      vec3 col = mix(mix(uColor, uSecondary, 0.36), mix(uColor, uSecondary, 0.72) * 1.15, uDarkMode);
+      float a = soft * vAlpha * uOpacity;
+      if (a < 0.004) discard;
+      gl_FragColor = vec4(col, clamp(a, 0.0, 0.16));
+    }
+  `;
+
+  const puffMat = new THREE.ShaderMaterial({
+    vertexShader: puffVert,
+    fragmentShader: puffFrag,
+    uniforms: {
+      uPixelRatio: {
+        value: typeof window !== "undefined" ? Math.min(2, window.devicePixelRatio || 1) : 1,
+      },
+      uOpacity: { value: baseOpacity * 0.52 },
+      uDarkMode: { value: 0 },
+      uColor: { value: new THREE.Color(baseHex) },
+      uSecondary: { value: new THREE.Color(secHex) },
+    },
+    transparent: true,
+    depthWrite: false,
+  });
+  puffMat.userData.isAirVolume = true;
+
+  const points = new THREE.Points(puffGeo, puffMat);
+  points.name = "airVolume_puffs";
+  points.renderOrder = 4;
+  points.frustumCulled = false;
+  points.userData.isAirVolume = true;
+  group.add(points);
+
+  let simTime = 0;
+
+  const update = (dt: number, updateOpts: AirVolumeUpdateOptions = {}): void => {
+    const safeDt = Number.isFinite(dt) ? Math.max(0, Math.min(dt, 0.25)) : 0;
+    const speedScale = updateOpts.speedScale ?? 1;
+    const opacityScale = Math.max(0, Math.min(2, updateOpts.opacityScale ?? 1));
+
+    simTime += safeDt * baseSpeed * speedScale;
+
+    if (updateOpts.colorHex !== undefined) {
+      for (const sm of shellMaterials) {
+        (sm.uniforms.uColor as { value: THREE.Color }).value.setHex(updateOpts.colorHex);
+      }
+      (puffMat.uniforms.uColor as { value: THREE.Color }).value.setHex(updateOpts.colorHex);
+    }
+
+    const darkFlag =
+      typeof updateOpts.darkMode === "boolean"
+        ? updateOpts.darkMode
+          ? 1
+          : 0
+        : typeof group.userData.darkMode === "number"
+          ? (group.userData.darkMode as number)
+          : 0;
+
+    const focusOpacity =
+      typeof group.userData.focusOpacityScale === "number"
+        ? group.userData.focusOpacityScale
+        : 1;
+    const revealAlpha =
+      typeof group.userData.revealAlpha === "number"
+        ? group.userData.revealAlpha
+        : 1;
+    const effOpacity = baseOpacity * opacityScale * focusOpacity * revealAlpha;
+
+    for (const sm of shellMaterials) {
+      (sm.uniforms.uTime as { value: number }).value = simTime;
+      (sm.uniforms.uDarkMode as { value: number }).value = darkFlag;
+      const w = (sm.userData.layerWeight as number) ?? 0.5;
+      (sm.uniforms.uOpacity as { value: number }).value = effOpacity * w;
+    }
+
+    (puffMat.uniforms.uDarkMode as { value: number }).value = darkFlag;
+    (puffMat.uniforms.uOpacity as { value: number }).value = effOpacity * 0.28;
+
+    for (let i = 0; i < puffs.length; i++) {
+      const p = puffs[i]!;
+      p.phase = (((p.phase + safeDt * baseSpeed * 0.58 * speedScale * p.speedJitter) % 1) + 1) % 1;
+      const t = p.phase;
+      const x = opts.x0 + t * length;
+
+      const rIn = rInner + (rInnerEnd - rInner) * t;
+      const rOut = rOuter + (rOuterEnd - rOuter) * t;
+      const intakeC = intakeFlare * Math.exp(-Math.pow(t / 0.14, 2.0));
+      const wakeS = Math.pow(Math.max(0, (t - 0.78) / 0.22), 1.6) * 0.18 * rOut;
+      const r = rIn + (rOut - rIn) * p.radialFrac + intakeC * p.radialFrac + wakeS;
+
+      const ang = p.angle + t * swirlStrength * 0.9 + Math.sin(simTime * 1.4 + p.wobble) * 0.08;
+      puffPositions[i * 3] = x;
+      puffPositions[i * 3 + 1] = Math.sin(ang) * r;
+      puffPositions[i * 3 + 2] = Math.cos(ang) * r;
+
+      const edgeFade = Math.sin(t * Math.PI);
+      puffSizes[i] = p.size * (0.72 + 0.55 * t);
+      puffAlphas[i] = Math.pow(Math.max(0, edgeFade), 0.75);
+    }
+
+    posAttr.needsUpdate = true;
+    sizeAttr.needsUpdate = true;
+    alphaAttr.needsUpdate = true;
+    puffGeo.computeBoundingSphere();
+  };
+
+  update(0);
+
+  group.userData.shellMaterials = shellMaterials;
+  group.userData.puffMaterial = puffMat;
+  group.userData.points = points;
+  return { group, update };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Primitive 16: jetPlume (High-Energy Volumetric Thermal Exhaust + Mach)    */
+/* -------------------------------------------------------------------------- */
+
+export interface JetPlumeOptions {
+  x0: number;
+  length: number;
+  rStart: number;
+  rEnd?: number;
+  speed?: number;
+  intensity?: number;
+  opacity?: number;
+  sparkCount?: number;
+  machDiamonds?: number;
+}
+
+export interface JetPlumeUpdateOptions {
+  speedScale?: number;
+  intensity?: number;
+  lengthScale?: number;
+  opacityScale?: number;
+  darkMode?: boolean;
+}
+
+export interface JetPlumeHandle {
+  group: THREE.Group;
+  update(dt: number, opts?: JetPlumeUpdateOptions): void;
+}
+
+function buildJetConeGeometry(
+  length: number,
+  rStart: number,
+  rEnd: number,
+  axialSegs = 56,
+  radialSegs = 48,
+): THREE.BufferGeometry {
+  const cols = radialSegs + 1;
+  const rows = axialSegs + 1;
+  const positions = new Float32Array(rows * cols * 3);
+  const normals = new Float32Array(rows * cols * 3);
+  const uvs = new Float32Array(rows * cols * 2);
+  const angles = new Float32Array(rows * cols);
+  const indices: number[] = [];
+
+  for (let i = 0; i <= axialSegs; i++) {
+    const t = i / axialSegs;
+    const x = t * length;
+    // Slight barrel expansion just past nozzle then smooth lance taper
+    const bulge = Math.sin(Math.pow(t, 0.7) * Math.PI) * rStart * 0.14;
+    const r = Math.max(0.008, rStart + (rEnd - rStart) * Math.pow(t, 0.85) + bulge);
+    for (let j = 0; j <= radialSegs; j++) {
+      const u = j / radialSegs;
+      const theta = u * Math.PI * 2;
+      const sinT = Math.sin(theta);
+      const cosT = Math.cos(theta);
+      const idx = i * cols + j;
+      positions[idx * 3] = x;
+      positions[idx * 3 + 1] = sinT * r;
+      positions[idx * 3 + 2] = cosT * r;
+      normals[idx * 3] = 0;
+      normals[idx * 3 + 1] = sinT;
+      normals[idx * 3 + 2] = cosT;
+      uvs[idx * 2] = t;
+      uvs[idx * 2 + 1] = u;
+      angles[idx] = theta;
+    }
+  }
+
+  for (let i = 0; i < axialSegs; i++) {
+    for (let j = 0; j < radialSegs; j++) {
+      const a = i * cols + j;
+      const b = a + 1;
+      const c = (i + 1) * cols + j;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geo.setAttribute("aTheta", new THREE.BufferAttribute(angles, 1));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  geo.computeBoundingBox();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+/**
+ * High-energy volumetric thermal exhaust jet plume: nested inner supersonic
+ * incandescent core (with live Mach shock diamonds) + turbulent fiery crimson
+ * shear sheath + fast racing ember streaks. Adapts cleanly to Light & Dark.
+ */
+export function jetPlume(opts: JetPlumeOptions): JetPlumeHandle {
+  const group = new THREE.Group();
+  group.name = "jetPlume";
+  group.position.x = opts.x0;
+  group.userData.isJetPlume = true;
+  group.userData.isFlowRibbon = true; // Inherits Dim & Illuminate + Progressive Reveal
+
+  const length = Math.max(0.4, opts.length);
+  const rStart = Math.max(0.05, opts.rStart);
+  const rEnd = Math.max(0.02, opts.rEnd ?? rStart * 0.45);
+  const baseSpeed = opts.speed ?? 1.5;
+  const baseIntensity = opts.intensity ?? 1.0;
+  const baseOpacity = opts.opacity ?? 0.92;
+  const machFreq = opts.machDiamonds ?? 4.5;
+
+  const plumeContainer = new THREE.Group();
+  plumeContainer.name = "jetPlume_shells";
+  group.add(plumeContainer);
+
+  const jetVert = /* glsl */ `
+    attribute float aTheta;
+    varying vec2 vUv;
+    varying float vTheta;
+    varying vec3 vNormalView;
+    uniform float uTime;
+    uniform float uIntensity;
+    uniform float uFlutter;
+    void main() {
+      vUv = uv;
+      vTheta = aTheta;
+      vec3 pos = position;
+      float t = uv.x;
+      float turb = smoothstep(0.12, 0.95, t) * uFlutter * (0.65 + 0.55 * uIntensity);
+      float w1 = sin(t * 16.0 - uTime * 15.0 + aTheta * 2.0);
+      float w2 = cos(t * 24.0 - uTime * 21.0 - aTheta * 3.0);
+      float radDisp = (w1 * 0.6 + w2 * 0.4) * turb;
+      pos.y += sin(aTheta) * radDisp;
+      pos.z += cos(aTheta) * radDisp;
+      vNormalView = normalize(normalMatrix * normal);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+  `;
+
+  const jetFrag = /* glsl */ `
+    varying vec2 vUv;
+    varying float vTheta;
+    varying vec3 vNormalView;
+    uniform float uTime;
+    uniform float uIntensity;
+    uniform float uOpacity;
+    uniform float uIsCore;
+    uniform float uMachFreq;
+    uniform float uDarkMode;
+
+    float hash3(vec3 p) {
+      p = fract(p * 0.3183099 + vec3(0.13, 0.19, 0.29));
+      p *= 17.0;
+      return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+    }
+
+    float noise3(vec3 x) {
+      vec3 i = floor(x);
+      vec3 f = fract(x);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(
+        mix(
+          mix(hash3(i + vec3(0,0,0)), hash3(i + vec3(1,0,0)), f.x),
+          mix(hash3(i + vec3(0,1,0)), hash3(i + vec3(1,1,0)), f.x),
+          f.y
+        ),
+        mix(
+          mix(hash3(i + vec3(0,0,1)), hash3(i + vec3(1,0,1)), f.x),
+          mix(hash3(i + vec3(0,1,1)), hash3(i + vec3(1,1,1)), f.x),
+          f.y
+        ),
+        f.z
+      );
+    }
+
+    float fbm(vec3 p) {
+      float v = 0.0;
+      float a = 0.55;
+      for (int i = 0; i < 3; i++) {
+        v += a * noise3(p);
+        p = p * 2.15 + vec3(2.3, 1.1, 3.7);
+        a *= 0.5;
+      }
+      return v;
+    }
+
+    void main() {
+      float t = clamp(vUv.x, 0.0, 1.0);
+      float nz = abs(normalize(vNormalView).z);
+      // Center-dense volumetric cylinder falloff: razor-hot core, feathered wispy fire edges
+      float coreVol = pow(nz, mix(1.15, 1.65, uIsCore));
+
+      vec3 nCoord = vec3(
+        t * 5.5 - uTime * 5.2,
+        sin(vTheta) * 2.2,
+        cos(vTheta) * 2.2
+      );
+      float fire = fbm(nCoord);
+      float fine = fbm(nCoord * 1.9 + vec3(-uTime * 3.4, 1.2, 2.4));
+      float turbMask = mix(0.68, 1.28, fire * 0.65 + fine * 0.35);
+
+      // Supersonic Mach shock-diamond compression cells
+      float diamondWave = pow(max(0.0, sin(t * uMachFreq * 3.14159 - uTime * 2.6)), 2.6);
+      float diamondEnv = smoothstep(0.04, 0.16, t) * (1.0 - smoothstep(0.45, 0.88, t));
+      float shock = diamondWave * diamondEnv * clamp(uIntensity * 0.72, 0.15, 1.35);
+
+      // Vivid fiery thermal palette: incandescent white-gold -> scorching orange -> deep crimson red
+      vec3 cWhite = vec3(1.0, 0.96, 0.80);
+      vec3 cOrange = vec3(1.0, 0.42, 0.06);
+      vec3 cCrimson = vec3(0.86, 0.12, 0.05);
+      vec3 cDarkRed = vec3(0.58, 0.07, 0.04);
+
+      vec3 outerCol = mix(cOrange, cCrimson, smoothstep(0.06, 0.52, t));
+      outerCol = mix(outerCol, cDarkRed, smoothstep(0.55, 0.96, t));
+      outerCol = mix(outerCol, cWhite, shock * 0.38 * coreVol);
+
+      vec3 innerCol = mix(cWhite, cOrange, smoothstep(0.05, 0.58, t));
+      innerCol = mix(innerCol, cCrimson, smoothstep(0.54, 0.95, t));
+      innerCol = mix(innerCol, cWhite, shock * 0.78);
+
+      vec3 col = mix(outerCol, innerCol, uIsCore);
+      // Slight luminous boost on Dark Mode while preserving rich saturated crimson on Light Mode
+      col *= mix(1.0, 1.24, uDarkMode);
+
+      float headFade = smoothstep(0.0, 0.08, t);
+      float tailFade = pow(max(0.0, 1.0 - smoothstep(0.28, 1.0, t)), mix(1.05, 1.35, uIsCore));
+      float baseA = coreVol * headFade * tailFade * turbMask * uOpacity * clamp(0.45 + 0.55 * uIntensity, 0.25, 1.45);
+      float alpha = baseA + shock * coreVol * 0.28 * uOpacity;
+      if (alpha < 0.008) discard;
+      gl_FragColor = vec4(col, clamp(alpha, 0.0, mix(0.88, 0.96, uIsCore)));
+    }
+  `;
+
+  // Outer fiery crimson shear plume
+  const outerGeo = buildJetConeGeometry(length, rStart, rEnd * 1.18, 56, 48);
+  const outerMat = new THREE.ShaderMaterial({
+    vertexShader: jetVert,
+    fragmentShader: jetFrag,
+    uniforms: {
+      uTime: { value: 0 },
+      uIntensity: { value: baseIntensity },
+      uOpacity: { value: baseOpacity * 0.62 },
+      uIsCore: { value: 0.0 },
+      uMachFreq: { value: machFreq },
+      uDarkMode: { value: 0 },
+      uFlutter: { value: rStart * 0.14 },
+    },
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  outerMat.userData.isJetPlume = true;
+  const outerMesh = new THREE.Mesh(outerGeo, outerMat);
+  outerMesh.name = "jetPlume_outer";
+  outerMesh.renderOrder = 5;
+  outerMesh.userData.isJetPlume = true;
+  plumeContainer.add(outerMesh);
+
+  // Inner incandescent supersonic lance + Mach diamonds
+  const innerGeo = buildJetConeGeometry(length * 0.86, rStart * 0.54, rEnd * 0.26, 48, 40);
+  const innerMat = new THREE.ShaderMaterial({
+    vertexShader: jetVert,
+    fragmentShader: jetFrag,
+    uniforms: {
+      uTime: { value: 0 },
+      uIntensity: { value: baseIntensity },
+      uOpacity: { value: baseOpacity * 0.88 },
+      uIsCore: { value: 1.0 },
+      uMachFreq: { value: machFreq },
+      uDarkMode: { value: 0 },
+      uFlutter: { value: rStart * 0.06 },
+    },
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  innerMat.userData.isJetPlume = true;
+  const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+  innerMesh.name = "jetPlume_inner";
+  innerMesh.renderOrder = 6;
+  innerMesh.userData.isJetPlume = true;
+  plumeContainer.add(innerMesh);
+
+  // Fast kinetic ember / plasma sparks racing strictly inside the exhaust plume
+  const sparkCount = Math.max(12, Math.round(opts.sparkCount ?? 46));
+  const sparkGeo = new THREE.SphereGeometry(Math.max(0.007, rStart * 0.032), 6, 6);
+  sparkGeo.scale(3.8, 0.38, 0.38); // subtle kinetic velocity ember along +X
+
+  const sparkMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.68,
+    depthWrite: false,
+  });
+  sparkMat.userData.isJetPlume = true;
+
+  const sparks = new THREE.InstancedMesh(sparkGeo, sparkMat, sparkCount);
+  sparks.name = "jetPlume_sparks";
+  sparks.renderOrder = 7;
+  sparks.frustumCulled = false;
+  sparks.userData.isJetPlume = true;
+  plumeContainer.add(sparks);
+
+  interface SparkState {
+    phase: number;
+    angle: number;
+    radialFrac: number;
+    speedJitter: number;
+    sizeScale: number;
+  }
+
+  const sparkStates: SparkState[] = [];
+  for (let i = 0; i < sparkCount; i++) {
+    sparkStates.push({
+      phase: (i * 0.6180339887) % 1,
+      angle: (i * 2.399963229728653) % (Math.PI * 2),
+      radialFrac: 0.1 + 0.72 * (((i * 7 + 1) * 0.381966) % 1),
+      speedJitter: 0.8 + 0.55 * (((i * 11 + 3) * 0.271828) % 1),
+      sizeScale: 0.65 + 0.7 * (((i * 5 + 2) * 0.414213) % 1),
+    });
+  }
+
+  const pos = new THREE.Vector3();
+  const quat = new THREE.Quaternion();
+  const scaleVec = new THREE.Vector3();
+  const mat4 = new THREE.Matrix4();
+  const sparkColor = new THREE.Color();
+  const cHot = new THREE.Color(0xfff1c2);
+  const cMid = new THREE.Color(0xff5e14);
+  const cTail = new THREE.Color(0xdc2626);
+  let simTime = 0;
+
+  const update = (dt: number, updateOpts: JetPlumeUpdateOptions = {}): void => {
+    const safeDt = Number.isFinite(dt) ? Math.max(0, Math.min(dt, 0.25)) : 0;
+    const speedScale = updateOpts.speedScale ?? 1;
+    const intensity = Math.max(0.15, updateOpts.intensity ?? baseIntensity);
+    const lengthScale = Math.max(0.35, Math.min(2.2, updateOpts.lengthScale ?? 1));
+    const opacityScale = Math.max(0, Math.min(2, updateOpts.opacityScale ?? 1));
+
+    simTime += safeDt * baseSpeed * speedScale;
+    plumeContainer.scale.set(lengthScale, 0.88 + 0.18 * Math.min(1.6, intensity), 0.88 + 0.18 * Math.min(1.6, intensity));
+
+    const darkFlag =
+      typeof updateOpts.darkMode === "boolean"
+        ? updateOpts.darkMode
+          ? 1
+          : 0
+        : typeof group.userData.darkMode === "number"
+          ? (group.userData.darkMode as number)
+          : 0;
+
+    const focusOpacity =
+      typeof group.userData.focusOpacityScale === "number"
+        ? group.userData.focusOpacityScale
+        : 1;
+    const revealAlpha =
+      typeof group.userData.revealAlpha === "number"
+        ? group.userData.revealAlpha
+        : 1;
+    const effOpacity = baseOpacity * opacityScale * focusOpacity * revealAlpha;
+
+    for (const [sm, mult] of [
+      [outerMat, 0.64],
+      [innerMat, 0.88],
+    ] as const) {
+      (sm.uniforms.uTime as { value: number }).value = simTime;
+      (sm.uniforms.uIntensity as { value: number }).value = intensity;
+      (sm.uniforms.uOpacity as { value: number }).value = effOpacity * mult;
+      (sm.uniforms.uDarkMode as { value: number }).value = darkFlag;
+    }
+
+    sparkMat.opacity = Math.min(0.76, effOpacity * 0.68);
+    const streakStretch = 0.72 + 0.42 * Math.min(2.0, speedScale);
+
+    for (let i = 0; i < sparkStates.length; i++) {
+      const s = sparkStates[i]!;
+      s.phase = (((s.phase + safeDt * baseSpeed * 0.92 * speedScale * s.speedJitter) % 1) + 1) % 1;
+      const t = s.phase;
+      // Keep kinetic embers strictly inside the sculpted plume envelope (0..0.82)
+      const x = t * length * 0.82;
+      const coneR = (rStart + (rEnd - rStart) * t) * 0.78;
+      const rad = coneR * s.radialFrac;
+      const ang = s.angle + t * 1.4;
+      pos.set(x, Math.sin(ang) * rad, Math.cos(ang) * rad);
+
+      const env = Math.sin(t * Math.PI) * Math.pow(Math.max(0, 1 - t), 0.7);
+      const sz = Math.max(0.12, s.sizeScale * (0.2 + 0.8 * env));
+      scaleVec.set(sz * streakStretch, sz, sz);
+      mat4.compose(pos, quat, scaleVec);
+      sparks.setMatrixAt(i, mat4);
+
+      if (t < 0.35) {
+        sparkColor.copy(cHot).lerp(cMid, t / 0.35);
+      } else {
+        sparkColor.copy(cMid).lerp(cTail, (t - 0.35) / 0.65);
+      }
+      sparks.setColorAt(i, sparkColor);
+    }
+
+    sparks.instanceMatrix.needsUpdate = true;
+    if (sparks.instanceColor) sparks.instanceColor.needsUpdate = true;
+  };
+
+  update(0);
+
+  group.userData.outerMesh = outerMesh;
+  group.userData.innerMesh = innerMesh;
+  group.userData.sparksMesh = sparks;
+  return { group, update };
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Primitive 13: boxPlate                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -2690,6 +3860,7 @@ interface RegisteredPart {
   accent: AccentKey;
   baseScale: THREE.Vector3;
   materials: MaterialEntry[];
+  shaderFlames: THREE.ShaderMaterial[];
   edges: EdgeEntry[];
   dynamicSubgroups: THREE.Object3D[];
   revealTarget: number;
@@ -2851,24 +4022,36 @@ export function createStudioStage(
       hemiLight.intensity = 0.68;
     }
 
-    // Update any baseMount shadow/ring materials in the scene
+    // Update baseMount & theme-adaptive volumetric airflow / jet plume materials
     scene.traverse((obj) => {
+      if (obj.userData.isAirVolume || obj.userData.isJetPlume) {
+        obj.userData.darkMode = theme === "dark" ? 1 : 0;
+      }
       if (obj.userData.isBaseMount) {
         const shadowMat = obj.userData.shadowMaterial as
           | THREE.ShadowMaterial
+          | undefined;
+        const contactMat = obj.userData.contactMaterial as
+          | THREE.ShaderMaterial
           | undefined;
         const ringMat = obj.userData.ringMaterial as
           | THREE.LineBasicMaterial
           | undefined;
         if (shadowMat) {
-          shadowMat.opacity = theme === "dark" ? 0.42 : 0.14;
-          shadowMat.color.setHex(theme === "dark" ? 0x050608 : 0x1a1c20);
+          shadowMat.opacity = theme === "dark" ? 0.12 : 0.04;
+          shadowMat.color.setHex(theme === "dark" ? 0x050608 : 0x181a1f);
+        }
+        if (contactMat && contactMat.uniforms) {
+          const uColor = contactMat.uniforms.uColor as { value: THREE.Color } | undefined;
+          const uOpacity = contactMat.uniforms.uOpacity as { value: number } | undefined;
+          if (uColor) uColor.value.setHex(theme === "dark" ? 0x040507 : 0x181a1f);
+          if (uOpacity) uOpacity.value = theme === "dark" ? 0.44 : 0.2;
         }
         if (ringMat) {
           ringMat.color.setHex(
             theme === "dark" ? 0xffffff : ARCHITECTURAL_EDGE_COLOR,
           );
-          ringMat.opacity = theme === "dark" ? 0.14 : 0.11;
+          ringMat.opacity = theme === "dark" ? 0.12 : 0.09;
         }
       }
     });
@@ -2903,12 +4086,21 @@ export function createStudioStage(
     }
 
     const materialEntries: MaterialEntry[] = [];
+    const shaderFlames: THREE.ShaderMaterial[] = [];
     const edgeEntries: EdgeEntry[] = [];
     const dynamicSubgroups: THREE.Object3D[] = [];
     const seenMat = new Set<THREE.Material>();
 
     obj.traverse((child) => {
-      if (child.userData.isFlowRibbon || child.userData.isMistCone) {
+      if (
+        child.userData.isFlowRibbon ||
+        child.userData.isMistCone ||
+        child.userData.isAirVolume ||
+        child.userData.isJetPlume
+      ) {
+        if (child.userData.isAirVolume || child.userData.isJetPlume) {
+          child.userData.darkMode = currentTheme === "dark" ? 1 : 0;
+        }
         dynamicSubgroups.push(child);
       }
       if (child instanceof THREE.Mesh) {
@@ -2916,6 +4108,19 @@ export function createStudioStage(
           ? child.material
           : [child.material];
         const nextMats = mats.map((m) => {
+          if (m instanceof THREE.ShaderMaterial && m.userData.isShaderFlame) {
+            let targetShader = m;
+            if (claimedMaterials.has(m)) {
+              targetShader = m.clone();
+              targetShader.userData = { ...m.userData };
+            }
+            claimedMaterials.add(targetShader);
+            if (!seenMat.has(targetShader)) {
+              seenMat.add(targetShader);
+              shaderFlames.push(targetShader);
+            }
+            return targetShader;
+          }
           if (!(m instanceof THREE.MeshStandardMaterial)) return m;
           let targetMat = m;
           if (claimedMaterials.has(m)) {
@@ -3004,6 +4209,7 @@ export function createStudioStage(
       accent,
       baseScale: obj.scale.clone(),
       materials: materialEntries,
+      shaderFlames,
       edges: edgeEntries,
       dynamicSubgroups,
       revealTarget: 1,
@@ -3163,6 +4369,20 @@ export function createStudioStage(
       for (const sub of part.dynamicSubgroups) {
         sub.userData.revealAlpha = part.revealAlpha;
         sub.userData.focusOpacityScale = focusOpacityScale;
+      }
+
+      // Update volumetric shader flames (time + reveal + dim modulation)
+      for (const sm of part.shaderFlames) {
+        const uTime = sm.uniforms.uTime as { value: number } | undefined;
+        const uOpacity = sm.uniforms.uOpacity as { value: number } | undefined;
+        if (uTime) uTime.value += safeDt;
+        if (uOpacity) {
+          const baseOp =
+            typeof sm.userData.baseOpacity === "number"
+              ? (sm.userData.baseOpacity as number)
+              : 0.92;
+          uOpacity.value = baseOp * part.revealAlpha * (1 - 0.65 * part.dimWeight);
+        }
       }
 
       // Update structural clay & accent materials

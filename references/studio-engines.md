@@ -75,19 +75,25 @@ These rules are enforced directly in the engine tokens and shaders — do **not*
 
 Use Engine A for **every physical object, machine, fluid/thermal/optical device, hardware, watch, battery, atomizer, or organ**. Always pair Engine A scenes with `studioPage({ hint: "Drag to orbit · Scroll to zoom", ... })` (the default).
 
-### 3 Concrete 3D CAD Craft Rules
+### 4 Concrete 3D CAD & Volumetric WebGL Craft Rules
 1. **Mechanically connect every sub-assembly:** join housings, rotors, vessels, manifolds, and actuators with real struts, collars, flanges, or necks — **zero floating parts**!
 2. **Lift camera `target.y` slightly negative:** aim camera presets slightly below vertical center (e.g. `target: [0, -0.25, 0]`) so subjects sit slightly higher in the viewport and clear the bottom subtitle bar and expandable `Tune` strip.
-3. **Anchor callouts directly on the part's surface or centerline:** register local anchors via `stage.registerPart(id, obj, { anchor, accent })` directly on the feature so leaders land accurately and follow moving parts automatically.
+3. **Anchor callouts directly on the part's surface or centerline:** register local anchors via `stage.registerPart(id, obj, { anchor, accent })` directly on the feature (remember: `anchor` is in the registered object's **local** space!) so leaders land accurately and follow moving parts automatically.
+4. **Use real WebGL volumetric shaders for invisible forces — NEVER rigid plastic tubes:**
+   - **Wide / diffused airflow, cooling, wind, or intake streams** → use **`airVolume()`** (seamless 360° GLSL domain-warped 3D fBM mist + soft billowing vapor puffs with optical rim-depth weighting so the cutaway core stays razor-sharp).
+   - **High-energy hot exhaust, rocket thrust, afterburners, or torches** → use **`jetPlume()`** (nested incandescent inner supersonic core with Mach shock diamonds + turbulent fiery crimson shear sheath + kinetic ember streaks, contained cleanly inside the frame).
+   - **Combustion chambers** → `combustorRing()` renders volumetric orthographic-Fresnel flickering GLSL flames automatically.
+   - **Narrow channeled streams (Venturi throats, dip tubes, narrow manifolds)** → use feathered **`flowRibbon({ curves, colorStops })`** with physically accurate axial thermal stops (`start` → `mid` → `end`).
+   - **Light + Dark theme safety:** never use naive `AdditiveBlending` alone (it washes out to white on cream Light mode). Engine A's `airVolume` and `jetPlume` automatically receive `uDarkMode` from `stage.setTheme()` so Light mode stays richly pigmented and Dark mode glows cleanly.
 
-### Complete Primitive & Stage Cheat-Sheet (All 15 Primitives — Type-Exact)
+### Complete Primitive & Stage Cheat-Sheet (All 17 Primitives — Type-Exact)
 
 | Export | Exact TypeScript Options / Return Shape | Purpose |
 | :--- | :--- | :--- |
 | `createStudioStage` | `(canvas, { theme?, frustumSize?, cameraPresets?, initialCamera?, pixelRatioCap? })` | Builds orthographic museum stage, 4-point lighting, PMREM `RoomEnvironment`, damped `OrbitControls`, and Director bridge (`registerPart`, `setFocus`, `setReveal`, `goToCamera`, `resetCamera`, `setCameraPreset`, `projectAnchor`, `setTheme`, `render`, `resize`, `dispose`). Built-in presets: `hero`, `iso`, `side`, `front`, `intake`, `rear`, `exhaust`, `top`, `closeup`. |
-| `cutawayCylinder` | `{ length, rOuter, rInner, rOuterEnd?, rInnerEnd?, openDeg?, startDeg?, x0?, axis?: "x"\|"y"\|"z", tone?, metalness?, roughness?, segments?, edgeThresholdDeg? }` | Watertight thick-walled revolved shell or tapered cone along `X` (or `Y`/`Z` via `axis`) with closed end rims and cutaway faces. |
+| `cutawayCylinder` | `{ length, rOuter, rInner, rOuterEnd?, rInnerEnd?, openDeg?, startDeg?, x0?, axis?: "x"\|"y"\|"z", tone?, metalness?, roughness?, segments?: 84, edgeThresholdDeg?: 26 }` | Smooth machined-looking watertight thick-walled revolved shell or tapered cone along `X` (or `Y`/`Z` via `axis`) with closed end rims and clean cutaway faces. |
 | `bladeRing` | `{ rHub, rTip, blades, chord?, thick?, twistDeg?, pitchDeg?, noseLen?, x?, hubLength?, tone?, hubTone? }` | Hub + optional ogive spinner nose + N twisted 3D airfoil blades along `X`. Spin via `.rotation.x += omega`. |
-| `combustorRing` | `{ rInner, rOuter, length, cans?, x?, tone?, openDeg? }` | Cutaway annular burner liner + fuel nozzles + emissive flames exposed at `group.userData.flameMeshes`. |
+| `combustorRing` | `{ rInner, rOuter, length, cans?, x?, tone?, openDeg? }` | Cutaway annular burner liner + fuel nozzles + volumetric flickering GLSL flames exposed at `group.userData.flameMeshes` (drive `flame.material.uniforms.uIntensity.value`). |
 | `shaft` | `{ length, r, x0?, tone?, collars?, metalness?, roughness? }` | Turned coaxial drive shaft along `X` with beveled collars. |
 | `pipe` | `{ points: [number, number, number][], r, tone?, tubularSegments?, radialSegments?, metalness?, roughness?, flanges? }` | Smooth Catmull-Rom `TubeGeometry` conduit with optional machined end flanges (`flanges !== false`). |
 | `spring` | `{ r, length, turns, wireR?, axis?: "x"\|"y"\|"z", tone?, tubularSegments?, radialSegments? }` | True 3D helical spring with spherical wire end caps. |
@@ -98,8 +104,10 @@ Use Engine A for **every physical object, machine, fluid/thermal/optical device,
 | `boxPlate` | `{ w, h, d, tone?, roughness?, metalness?, edgeThresholdDeg? }` | Color-locked matte-clay rectangular structural plate, bracket, manifold block, or bulkhead with `EdgesGeometry` contours. |
 | `pistonPlunger` | `{ r, headLength?, rodLength?, springTurns?, withSpring?: boolean, axis?: "x"\|"y", tone?, rodTone? }` → returns `{ group, setStroke(offset) }` | Machined piston head + dual sealing O-rings + crown boss + connecting rod + push cap + optional coaxial return spring (`withSpring`). Animate travel with `handle.setStroke(offset)`. |
 | `mistCone` | `{ origin: [x,y,z], length, startRadius?, endRadius?, count?, color?, speed?, dropletRadius?, opacity?, direction?: [x,y,z] }` → returns `{ group, update(dt, { speedScale?, dropletScale?, spreadScale?, opacityScale?, gravitySag?, colorHex? }) }` | Volumetric 3D spray veil + instanced micro-droplet cone bursting along `direction` (default `[1, 0, 0]`). |
-| `baseMount` | `{ y, radius? }` | Invisible `ShadowMaterial` shadow catcher + ultra-subtle ground contact ring. Always ground floating CAD rigs with this. |
-| `flowRibbon` | `{ curves: [number, number, number][][], radius?, color, speed?, particleCount?, opacity?, swirlAmp?, swirlFreq? }` → returns `{ group, update(dt, { speedScale?, opacityScale?, radiusScale?, colorHex? }) }` | Translucent 3D streamline tubes + instanced streak particles with gentle helical swirl. |
+| `baseMount` | `{ y, radius? }` | Soft radial Gaussian studio contact shadow + subtle directional catcher + architectural ground contact ring. Adapts automatically to Light & Dark themes. |
+| `airVolume` | `{ x0, length, rInner, rOuter, rInnerEnd?, rOuterEnd?, intakeFlare?, color?, secondaryColor?, opacity?, speed?, puffCount?, swirl? }` → returns `{ group, update(dt, { speedScale?, opacityScale?, colorHex?, darkMode? }) }` | **Preferred for wide diffused airflow/wind/cooling:** 3 nested seamless 360° GLSL domain-warped 3D fBM mist shells with optical rim-depth weighting + ultra-soft billowing Gaussian vapor puffs. |
+| `jetPlume` | `{ x0, length, rStart, rEnd?, speed?, intensity?, opacity?, sparkCount?, machDiamonds? }` → returns `{ group, update(dt, { speedScale?, intensity?, lengthScale?, opacityScale?, darkMode? }) }` | **Preferred for fiery hot exhaust / rockets / afterburners:** nested incandescent supersonic core with Mach shock diamonds + turbulent fiery crimson outer shear sheath + fast kinetic ember streaks. |
+| `flowRibbon` | `{ curves: [number, number, number][][], radius?, color, colorStops?: { start, mid?, end?, midAt? }, speed?, particleCount?, opacity?, swirlAmp?, swirlFreq? }` → returns `{ group, update(dt, { speedScale?, opacityScale?, radiusScale?, colorHex? }) }` | **For narrow channeled conduits/throats:** feathered crossed orthogonal aerodynamic ribbon shader with multi-harmonic scrolling wisps, optional 3-stop axial thermal gradient (`colorStops`), and fine wind-mote speed needles. |
 | `createClayMaterial` | `(tone?: MonochromeKey, { roughness?, metalness?, side? })` | Color-locked PBR matte-clay / satin-metal material compatible with Dim & Illuminate. |
 | `addArchitecturalEdges` | `(mesh, thresholdDeg = 18, { color?, opacity? })` | Attaches crisp `EdgesGeometry` architectural contour lines to custom Three.js meshes. |
 | `MONOCHROME_TOKENS` / `ACCENT_TOKENS` | Const hex maps | Strict color-lock palette constants. |
