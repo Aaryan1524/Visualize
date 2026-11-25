@@ -28,10 +28,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Aaryan1524/Visualize/releases/download/v3.1.0/turbofan-studio-tour.mp4"><img src=".github/assets/turbofan-studio.gif" width="820" alt="High-Bypass Turbofan Jet Engine 3D cutaway playing live: spinning matte-clay fan and compressor blades, diffused volumetric blue bypass air, flickering annular combustor flames, blazing red-orange exhaust, and live Airliner 8:1 to Fighter 1:1 morph."></a>
+  <a href="https://github.com/Aaryan1524/Visualize/releases/download/v3.1.0/turbofan-studio-demo.mp4"><img src=".github/assets/turbofan-studio.gif" width="820" alt="High-Bypass Turbofan Jet Engine complete 7-step 3D cutaway demo: spinning matte-clay blades, diffused volumetric blue bypass air, flickering annular combustor flames, blazing red-orange exhaust, Airliner 8:1 to Fighter 1:1 morph, and Dark Obsidian studio mode."></a>
 </p>
 
-<p align="center"><sub><b>High-Bypass Turbofan Jet Engine</b> — built from <code>/visualize explain how a jet engine works</code>.<br>Orthographic matte-clay 3D CAD, procedural GLSL volumetric airflow &amp; jet exhaust, live telemetry, offline Kokoro voiceover, and one-click Airliner (8:1) ↔ Fighter (1:1) comparison.<br><a href="https://github.com/Aaryan1524/Visualize/releases/download/v3.1.0/turbofan-studio-tour.mp4"><b>▶ Watch the full narrated tour (MP4, with sound)</b></a> · <a href="https://github.com/Aaryan1524/Visualize/releases/download/v3.1.0/turbofan-studio-teaser.mp4"><b>▶ Watch the 1-min teaser (MP4)</b></a></sub></p>
+<p align="center"><sub><b>High-Bypass Turbofan Jet Engine — Complete End-to-End 7-Step Demo</b> — built from <code>/visualize explain how a jet engine works</code>.<br>Orthographic matte-clay 3D CAD, procedural GLSL volumetric airflow &amp; jet exhaust, Dim &amp; Illuminate camera tour, Airliner (8:1) ↔ Fighter (1:1) morph, and Light/Dark modes.<br><a href="https://github.com/Aaryan1524/Visualize/releases/download/v3.1.0/turbofan-studio-demo.mp4"><b>▶ Watch the complete end-to-end HD demo (MP4, 1280×800)</b></a> · <a href="https://github.com/Aaryan1524/Visualize/releases/download/v3.1.0/turbofan-studio-tour.mp4"><b>▶ Narrated voice tour (MP4, with sound)</b></a></sub></p>
 
 ---
 
@@ -152,6 +152,16 @@ cd <your-visualize-folder> && npm install
 
 Start a new agent session and you're ready. Update anytime with `git pull`.
 
+<details>
+<summary><b>Troubleshooting: Codex sandbox &amp; Antigravity headless permissions</b></summary>
+
+<br>
+
+- **Codex:** Headless Chrome checks (`check-studio.mjs`) may be blocked by Codex's sandbox — the HTML still builds cleanly. Approve running `check-studio.mjs` outside the sandbox when prompted, or run `node ~/.agents/skills/visualize/scripts/check-studio.mjs dist/<slug>.html --shots <dir>` in your terminal.
+- **Antigravity (`agy -p`):** Add allow rules for `~/.gemini/config/skills/visualize` and `node ~/.gemini/config/skills/visualize/scripts/` under `permissions.allow` in `settings.json` to run unattended without prompts.
+
+</details>
+
 ---
 
 ## Prompts to try
@@ -223,6 +233,11 @@ node scripts/check-studio.mjs dist/turbofan-studio.html --shots /tmp/shots --fas
 | **Node.js 24+** | Builds & checks | Runs TypeScript directly via native type stripping. |
 | **Chrome or Chromium** | Visual & runtime QA | Auto-detected on macOS, Linux, and Windows (`CHROME_PATH` override supported). |
 | **~90 MB (once)** | Offline voiceover | Kokoro TTS downloads once on first narration run, then runs 100% offline. |
+
+## Limits
+
+- **Desktop first.** Standalone pages open on mobile, though the interactive 3D orbit + dock layout is tuned primarily for desktop viewports (`1280×800`+).
+- **Thorough by design.** Building a verified simulation model, 3D CAD or tactile 2D scene, headless Chrome QA, dual fresh-context reviews, and offline voiceover takes a real multi-step run — not an instant one-shot SVG dump.
 
 ## Contributing
 
