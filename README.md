@@ -28,41 +28,41 @@
 </p>
 
 <p align="center">
-  <img src=".github/assets/turbofan-studio-light.jpg" width="840" alt="High-Bypass Turbofan Jet Engine 3D cutaway in Visualize Studio: matte-clay nacelle with architectural edges, diffused volumetric blue bypass air, flickering annular combustor flames, and glowing red-orange core jet exhaust.">
+  <a href="https://github.com/Aaryan1524/Visualize/releases/download/v3.1.0/turbofan-studio-tour.mp4"><img src=".github/assets/turbofan-studio.gif" width="820" alt="High-Bypass Turbofan Jet Engine 3D cutaway playing live: spinning matte-clay fan and compressor blades, diffused volumetric blue bypass air, flickering annular combustor flames, blazing red-orange exhaust, and live Airliner 8:1 to Fighter 1:1 morph."></a>
 </p>
 
-<p align="center"><sub><b>High-Bypass Turbofan Jet Engine</b> — built from <code>/visualize explain how a jet engine works</code>.<br>Orthographic matte-clay 3D CAD, procedural GLSL volumetric airflow &amp; jet exhaust, live telemetry, offline Kokoro voiceover, and one-click Airliner (8:1) ↔ Fighter (1:1) comparison.</sub></p>
+<p align="center"><sub><b>High-Bypass Turbofan Jet Engine</b> — built from <code>/visualize explain how a jet engine works</code>.<br>Orthographic matte-clay 3D CAD, procedural GLSL volumetric airflow &amp; jet exhaust, live telemetry, offline Kokoro voiceover, and one-click Airliner (8:1) ↔ Fighter (1:1) comparison.<br><a href="https://github.com/Aaryan1524/Visualize/releases/download/v3.1.0/turbofan-studio-tour.mp4"><b>▶ Watch the full narrated tour (MP4, with sound)</b></a> · <a href="https://github.com/Aaryan1524/Visualize/releases/download/v3.1.0/turbofan-studio-teaser.mp4"><b>▶ Watch the 1-min teaser (MP4)</b></a></sub></p>
 
 ---
 
 ## Showcase
 
-Every image below is an unedited headless-Chrome capture of a standalone, offline HTML page built with **Visualize Studio v3.1**.
+Every animation and screenshot below is captured directly from a standalone, offline HTML page built with **Visualize Studio v3.1**.
 
 <table>
   <tr>
-    <td width="50%"><img src=".github/assets/turbofan-studio-light.jpg" alt="Turbofan Jet Engine 3D cutaway in light mode with volumetric blue bypass air, flickering combustor flames, and glowing red-orange core exhaust."></td>
+    <td width="50%"><img src=".github/assets/turbofan-studio.gif" alt="Turbofan Jet Engine 3D cutaway animated live in light mode with volumetric blue bypass air, flickering combustor flames, glowing red-orange core exhaust, and Airliner to Fighter morph."></td>
     <td width="50%"><img src=".github/assets/turbofan-studio-dark.jpg" alt="Turbofan Jet Engine 3D cutaway in dark obsidian studio mode with luminous matte-clay blades, volumetric cobalt bypass mist, and blazing Mach-diamond exhaust."></td>
   </tr>
   <tr>
-    <td><sub><b>Turbofan Jet Engine — Light Studio (Engine A · 3D CAD + WebGL)</b><br><code>/visualize explain how a jet engine works</code><br>Diffused fBM <code>airVolume()</code> bypass mist, volumetric flickering <code>combustorRing()</code> flames, and supersonic <code>jetPlume()</code> exhaust.</sub></td>
+    <td><sub><b>Turbofan Jet Engine — Live Light Studio (Engine A · 3D CAD + WebGL)</b><br><code>/visualize explain how a jet engine works</code><br>Diffused fBM <code>airVolume()</code> bypass mist, volumetric flickering <code>combustorRing()</code> flames, and supersonic <code>jetPlume()</code> exhaust.</sub></td>
     <td><sub><b>Turbofan Jet Engine — Dark Obsidian Studio</b><br>Every page ships with one-click <b>Dark</b> mode (<code>uDarkMode</code>-adaptive shaders) keeping matte-clay solids and volumetric forces razor-sharp in both themes.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src=".github/assets/v6-engine-light.jpg" alt="V6 Internal Combustion Engine 3D cutaway in light mode showing six slanted cylinders in two banks linked to a shared crankshaft with live 4-stroke combustion gas."></td>
+    <td width="50%"><img src=".github/assets/v6-engine.gif" alt="V6 Internal Combustion Engine 3D cutaway animated live showing six slanted cylinders pumping on a shared crankshaft with 4-stroke combustion flashes."></td>
     <td width="50%"><img src=".github/assets/v6-engine-dark.jpg" alt="V6 Internal Combustion Engine 3D cutaway in dark mode showing glowing orange power-stroke combustion and machined matte-clay pistons on a dark studio floor."></td>
   </tr>
   <tr>
-    <td><sub><b>V6 Internal Combustion Engine — Light Studio (Engine A · 3D CAD)</b><br><code>/visualize explain how a V6 engine works</code><br>Six slanted cutaway cylinders in two V-banks linked to a shared crankshaft, live 4-stroke gas cycles, and High/Low gear variants.</sub></td>
+    <td><sub><b>V6 Internal Combustion Engine — Live Light Studio (Engine A · 3D CAD)</b><br><code>/visualize explain how a V6 engine works</code><br>Six slanted cutaway cylinders in two V-banks linked to a shared crankshaft, live 4-stroke gas cycles, and High/Low gear variants.</sub></td>
     <td><sub><b>V6 Internal Combustion Engine — Dark Studio</b><br>Interactive orbit &amp; zoom, real RPM / power-strokes-per-second telemetry, and a live <b>Now You Try</b> challenge verified against the physics model.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src=".github/assets/venturi-atomizer-light.jpg" alt="Venturi Perfume Atomizer 3D cutaway glass bottle with feathered blue throat airflow, amber liquid rising up the dip tube, and animated micro-droplet mist cone."></td>
-    <td width="50%"><img src=".github/assets/multiagent-orchestration-light.jpg" alt="Multi-Agent Orchestration in Engine C showing a Braun-style tactile switchboard pipeline strip, milled worker execution rail, and live pulsing Bezier links."></td>
+    <td width="50%"><img src=".github/assets/venturi-atomizer.gif" alt="Venturi Perfume Atomizer 3D cutaway animated live with feathered blue throat airflow, amber liquid rising up the dip tube, and spraying micro-droplet mist cone."></td>
+    <td width="50%"><img src=".github/assets/multiagent-orchestration.gif" alt="Multi-Agent Orchestration animated live in Engine C showing a Braun-style tactile switchboard pipeline strip, milled worker execution rail, and live pulsing Bezier links."></td>
   </tr>
   <tr>
-    <td><sub><b>Venturi Perfume Atomizer (Engine A · Fluid &amp; Glass 3D)</b><br><code>/visualize explain how a perfume atomizer works</code><br>Cutaway <code>glassVessel()</code>, Bernoulli pressure drop, feathered throat airflow, rising amber liquid, and an animated micro-droplet <code>mistCone()</code>.</sub></td>
-    <td><sub><b>Multi-Agent Orchestration (Engine C · Tactile Conceptual Studio)</b><br><code>/visualize explain how multi-agent orchestration works</code><br>Braun/Rams instrument on drafting paper: switchboard <code>strip</code> pipeline, milled <code>track</code> worker rail with spring lift-arc motion, and live <code>flowPipe</code> dispatch.</sub></td>
+    <td><sub><b>Venturi Perfume Atomizer — Live (Engine A · Fluid &amp; Glass 3D)</b><br><code>/visualize explain how a perfume atomizer works</code><br>Cutaway <code>glassVessel()</code>, Bernoulli pressure drop, feathered throat airflow, rising amber liquid, and an animated micro-droplet <code>mistCone()</code>.</sub></td>
+    <td><sub><b>Multi-Agent Orchestration — Live (Engine C · Tactile Conceptual Studio)</b><br><code>/visualize explain how multi-agent orchestration works</code><br>Braun/Rams instrument on drafting paper: switchboard <code>strip</code> pipeline, milled <code>track</code> worker rail with spring lift-arc motion, and live <code>flowPipe</code> dispatch.</sub></td>
   </tr>
 </table>
 
