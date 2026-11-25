@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  CHECK_STAMP_FILE,
   EXPECTED_SHOTS,
   MAX_REVIEW_ROUNDS,
   buildReviewBrief,
@@ -73,7 +74,7 @@ ${extraBody}
 `;
 }
 
-function writeFreshShots(shotsDir, offsetMs = 2000) {
+function writeFreshShots(shotsDir, offsetMs = 2000, htmlForStamp = null) {
   mkdirSync(shotsDir, { recursive: true });
   const futureDate = new Date(Date.now() + offsetMs);
   const shas = {};
@@ -84,6 +85,17 @@ function writeFreshShots(shotsDir, offsetMs = 2000) {
     writeFileSync(p, buf);
     utimesSync(p, futureDate, futureDate);
     shas[name] = computeHtmlSha256(buf);
+  }
+  if (htmlForStamp !== null) {
+    writeFileSync(
+      join(shotsDir, CHECK_STAMP_FILE),
+      JSON.stringify({
+        status: "passed",
+        htmlSha256: computeHtmlSha256(htmlForStamp),
+        timestamp: new Date().toISOString(),
+      }),
+      "utf8",
+    );
   }
   return shas;
 }
@@ -101,7 +113,7 @@ describe("scripts/studio-review.mjs fresh-context final verifier gate", () => {
     const modelSrc = "export function simModel() { return { press: 70, dropKpa: 12 }; }\n";
     writeFileSync(htmlPath, html, "utf8");
     writeFileSync(modelPath, modelSrc, "utf8");
-    const expectedShotShas = writeFreshShots(shotsDir, 5000);
+    const expectedShotShas = writeFreshShots(shotsDir, 5000, html);
 
     const sha = computeHtmlSha256(html);
     const modelSha = computeFileSha256(modelPath);
@@ -164,7 +176,7 @@ describe("scripts/studio-review.mjs fresh-context final verifier gate", () => {
     utimesSync(stalePng, pastDate, pastDate);
 
     const brief = buildReviewBrief({ htmlPath, shotsDir });
-    assert.equal(brief.warnings.length, 4); // 1 stale + 3 missing
+    assert.equal(brief.warnings.length, 5); // 1 stale + 3 missing + 1 missing check-studio stamp
     assert.ok(brief.warnings.some((w) => /Stale screenshot: .*step0-light\.png/.test(w)));
     assert.ok(brief.warnings.some((w) => /Missing screenshot: .*step0-dark\.png/.test(w)));
     assert.match(brief.text, /WARNINGS:/);
@@ -181,7 +193,7 @@ describe("scripts/studio-review.mjs fresh-context final verifier gate", () => {
     const html = makeFixtureHtml("perfume-atomizer");
     writeFileSync(htmlPath, html, "utf8");
     writeFileSync(modelPath, "export function simModel() { return { press: 70 }; }\n", "utf8");
-    const shotSha256s = writeFreshShots(shotsDir, 4000);
+    const shotSha256s = writeFreshShots(shotsDir, 4000, html);
     const sha = computeHtmlSha256(html);
     const modelSha = computeFileSha256(modelPath);
 
@@ -325,7 +337,7 @@ describe("scripts/studio-review.mjs fresh-context final verifier gate", () => {
 
     const html = makeFixtureHtml("shot-tamper-demo");
     writeFileSync(htmlPath, html, "utf8");
-    const shotSha256s = writeFreshShots(shotsDir, 4000);
+    const shotSha256s = writeFreshShots(shotsDir, 4000, html);
     const sha = computeHtmlSha256(html);
 
     writeFileSync(
@@ -591,5 +603,79 @@ describe("scripts/studio-review.mjs fresh-context final verifier gate", () => {
     assert.equal(res.errors.length, 2);
     assert.ok(res.errors.some((e) => /Open conceptual finding/.test(e)));
     assert.ok(res.errors.some((e) => /Open visual finding/.test(e)));
+  });
+
+  it("refuses copy-pasting the brief schema verbatim (uses <pass|fail> placeholders instead of pre-filled pass)", () => {
+    const dir = join(TMP_ROOT, "anti-copy-paste");
+    mkdirSync(dir, { recursive: true });
+    const htmlPath = join(dir, "page.html");
+    const shotsDir = join(dir, "shots");
+    const reviewPath = join(dir, "review.json");
+    const html = makeFixtureHtml("anti-copy-demo");
+    writeFileSync(htmlPath, html, "utf8");
+    writeFreshShots(shotsDir, 4000, html);
+
+    const brief = buildReviewBrief({ htmlPath, shotsDir, outPath: reviewPath });
+    assert.equal(brief.schema.conceptual.status, "<pass|fail>");
+    assert.equal(brief.schema.visual.status, "<pass|fail>");
+    assert.doesNotMatch(JSON.stringify(brief.schema), /"status":"pass"/);
+    assert.match(brief.text, /"status": "<pass\|fail>"/);
+
+    // Copying brief.schema verbatim into review.json must FAIL verify!
+    writeFileSync(reviewPath, JSON.stringify(brief.schema, null, 2), "utf8");
+    const res = verifyReviewFile({ htmlPath, reviewPath, shotsDir });
+    assert.equal(res.ok, false);
+    assert.ok(res.errors.some((e) => /"conceptual\.status" must be "pass"/.test(e)));
+    assert.ok(res.errors.some((e) => /"visual\.status" must be "pass"/.test(e)));
+  });
+
+  it("rejects verify --shots when check-studio pass stamp is missing, failed, or stale", () => {
+    const dir = join(TMP_ROOT, "check-stamp-gate");
+    mkdirSync(dir, { recursive: true });
+    const htmlPath = join(dir, "page.html");
+    const shotsDir = join(dir, "shots");
+    const reviewPath = join(dir, "review.json");
+    const html = makeFixtureHtml("stamp-demo");
+    writeFileSync(htmlPath, html, "utf8");
+    const sha = computeHtmlSha256(html);
+
+    // Fresh screenshots WITHOUT a check-studio pass stamp (e.g. page failed check-studio!)
+    const shotSha256s = writeFreshShots(shotsDir, 4000, null);
+    writeFileSync(
+      reviewPath,
+      JSON.stringify({
+        reviewer: "independent",
+        round: 1,
+        htmlSha256: sha,
+        shotSha256s,
+        sceneId: "stamp-demo",
+        conceptual: { status: "pass", summary: "ok", blockers: [], nits: [] },
+        visual: { status: "pass", summary: "ok", blockers: [], nits: [] },
+      }),
+      "utf8",
+    );
+
+    const missingStamp = verifyReviewFile({ htmlPath, reviewPath, shotsDir });
+    assert.equal(missingStamp.ok, false);
+    assert.ok(missingStamp.errors.some((e) => /Missing check-studio pass stamp/.test(e)));
+
+    // Stale/wrong-hash pass stamp -> must still fail!
+    writeFileSync(
+      join(shotsDir, CHECK_STAMP_FILE),
+      JSON.stringify({ status: "passed", htmlSha256: "0".repeat(64) }),
+      "utf8",
+    );
+    const staleStamp = verifyReviewFile({ htmlPath, reviewPath, shotsDir });
+    assert.equal(staleStamp.ok, false);
+    assert.ok(staleStamp.errors.some((e) => /Stale check-studio pass stamp/.test(e)));
+
+    // Valid matching pass stamp -> now passes!
+    writeFileSync(
+      join(shotsDir, CHECK_STAMP_FILE),
+      JSON.stringify({ status: "passed", htmlSha256: sha }),
+      "utf8",
+    );
+    const validStamp = verifyReviewFile({ htmlPath, reviewPath, shotsDir });
+    assert.equal(validStamp.ok, true);
   });
 });

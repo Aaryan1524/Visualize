@@ -5,12 +5,14 @@
 //
 // Exits 0 with "studio: passed" when every invariant holds, or exits 1 listing every failure.
 
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import puppeteer from "puppeteer-core";
 import { chromePath } from "./lib/browser.mjs";
 
+export const CHECK_STAMP_FILE = ".studio-check.json";
 export const BAD_VALUE_RE = /(?:^|[^A-Za-z0-9_])(?:-?Infinity|NaN|undefined)(?:$|[^A-Za-z0-9_])/;
 
 export function normalizeEngineId(engine) {
@@ -1059,9 +1061,35 @@ async function main() {
     console.log("  5. Final step & challenge card: floating challenge card stays clear of the primary visual focal point.");
   }
 
+  const absShotsDir = shotsDir ? resolve(shotsDir) : null;
+  const stampPath = absShotsDir ? join(absShotsDir, CHECK_STAMP_FILE) : null;
+
   if (allFailures.length) {
+    if (stampPath) {
+      rmSync(stampPath, { force: true });
+    }
     for (const f of allFailures) console.error(`FAIL: ${f}`);
     process.exit(1);
+  }
+
+  if (stampPath) {
+    const htmlSha256 = createHash("sha256").update(readFileSync(absFile)).digest("hex");
+    mkdirSync(absShotsDir, { recursive: true });
+    writeFileSync(
+      stampPath,
+      JSON.stringify(
+        {
+          status: "passed",
+          htmlSha256,
+          file: absFile,
+          steps: stepsSummary,
+          variants: variantsSummary,
+          timestamp: new Date().toISOString(),
+        },
+        null,
+        2,
+      ) + "\n",
+    );
   }
 
   console.log(

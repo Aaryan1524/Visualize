@@ -20,6 +20,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SELF_SCRIPT = resolve(HERE, "studio-review.mjs");
 
 export const MAX_REVIEW_ROUNDS = 2;
+export const CHECK_STAMP_FILE = ".studio-check.json";
 
 export const EXPECTED_SHOTS = Object.freeze([
   "step0-light.png",
@@ -143,6 +144,26 @@ export function buildReviewBrief({
     }
   }
 
+  if (absShotsDir) {
+    const stampPath = join(absShotsDir, CHECK_STAMP_FILE);
+    if (!existsSync(stampPath)) {
+      warnings.push(
+        `Missing check-studio pass stamp (${stampPath}). Run check-studio.mjs --shots ${absShotsDir} and ensure it passes before verifying.`,
+      );
+    } else {
+      try {
+        const stamp = JSON.parse(readFileSync(stampPath, "utf8"));
+        if (stamp?.status !== "passed" || stamp?.htmlSha256 !== htmlSha256) {
+          warnings.push(
+            `Stale or non-passing check-studio stamp (${stampPath}). Re-run check-studio.mjs --shots ${absShotsDir} until it passes.`,
+          );
+        }
+      } catch {
+        warnings.push(`Unreadable check-studio pass stamp (${stampPath}). Re-run check-studio.mjs --shots ${absShotsDir}.`);
+      }
+    }
+  }
+
   if (reviewRound > MAX_REVIEW_ROUNDS) {
     warnings.push(
       `Circuit breaker warning: round ${reviewRound} exceeds max_rounds (${MAX_REVIEW_ROUNDS}). Fix only genuine blockers and avoid infinite nit-picking loops.`,
@@ -156,8 +177,18 @@ export function buildReviewBrief({
     modelSha256,
     shotSha256s,
     sceneId,
-    conceptual: { status: "pass", summary: "...", blockers: [], nits: [] },
-    visual: { status: "pass", summary: "...", blockers: [], nits: [] },
+    conceptual: {
+      status: "<pass|fail>",
+      summary: "<1-2 sentence independent verdict from Verifier 1>",
+      blockers: [],
+      nits: [],
+    },
+    visual: {
+      status: "<pass|fail>",
+      summary: "<1-2 sentence independent verdict from Verifier 2>",
+      blockers: [],
+      nits: [],
+    },
   };
 
   const variantsSummary = (config.variants || [])
@@ -488,6 +519,32 @@ export function verifyReviewFile(htmlPathOrOpts, reviewPathArg, extraOpts = {}) 
 
   if (shotsDir) {
     const absShots = resolve(shotsDir);
+    const stampPath = join(absShots, CHECK_STAMP_FILE);
+    if (!existsSync(stampPath)) {
+      errors.push(
+        `Missing check-studio pass stamp: ${stampPath}. Run check-studio.mjs ${absHtml} --shots ${absShots} until it exits 0.`,
+      );
+    } else {
+      let stamp = null;
+      try {
+        stamp = JSON.parse(readFileSync(stampPath, "utf8"));
+      } catch (err) {
+        errors.push(`Invalid JSON in check-studio pass stamp ${stampPath}: ${err?.message ?? err}`);
+      }
+      if (stamp) {
+        if (stamp.status !== "passed") {
+          errors.push(
+            `check-studio stamp ${stampPath} did not pass (status=${JSON.stringify(stamp.status)}). Fix check-studio failures first.`,
+          );
+        }
+        if (typeof stamp.htmlSha256 !== "string" || stamp.htmlSha256 !== liveHtmlSha256) {
+          errors.push(
+            `Stale check-studio pass stamp: stamp has ${JSON.stringify(stamp.htmlSha256)}, live HTML is ${liveHtmlSha256}. Re-run check-studio.mjs --shots.`,
+          );
+        }
+      }
+    }
+
     const recordedShots =
       review.shotSha256s && typeof review.shotSha256s === "object" && !Array.isArray(review.shotSha256s)
         ? review.shotSha256s
