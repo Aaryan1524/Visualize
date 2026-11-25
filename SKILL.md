@@ -69,7 +69,7 @@ node <folder>/build.mjs && node <skill>/scripts/check-studio.mjs dist/<slug>.htm
 
 ## Studio Manuals (Read Before Your First Build)
 
-- **`references/studio-engines.md`** — Strict 2-Engine routing table (`A` vs `C`), Color Lock, 3D CAD craft rules, and type-exact cheat-sheets for `engine-a.ts` (all 15 primitives) and `engine-c.ts` (all 5 kinetic primitives + `removeMissing`).
+- **`references/studio-engines.md`** — Strict 2-Engine routing table (`A` vs `C`), Color Lock, 3D CAD + Volumetric WebGL craft rules, and type-exact cheat-sheets for `engine-a.ts` (all 17 primitives including `airVolume` and `jetPlume`) and `engine-c.ts` (all 5 kinetic primitives + `removeMissing`).
 - **`references/studio-director.md`** — `studioPage()` contract (`hint`, outer-margin callout `place`), storyboard schema, `simModel(params, variant, t?)`, variant-key rule, Dim & Illuminate, Progressive Reveal, `tryOut` challenges, and `window.__studio` + `diagnostics()`.
 - **`references/studio-qa.md`** — End-to-end QA pipeline, `studio-review.mjs` v3.1 schema (`conceptual` / `visual` with `blockers[]` & `nits[]`, `round`, `max_rounds = 2`, SHA-256 locks), cross-harness verifier dispatch, and failure-recovery triage.
 
@@ -77,16 +77,17 @@ node <folder>/build.mjs && node <skill>/scripts/check-studio.mjs dist/<slug>.htm
 
 | Engine | Kit Module | Route Here For | Flagship Examples |
 |---|---|---|---|
-| **Engine A — 3D Physical CAD Studio** | `src/studio/engine-a.ts` (Three.js Orthographic Matte-Clay + `EdgesGeometry` + `RoomEnvironment` + damped `OrbitControls`) | **EVERY physical object, machine, fluid/thermal/optical device, hardware, watch, battery, atomizer, or organ** — **NO flat 2D drawings for physical objects!** (`cutawayCylinder`, `bladeRing`, `combustorRing`, `shaft`, `pipe`, `spring`, `gear`, `glassVessel`, `liquidVolume`, `pistonPlunger`, `mistCone`, `baseMount`, `flowRibbon`, `boxPlate`, `gasVolume`) | `examples/turbofan-studio/` (`dist/turbofan-studio.html`), `examples/venturi-atomizer/` (`dist/venturi-atomizer.html`) |
+| **Engine A — 3D Physical CAD Studio** | `src/studio/engine-a.ts` (Three.js Orthographic Matte-Clay + `EdgesGeometry` + `RoomEnvironment` + Volumetric WebGL GLSL Shaders + damped `OrbitControls`) | **EVERY physical object, machine, fluid/thermal/optical device, hardware, watch, battery, atomizer, or organ** — **NO flat 2D drawings for physical objects!** (`cutawayCylinder`, `bladeRing`, `combustorRing`, `shaft`, `pipe`, `spring`, `gear`, `glassVessel`, `liquidVolume`, `pistonPlunger`, `mistCone`, `baseMount`, `flowRibbon`, `airVolume`, `jetPlume`, `boxPlate`, `gasVolume`) | `examples/turbofan-studio/` (`dist/turbofan-studio.html`), `examples/venturi-atomizer/` (`dist/venturi-atomizer.html`) |
 | **Engine C — 2D Tactile Conceptual Studio** | `src/studio/engine-c.ts` (Braun/Rams tactile instruments on warm drafting paper: switchboard strips, milled sliding rails with lift-arc spring reorder & drop-off eviction, single-active-thread Bézier arcs — ZERO nested dashed SaaS boxes or badge soup!) | **EVERY conceptual / abstract topic**: algorithms, data structures, protocols, distributed systems, ML/transformers, math, finance, circuits/logic (`strip`, `track`, `arcLink`, `stageNode`, `flowPipe`, `removeMissing`, `hint: ""`, max 1 outer-margin callout with `place: "top"\|"bottom"`) | `examples/lru-studio/` (`dist/lru-studio.html`) |
 
 ## Hardcoded "Anti-Slop" Guardrails (Enforced in Code)
 
 1. **Color Lock:** Structural geometry uses only 4 monochrome tokens (`clayLight`, `clayMid`, `clayDark`, `graphite`). Saturated color (`orange`, `cobalt`, `ember`, `teal`, `gold`) is reserved strictly for `focus[]` highlights and invisible forces (airflow, liquid, gas, mist, heat, pressure, electric current, active packets).
-2. **Light-Faithful Dark Mode:** Warm gallery paper (`#f6f5f0`) in Light mode; obsidian studio mat (`#111317`) in Dark mode with luminous 3D matte-clay solids and crisp matte-ivory 2D ceramic tiles.
-3. **Single Source of Truth (`simModel(params, variant, t?)`):** One pure function drives animation, quiet monospace telemetry, and verified `tryOut` challenges — zero arithmetic drift or `? %` placeholders.
-4. **Hard Label Budget:** `director.mjs` caps callouts at ≤ 2 per step (use ≤ 1 outer-margin callout in Engine C) with 2D AABB repulsion and viewport clamping.
-5. **Cinema-Minimal Chrome:** ≥85% unobstructed frameless canvas, Dim & Illuminate on `focus[]`, Progressive Reveal on `reveal[]`, floating subtitle bar, quiet telemetry strip, bottom pill dock (`Play`, presets, `Tune`, `Reset`), and verified "Now You Try" challenges.
+2. **Volumetric WebGL Over Rigid Tubes:** Whenever visualizing physical invisible forces in Engine A, **use full WebGL procedural GLSL shaders** — `airVolume()` for wide diffused air/wind/cooling mist (optical rim-depth weighted so cutaway internals stay razor-sharp), `jetPlume()` for strong fiery exhaust/rockets/afterburners (Mach shock diamonds + turbulent shear sheath), volumetric `combustorRing()` flames, `mistCone()` for sprays, and feathered `flowRibbon({ colorStops })` only for narrow channeled conduits/throats. Never draw rigid opaque rods for air or flames, and always adapt shader luminance across Light & Dark themes (`uDarkMode`).
+3. **Light-Faithful Dark Mode:** Warm gallery paper (`#f6f5f0`) in Light mode; obsidian studio mat (`#111317`) in Dark mode with luminous 3D matte-clay solids and crisp matte-ivory 2D ceramic tiles.
+4. **Single Source of Truth (`simModel(params, variant, t?)`):** One pure function drives animation, quiet monospace telemetry, and verified `tryOut` challenges — zero arithmetic drift or `? %` placeholders.
+5. **Hard Label Budget:** `director.mjs` caps callouts at ≤ 2 per step (use ≤ 1 outer-margin callout in Engine C) with 2D AABB repulsion and viewport clamping.
+6. **Cinema-Minimal Chrome:** ≥85% unobstructed frameless canvas, Dim & Illuminate on `focus[]`, Progressive Reveal on `reveal[]`, floating subtitle bar, quiet telemetry strip, bottom pill dock (`Play`, presets, `Tune`, `Reset`), and verified "Now You Try" challenges.
 
 ---
 

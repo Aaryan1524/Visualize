@@ -2,13 +2,14 @@ import * as THREE from "three";
 import {
   ACCENT_TOKENS,
   addArchitecturalEdges,
+  airVolume,
   baseMount,
   bladeRing,
   combustorRing,
   createClayMaterial,
   createStudioStage,
   cutawayCylinder,
-  flowRibbon,
+  jetPlume,
   shaft,
 } from "../../src/studio/engine-a.ts";
 
@@ -54,7 +55,7 @@ function makeTailconePlug(xStart, length, rBase) {
     const r = Math.max(0.004, rBase * Math.pow(1 - t, 0.72));
     pts.push(new THREE.Vector2(r, t * length));
   }
-  const geo = new THREE.LatheGeometry(pts, 32);
+  const geo = new THREE.LatheGeometry(pts, 64);
   // +Y -> +X via -90° around Z
   geo.rotateZ(-Math.PI / 2);
   geo.translate(xStart, 0, 0);
@@ -65,55 +66,58 @@ function makeTailconePlug(xStart, length, rBase) {
   mesh.name = "core_tailcone_plug";
   mesh.castShadow = true;
   mesh.receiveShadow = true;
-  addArchitecturalEdges(mesh, 24);
+  addArchitecturalEdges(mesh, 26);
   return mesh;
 }
 
 function buildBypassCurves() {
-  // 6 sculpted 3D streamlines through the wide outer bypass annulus (upper, cutaway rim, lower, back)
-  // Angles in degrees around X axis where 0° = +Z, 90° = +Y:
+  // 6 sculpted 3D aerodynamic intake->bypass streamlines curling smoothly around the rounded
+  // intake lip, sweeping through the wide cold bypass duct, and converging gently out the rear.
   const specs = [
-    { deg: 76, rIn: 1.18, rMid: 1.38, rOut: 1.06 },
-    { deg: 48, rIn: 1.12, rMid: 1.32, rOut: 1.02 },
-    { deg: 18, rIn: 1.15, rMid: 1.35, rOut: 1.04 },
-    { deg: -16, rIn: 1.16, rMid: 1.36, rOut: 1.05 },
-    { deg: -64, rIn: 1.18, rMid: 1.38, rOut: 1.06 },
-    { deg: 122, rIn: 1.18, rMid: 1.36, rOut: 1.05 },
+    { deg: 76, rLip: 1.48, rIn: 1.24, rMid: 1.38, rOut: 1.06 },
+    { deg: 48, rLip: 1.44, rIn: 1.16, rMid: 1.32, rOut: 1.02 },
+    { deg: 18, rLip: 1.46, rIn: 1.18, rMid: 1.35, rOut: 1.04 },
+    { deg: -16, rLip: 1.48, rIn: 1.20, rMid: 1.36, rOut: 1.05 },
+    { deg: -64, rLip: 1.50, rIn: 1.22, rMid: 1.38, rOut: 1.06 },
+    { deg: 122, rLip: 1.48, rIn: 1.20, rMid: 1.36, rOut: 1.05 },
   ];
 
-  return specs.map(({ deg, rIn, rMid, rOut }) => {
+  return specs.map(({ deg, rLip, rIn, rMid, rOut }) => {
     const a0 = (deg * Math.PI) / 180;
-    const a1 = ((deg + 9) * Math.PI) / 180;
-    const a2 = ((deg + 16) * Math.PI) / 180;
+    const a1 = ((deg + 8) * Math.PI) / 180;
+    const a2 = ((deg + 15) * Math.PI) / 180;
     const a3 = ((deg + 20) * Math.PI) / 180;
     return [
-      [-3.55, Math.sin(a0) * (rIn * 0.96), Math.cos(a0) * (rIn * 0.96)],
-      [-2.35, Math.sin(a0) * rIn, Math.cos(a0) * rIn],
-      [-1.15, Math.sin(a1) * rMid, Math.cos(a1) * rMid],
-      [0.35, Math.sin(a2) * (rMid * 0.96), Math.cos(a2) * (rMid * 0.96)],
-      [1.75, Math.sin(a3) * (rOut * 1.06), Math.cos(a3) * (rOut * 1.06)],
-      [3.55, Math.sin(a3) * rOut, Math.cos(a3) * rOut],
+      [-3.72, Math.sin(a0) * rLip, Math.cos(a0) * rLip],
+      [-2.82, Math.sin(a0) * (rIn * 1.08), Math.cos(a0) * (rIn * 1.08)],
+      [-2.05, Math.sin(a0) * rIn, Math.cos(a0) * rIn],
+      [-0.95, Math.sin(a1) * rMid, Math.cos(a1) * rMid],
+      [0.45, Math.sin(a2) * (rMid * 0.96), Math.cos(a2) * (rMid * 0.96)],
+      [1.82, Math.sin(a3) * (rOut * 1.06), Math.cos(a3) * (rOut * 1.06)],
+      [3.65, Math.sin(a3) * rOut, Math.cos(a3) * rOut],
     ];
   });
 }
 
 function buildCoreCurves() {
-  // 4 sculpted 3D streamlines diving into the inner core, squeezing through the compressor,
-  // igniting in the annular combustor, spinning the turbine, and blasting out the exhaust nozzle.
-  const angles = [56, 22, -28, 128];
+  // 4 sculpted 3D core streamlines curling around the front spinner cone (cool cobalt),
+  // compressing tightly through the 4-stage compressor (warming to gold),
+  // igniting in the annular combustor (blazing orange-ember), and blasting out the exhaust nozzle.
+  const angles = [54, 18, -30, 128];
   return angles.map((deg) => {
     const a0 = (deg * Math.PI) / 180;
-    const a1 = ((deg + 14) * Math.PI) / 180;
-    const a2 = ((deg + 26) * Math.PI) / 180;
-    const a3 = ((deg + 34) * Math.PI) / 180;
+    const a1 = ((deg + 12) * Math.PI) / 180;
+    const a2 = ((deg + 24) * Math.PI) / 180;
+    const a3 = ((deg + 32) * Math.PI) / 180;
     return [
-      [-3.15, Math.sin(a0) * 0.64, Math.cos(a0) * 0.64],
-      [-1.75, Math.sin(a0) * 0.56, Math.cos(a0) * 0.56],
-      [-0.45, Math.sin(a1) * 0.48, Math.cos(a1) * 0.48],
+      [-3.32, Math.sin(a0) * 0.84, Math.cos(a0) * 0.84],
+      [-2.35, Math.sin(a0) * 0.68, Math.cos(a0) * 0.68],
+      [-1.45, Math.sin(a0) * 0.56, Math.cos(a0) * 0.56],
+      [-0.38, Math.sin(a1) * 0.48, Math.cos(a1) * 0.48],
       [0.78, Math.sin(a2) * 0.49, Math.cos(a2) * 0.49],
       [1.82, Math.sin(a3) * 0.45, Math.cos(a3) * 0.45],
       [2.85, Math.sin(a3) * 0.36, Math.cos(a3) * 0.36],
-      [4.25, Math.sin(a3) * 0.28, Math.cos(a3) * 0.28],
+      [4.28, Math.sin(a3) * 0.28, Math.cos(a3) * 0.28],
     ];
   });
 }
@@ -163,7 +167,8 @@ export function mount(canvas, ctx = {}) {
       tone: "clayLight",
       roughness: 0.62,
       metalness: 0.1,
-      segments: 56,
+      segments: 88,
+      edgeThresholdDeg: 26,
     }),
   );
   // Main outer bypass barrel
@@ -179,7 +184,8 @@ export function mount(canvas, ctx = {}) {
       tone: "clayLight",
       roughness: 0.72,
       metalness: 0.06,
-      segments: 56,
+      segments: 88,
+      edgeThresholdDeg: 26,
     }),
   );
   // Rear tapered bypass exit cowling
@@ -195,7 +201,8 @@ export function mount(canvas, ctx = {}) {
       tone: "clayMid",
       roughness: 0.72,
       metalness: 0.08,
-      segments: 56,
+      segments: 88,
+      edgeThresholdDeg: 26,
     }),
   );
   // Internal bypass outlet guide struts connecting core to nacelle (in non-cutaway arc)
@@ -231,7 +238,7 @@ export function mount(canvas, ctx = {}) {
   fanMorph.add(frontFan);
 
   stage.registerPart("fan", fanPart, {
-    anchor: [-2.18, 1.46, 0.42],
+    anchor: [-2.14, 1.06, 0.42],
     accent: "orange",
   });
 
@@ -252,7 +259,8 @@ export function mount(canvas, ctx = {}) {
       tone: "clayMid",
       roughness: 0.66,
       metalness: 0.14,
-      segments: 48,
+      segments: 84,
+      edgeThresholdDeg: 26,
     }),
   );
   // Compressor casing (tapers inward as air is squeezed 30x tighter)
@@ -268,7 +276,8 @@ export function mount(canvas, ctx = {}) {
       tone: "clayMid",
       roughness: 0.64,
       metalness: 0.18,
-      segments: 48,
+      segments: 84,
+      edgeThresholdDeg: 26,
     }),
   );
   // Combustor & turbine outer case
@@ -284,7 +293,8 @@ export function mount(canvas, ctx = {}) {
       tone: "clayDark",
       roughness: 0.58,
       metalness: 0.24,
-      segments: 48,
+      segments: 84,
+      edgeThresholdDeg: 26,
     }),
   );
   // Convergent rear hot exhaust nozzle
@@ -300,7 +310,8 @@ export function mount(canvas, ctx = {}) {
       tone: "graphite",
       roughness: 0.46,
       metalness: 0.32,
-      segments: 48,
+      segments: 84,
+      edgeThresholdDeg: 26,
     }),
   );
   // Central aerodynamic exhaust plug cone
@@ -340,7 +351,7 @@ export function mount(canvas, ctx = {}) {
   const flameMeshes = combustorObj.userData.flameMeshes || [];
 
   stage.registerPart("combustor", combustorObj, {
-    anchor: [0.84, 0.72, 0.44],
+    anchor: [0.06, 0.44, 0.28],
     accent: "ember",
   });
 
@@ -371,39 +382,67 @@ export function mount(canvas, ctx = {}) {
     accent: "orange",
   });
 
-  // 8. LIVE 3D AIRFLOW RIBBONS (saturated accents strictly for invisible forces!)
+  // 8. VOLUMETRIC DIFFUSED BLUE BYPASS AIR + STRONG FIERY RED/ORANGE CORE JET PLUME
   const bypassFlowPart = new THREE.Group();
   bypassFlowPart.name = "part_bypass_flow";
   const bypassMorph = new THREE.Group();
   bypassFlowPart.add(bypassMorph);
-  const bypassFlow = flowRibbon({
-    curves: buildBypassCurves(),
-    radius: 0.031,
+  const bypassAir = airVolume({
+    x0: -3.55,
+    length: 7.05,
+    rInner: 0.96,
+    rOuter: 1.56,
+    rInnerEnd: 0.78,
+    rOuterEnd: 1.24,
+    intakeFlare: 0.24,
     color: "cobalt",
-    speed: 0.56,
-    particleCount: 36,
-    opacity: 0.3,
-    swirlAmp: 0.032,
-    swirlFreq: 2.2,
+    secondaryColor: 0x60a5fa,
+    opacity: 0.42,
+    speed: 0.72,
+    puffCount: 165,
+    swirl: 0.72,
   });
-  bypassMorph.add(bypassFlow.group);
+  bypassMorph.add(bypassAir.group);
   stage.registerPart("bypass_flow", bypassFlowPart, {
     anchor: [-0.28, 1.42, 0.62],
     accent: "cobalt",
   });
 
-  const coreFlow = flowRibbon({
-    curves: buildCoreCurves(),
-    radius: 0.025,
-    color: "orange",
-    speed: 0.78,
-    particleCount: 28,
-    opacity: 0.36,
-    swirlAmp: 0.022,
-    swirlFreq: 3.4,
+  // Inner core flow: subtle diffused intake/compression mist + strong incandescent fiery jet blast!
+  const coreFlowPart = new THREE.Group();
+  coreFlowPart.name = "part_core_flow";
+  const coreIntakeAir = airVolume({
+    x0: -3.08,
+    length: 3.72,
+    rInner: 0.28,
+    rOuter: 0.62,
+    rInnerEnd: 0.36,
+    rOuterEnd: 0.56,
+    intakeFlare: 0.14,
+    color: "cobalt",
+    secondaryColor: 0x93c5fd,
+    opacity: 0.24,
+    speed: 0.92,
+    puffCount: 52,
+    swirl: 1.15,
   });
-  stage.registerPart("core_flow", coreFlow.group, {
-    anchor: [2.85, 0.32, 0.35],
+  coreFlowPart.add(coreIntakeAir.group);
+
+  const coreJet = jetPlume({
+    x0: 1.32,
+    length: 2.85,
+    rStart: 0.52,
+    rEnd: 0.28,
+    speed: 1.65,
+    intensity: 1.05,
+    opacity: 0.94,
+    sparkCount: 44,
+    machDiamonds: 4.5,
+  });
+  coreFlowPart.add(coreJet.group);
+
+  stage.registerPart("core_flow", coreFlowPart, {
+    anchor: [2.95, 0.26, 0.32],
     accent: "ember",
   });
 
@@ -468,33 +507,39 @@ export function mount(canvas, ctx = {}) {
       for (const s of compStages) s.rotation.x += omegaCore;
       for (const s of turbineStages) s.rotation.x += omegaFan * 1.25;
 
-      // Throttle-reactive combustor flame glow + lively flicker
+      // Throttle-reactive volumetric combustor flames + lively flicker
       for (let i = 0; i < flameMeshes.length; i++) {
         const flame = flameMeshes[i];
         const flicker = 0.92 + 0.14 * Math.sin(elapsed * 11 + i * 1.7);
-        const intensity = (0.7 + 1.9 * burnerGlow) * flicker;
-        flame.scale.set(0.65 + 0.55 * burnerGlow * flicker, 0.8 + 0.3 * burnerGlow, 0.8 + 0.3 * burnerGlow);
-        if (flame.material && "emissiveIntensity" in flame.material) {
+        const intensity = (0.72 + 1.55 * burnerGlow) * flicker;
+        flame.scale.set(0.68 + 0.52 * burnerGlow * flicker, 0.85 + 0.28 * burnerGlow, 0.85 + 0.28 * burnerGlow);
+        if (flame.material?.uniforms?.uIntensity) {
+          flame.material.uniforms.uIntensity.value = intensity;
+        } else if (flame.material && "emissiveIntensity" in flame.material) {
           flame.material.emissiveIntensity = intensity;
         }
       }
 
-      // Live bypass & core airflow ribbons synced directly to simModel!
+      // Live diffused cool bypass air & strong fiery hot core jet synced directly to simModel!
       const bypassNorm = Math.max(0.28, Math.min(1.25, fanPushPct / 80));
-      const coreNorm = Math.max(0.45, Math.min(1.65, (corePushPct / 20) * 0.45 + (throttlePct / 100) * 0.85));
+      const coreNorm = Math.max(0.45, Math.min(1.85, (corePushPct / 20) * 0.42 + (throttlePct / 100) * 0.92));
 
-      bypassFlow.update(safeDt, {
-        speedScale: 0.65 + 0.85 * fanSpeed,
-        opacityScale: 0.48 + 0.68 * bypassNorm,
-        radiusScale: 0.62 + 0.48 * bypassNorm,
+      bypassAir.update(safeDt, {
+        speedScale: 0.65 + 0.9 * fanSpeed,
+        opacityScale: 0.52 + 0.68 * bypassNorm,
       });
 
-      const isBlazingCore = corePushPct >= 50 || throttlePct >= 92;
-      coreFlow.update(safeDt, {
-        speedScale: 0.75 + 1.05 * coreNorm,
-        opacityScale: 0.68 + 0.55 * Math.min(1.3, coreNorm),
-        radiusScale: 0.78 + 0.42 * Math.min(1.3, coreNorm),
-        colorHex: isBlazingCore ? ACCENT_TOKENS.ember : ACCENT_TOKENS.orange,
+      coreIntakeAir.update(safeDt, {
+        speedScale: 0.75 + 0.95 * fanSpeed,
+        opacityScale: 0.55 + 0.5 * Math.min(1.3, coreNorm),
+      });
+
+      const isFighterBlast = corePushPct >= 45 || throttlePct >= 92;
+      coreJet.update(safeDt, {
+        speedScale: 0.8 + 1.15 * coreNorm,
+        intensity: (0.68 + 0.85 * burnerGlow) * (isFighterBlast ? 1.32 : 1.0),
+        lengthScale: 0.76 + 0.34 * Math.min(1.4, coreNorm) * (isFighterBlast ? 1.14 : 1.0),
+        opacityScale: 0.74 + 0.45 * Math.min(1.3, coreNorm),
       });
 
       stage.render(safeDt);

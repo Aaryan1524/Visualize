@@ -5,6 +5,7 @@ import {
   ACCENT_TOKENS,
   MONOCHROME_TOKENS,
   addArchitecturalEdges,
+  airVolume,
   baseMount,
   bladeRing,
   boxPlate,
@@ -17,6 +18,7 @@ import {
   gasVolume,
   gear,
   glassVessel,
+  jetPlume,
   liquidVolume,
   mistCone,
   pipe,
@@ -640,6 +642,71 @@ describe("Engine A — Fluid, Glass & Aerosol Primitives", () => {
         assert.ok(Number.isFinite(v), `mist droplet ${i} matrix has non-finite value`);
       }
       assert.ok(m.determinant() > 1e-12, `mist droplet ${i} matrix must be non-degenerate`);
+    }
+  });
+
+  it("airVolume builds seamless fBM mist shells and advances Gaussian vapor puffs cleanly", () => {
+    const air = airVolume({
+      x0: -3.2,
+      length: 6.4,
+      rInner: 0.9,
+      rOuter: 1.5,
+      rInnerEnd: 0.75,
+      rOuterEnd: 1.2,
+      color: "cobalt",
+      puffCount: 64,
+    });
+    assertGroupMeshesClean(air.group, "airVolume");
+    assert.equal(air.group.userData.isAirVolume, true);
+
+    const shells = air.group.userData.shellMaterials as THREE.ShaderMaterial[];
+    assert.equal(shells.length, 3);
+    const points = air.group.userData.points as THREE.Points;
+    assert.ok(points instanceof THREE.Points);
+    const posAttr = points.geometry.getAttribute("position") as THREE.BufferAttribute;
+    assert.equal(posAttr.count, 64);
+
+    const beforeX = posAttr.getX(0);
+    air.update(0.05, { speedScale: 1.4, opacityScale: 0.9, darkMode: true });
+    const afterX = posAttr.getX(0);
+    assert.notEqual(beforeX, afterX, "airVolume vapor puff positions must advance on update");
+    assert.equal((shells[0]!.uniforms.uDarkMode as { value: number }).value, 1);
+    for (let i = 0; i < posAttr.count; i++) {
+      assert.ok(Number.isFinite(posAttr.getX(i)) && Number.isFinite(posAttr.getY(i)) && Number.isFinite(posAttr.getZ(i)));
+    }
+  });
+
+  it("jetPlume builds volumetric exhaust cones and advances kinetic ember streaks cleanly", () => {
+    const jet = jetPlume({
+      x0: 1.2,
+      length: 2.8,
+      rStart: 0.5,
+      rEnd: 0.28,
+      sparkCount: 32,
+      machDiamonds: 4.5,
+    });
+    assertGroupMeshesClean(jet.group, "jetPlume");
+    assert.equal(jet.group.userData.isJetPlume, true);
+
+    const sparks = jet.group.userData.sparksMesh as THREE.InstancedMesh;
+    assert.ok(sparks instanceof THREE.InstancedMesh);
+    assert.equal(sparks.count, 32);
+
+    const before = new THREE.Matrix4();
+    const after = new THREE.Matrix4();
+    sparks.getMatrixAt(0, before);
+
+    jet.update(0.03, { speedScale: 1.6, intensity: 1.35, lengthScale: 1.15, darkMode: true });
+    sparks.getMatrixAt(0, after);
+    assert.notDeepEqual(Array.from(before.elements), Array.from(after.elements));
+
+    const m = new THREE.Matrix4();
+    for (let i = 0; i < sparks.count; i++) {
+      sparks.getMatrixAt(i, m);
+      for (const v of m.elements) {
+        assert.ok(Number.isFinite(v), `jetPlume spark ${i} matrix has non-finite value`);
+      }
+      assert.ok(m.determinant() > 1e-12, `jetPlume spark ${i} matrix must be non-degenerate`);
     }
   });
 });
