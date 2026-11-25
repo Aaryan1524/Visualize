@@ -99,9 +99,14 @@ const modelLead = modelPath
   ? `Read the executable model at ${modelPath}.`
   : "Inspect the page's executable model (model.mjs).";
 
-const FULL_VISUAL_RUBRIC = `   Evaluate EVERY step in BOTH light and dark themes against the studio bar:
-   - **3D contrast & materials:** tops and side walls clearly separate; no cream-on-cream flatness, no pitch-black CSS variable cycles, no washed-out dark mode.
-   - **Geometry & clarity:** clean silhouettes, no bow-tie/self-intersecting cutouts or z-fighting; flat layered machines (watches, gearboxes, clutches) use an exploded vertical stack with centre lines instead of a squashed disc; no unexplained pillars or covers hiding the subject.
+const FULL_VISUAL_RUBRIC = `   Evaluate EVERY step in BOTH light and dark themes as a ruthless Visual Design Director — **FAIL** immediately on any defect below:
+   - **No Closed Opaque Step 0:** Step 0 MUST open on the live cutaway or exploded working mechanism with anatomy callouts naming the key parts — **NEVER** a closed opaque exterior, solid cover, or opaque watch dial hiding the mechanism inside.
+   - **No Floating / Unmeshed Parts or "Empty Ashtray" Interiors:** Every gear, link, shaft, or moving element must visibly connect/mesh (\`solveGearTrain\` / \`layoutFlowSpine\`) and fill its cavity purposefully (\`checkCavityFill\`). **FAIL** tiny disconnected gears floating in empty flat space!
+   - **No Impossible Layering or Part Collisions:** **FAIL** overlapping gears, barrels, or housings (e.g., balance wheel crashing into mainspring barrel, oscillating rotor sitting under front watch hands, or shafts passing through solid bridges without clearance — verify \`assertNoCollisions\`).
+   - **No Clunky Decorative Straps/Stands:** **FAIL** chunky rectangular lugs, chopped-off watch straps, or oversized decorative pedestals that waste >15% of the silhouette without teaching anything.
+   - **Flat Layered Machines (watches, gearboxes, clutches):** Require clean vertical layer separation (\`composeExplodedLayers\` / \`explodedStack\` + \`centreLines\`) so assemblies read in depth and never fight in one squashed flat pan.
+   - **3D contrast & materials:** tops and side walls clearly separate; studio finishes (\`metal\`, \`glass\`, \`satin\`), soft grounding shadows, and crisp cutaway hatching; no cream-on-cream flatness, no pitch-black CSS variable cycles, no washed-out dark mode.
+   - **Geometry & clarity:** clean silhouettes, no bow-tie/self-intersecting cutouts or z-fighting; no unexplained pillars or covers hiding the subject.
    - **Studio restraint & framing:** calm neutral stage with ONE signal colour (orange \`subject\`); the figure dominates; camera framing changes purposefully across steps; no title block, heading, card, or callout collisions; leader lines are short, non-crossing, and land squarely on the named part.
    - **Legibility:** printed values, indices, working strips, and equations read crisply in both themes.`;
 
@@ -144,7 +149,12 @@ omitted What-if variants, or omitted recorded voice — those are intentionally 
 4. Check core claims and Coverage for anything factually wrong or misleading (do not fail for omitted optional variants or concise scope).`,
     part2: `## Part 2 — Studio visual consistency (${LOOK_REF} — fast sanity shots)
 5. ${shotsSection}
-   Evaluate the light core-step shots, lab shot (if present), and dark sanity shot for blocking defects:
+   Evaluate the light core-step shots, lab shot (if present), and dark sanity shot as a ruthless Visual Design Director for blocking defects:
+   - **No Closed Opaque Step 0:** Step 0 MUST show the live cutaway or exploded working mechanism with anatomy callouts — **NEVER** a closed opaque exterior/dial hiding the inside.
+   - **No Floating / Unmeshed Parts or "Empty Ashtray" Interiors:** Every gear, link, or moving element must visibly connect/mesh (\`solveGearTrain\` / \`layoutFlowSpine\`). **FAIL** tiny disconnected parts floating in empty flat space!
+   - **No Impossible Layering or Part Collisions:** **FAIL** overlapping gears/barrels (e.g., balance wheel crashing into barrel, rotor sitting under front watch hands).
+   - **No Clunky Decorative Straps/Stands:** **FAIL** chunky rectangular lugs, chopped-off straps, or oversized pedestals wasting >15% of the silhouette without teaching anything.
+   - **Flat Layered Machines (watches, gearboxes, clutches):** Require clean vertical layer separation (\`composeExplodedLayers\` / \`explodedStack\` + \`centreLines\`) so parts never fight in one flat pan.
    - **Zero collisions or clipping:** no callout/card overlaps, no labels or lit parts clipped off-stage, no broken silhouettes.
    - **Light & dark contrast:** tops and walls separate cleanly and text/values are legible in BOTH light and dark sanity shots (no flat cream-on-cream or pitch-black CSS cycles).
    - **Non-crossing leaders:** leader lines point cleanly to their parts without tangling across the subject.

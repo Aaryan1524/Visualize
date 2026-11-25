@@ -1,0 +1,93 @@
+{
+  "stamp": "6906c857d054cb09",
+  "mode": "everyday",
+  "reviewer": "independent",
+  "checks": {
+    "conceptual": "pass",
+    "visual": "pass"
+  },
+  "summary": "All 6 conceptual, variant-consistency, and physics findings are cleanly resolved across both Airliner (8:1) and Fighter (1:1) variants with monotonic scaling, zero Predict or Practice spoilers, and zero thermodynamics jargon. All 3 studio visual findings are cleanly resolved in light and dark modes with zero UI collisions, crisp Step 0 anatomy leaders, continuous grounding shadow, and museum-grade 3-point shading.",
+  "findings": [
+    {
+      "where": "examples/turbofan/model.mjs (Fighter Step 3 HUD)",
+      "category": "consistency",
+      "text": "Why: Compact fast jet favors raw speed",
+      "severity": "wrong",
+      "finding": "Fighter Step 3 HUD branches on bypass ratio to match '65% core jet' instead of airliner bypass fuel copy.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/turbofan/story.mjs (prediction)",
+      "category": "consistency",
+      "text": "Variant-aware prediction(M)",
+      "severity": "wrong",
+      "finding": "Predict branches cleanly between Airliner (8:1, answer 0, 80% cool fan) and Fighter (1:1, answer 1, 65% hot core jet).",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/turbofan/story.mjs (Fighter Steps 0-2 & voice.json)",
+      "category": "consistency",
+      "text": "slim bypass duct; one part sweeps",
+      "severity": "wrong",
+      "finding": "Fighter Steps 0-2 prose and re-recorded voice tracks adapt to 1:1 bypass with singular grammar and zero airliner contradictions.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/turbofan/model.mjs (Steps 0-2 hidePushSplit)",
+      "category": "consistency",
+      "text": "hidePushSplit: true on Steps 0, 1, and 2",
+      "severity": "misleading",
+      "finding": "Cool fan push meter and bottom readout stay masked to '?' until Step 3 reveal, eliminating pre-Predict spoilers.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/turbofan/model.mjs (turbineExtractShare)",
+      "category": "conceptual",
+      "text": "turbineExtractShare scales 55% (1:1) -> 80% (8:1) -> 82% (10:1)",
+      "severity": "misleading",
+      "finding": "Turbine power extraction scales monotonically with bypass ratio across Step 5, Lab, Practice, and Details.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/turbofan/story.mjs (practice kind 0)",
+      "category": "consistency",
+      "text": "Out of all incoming air, what share goes through the outer bypass duct?",
+      "severity": "misleading",
+      "finding": "Practice kind 0 no longer gives away b + 1 total parts verbatim in the question stem or HUD.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "airliner-step-4-light.png, airliner-step-4-dark.png (Step 4 heading clearance)",
+      "category": "visual",
+      "text": "Intake nacelle rim clear of Step 4 heading",
+      "severity": "wrong",
+      "finding": "Added fan to camera.around[4]; front intake lip clears top-left heading with generous margin in light and dark modes.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "airliner-step-0-light.png, airliner-step-0-dark.png (Step 0 Compressor & Burner leaders)",
+      "category": "visual",
+      "text": "Compressor above, Burner below, 39% longest leader",
+      "severity": "misleading",
+      "finding": "Compressor and Burner leaders drop cleanly onto exposed blades and combustor lip without slashing across fan blades or bypass arrows.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "airliner-step-1..6-light.png, fighter-step-6-dark.png (grounding shadow)",
+      "category": "visual",
+      "text": "Continuous studio grounding shadow across Steps 0-6",
+      "severity": "misleading",
+      "finding": "Soft studio floor shadow stays smoothly rendered beneath the nacelle across all steps, Lab, and Practice.",
+      "resolved": true,
+      "fixed": true
+    }
+  ]
+}

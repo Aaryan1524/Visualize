@@ -1,0 +1,111 @@
+{
+  "stamp": "832ed01fbfc5a277",
+  "mode": "everyday",
+  "reviewer": "independent",
+  "checks": {
+    "conceptual": "pass",
+    "visual": "pass"
+  },
+  "summary": "All 6 conceptual, kinematic, and consistency findings are cleanly resolved with zero regressions across the everyday watch model, Step 4 gear-ratio direction, CW hand / CCW escape-wheel kinematics, live draining HUD, jargon-free copy, and reachable slipping-clutch Lab/Practice cap. All 5 studio visual findings are cleanly resolved in light and dark modes with museum-grade 3-layer exhibition cutaway craft, 0% leader crossings, 0.196 min OKLab contrast, and generous UI breathing room on every step, Lab, and Practice view.",
+  "findings": [
+    {
+      "where": "examples/watch-everyday/story.mjs (Step 4 caption & voice) & model.mjs (Step 4 HUD)",
+      "category": "conceptual",
+      "text": "Small steel pinions drive larger brass wheels inward from the escape wheel to step fast ticks down into seconds, minutes, and hours.",
+      "severity": "wrong",
+      "finding": "Step 4 caption, re-recorded voice narration, and HUD now accurately describe the gear-ratio reduction direction.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/watch-everyday/build.mjs (centerDeg) & figure.test.mjs",
+      "category": "conceptual",
+      "text": "Negated centerDeg across Steps 0-6 and Lab",
+      "severity": "wrong",
+      "finding": "centerWheel and fourthWheel now spin CW matching the watch hands, and escapePinion/escapeWheel spin CCW matching esc.escDeg and club-tooth rake.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/watch-everyday/build.mjs (Step 6 stateAt)",
+      "category": "consistency",
+      "text": "Dynamic live draining hudRows while liveReserve > 0",
+      "severity": "misleading",
+      "finding": "Step 6 now displays live coiled turns and 'Still ticking — draining down' while draining, switching to stopped rows only at 0 h.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/watch-everyday/model.mjs (Step 5 HUD) & build.mjs (aria-labels)",
+      "category": "consistency",
+      "text": "Center: 3 nested hand shafts",
+      "severity": "misleading",
+      "finding": "Removed 'arbors' and technical aria-label jargon; guarded by claims.test.mjs.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/watch-everyday/model.mjs (MAX_LAB_WORN_HOURS) & story.mjs (practice)",
+      "category": "consistency",
+      "text": "MAX_LAB_WORN_HOURS = 16; Practice scenario { start: 24, worn: 12, still: 12 }",
+      "severity": "misleading",
+      "finding": "Slipping-clutch 42 h cap (clippedByClutch) is now genuinely reachable and testable in both Lab and Practice.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "examples/watch-everyday/model.mjs (Step 3 HUD & VARIANTS.active)",
+      "category": "conceptual",
+      "text": "Release: 1 tooth step per tick; 14 h worn + 10 h still = 24 h day",
+      "severity": "misleading",
+      "finding": "Clarified Step 3 HUD tooth step wording and aligned VARIANTS.active to a full 24 h day with 60 swings/h.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "active-step-2-light.png, active-step-2-dark.png (Step 2 — Wound spring)",
+      "category": "visual",
+      "text": "Parked rotor and Predict card clearance",
+      "severity": "wrong",
+      "finding": "Rotor parks cleanly on the left clear of #explainer and heading; #predict sits clear of the calibrePlate rim in light & dark modes.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "active-step-3-light.png, active-step-3-dark.png (Step 3 — Ticking brake)",
+      "category": "visual",
+      "text": "Step 3 heading clearance above calibrePlate",
+      "severity": "wrong",
+      "finding": "Top-left heading sits completely in clean stage whitespace clear of calibrePlate; rotor clears #explainer.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "active-step-4-light.png, active-step-4-dark.png (Step 4 — Gear train)",
+      "category": "visual",
+      "text": "Receded upper dial bezel clearance from Step 4 heading",
+      "severity": "misleading",
+      "finding": "Receded upper exhibition dial and shadow stay cleanly clear of the top-left Gear train heading in light & dark modes.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "active-step-0-light.png, active-step-0-dark.png (Step 0 — Gear train leader)",
+      "category": "visual",
+      "text": "Gear train leader routing",
+      "severity": "misleading",
+      "finding": "Gear train leader routes cleanly from the right onto the exposed brass third wheel rim with 0% crossing.",
+      "resolved": true,
+      "fixed": true
+    },
+    {
+      "where": "active-step-0/2/3/4/6 (Orphan barrel axis line)",
+      "category": "visual",
+      "text": "Single concentric central-axis dash-dot line",
+      "severity": "misleading",
+      "finding": "Removed orphan off-center barrel axis line; only the true concentric central axis links the 3 exploded layers.",
+      "resolved": true,
+      "fixed": true
+    }
+  ]
+}

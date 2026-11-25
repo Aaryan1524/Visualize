@@ -4,12 +4,23 @@ description: Build step-through visual explanations whose picture is checked aga
 license: MIT
 compatibility: Works in Claude Code, Codex and Antigravity. Needs Node.js 24+ (runs TypeScript directly) and Google Chrome or Chromium for the checks. Run `npm install` (or `pnpm install`) once in this folder.
 metadata:
-  version: "1.2.0"
+  version: "2.0.0"
 ---
 
 # Visualize
 
 A figure here is a model you can watch. You write a small executable model of the idea, a figure of solid parts that the model's states move, and the words a reader sees and hears. The page shows the model's numbers, the audit checks the words against the model, and the checks drive the built page in Chrome to prove it frames, plays and reads as intended.
+
+## The 3-Layer Visual Design Engine (`v2.0`)
+
+Every Visualize page is compiled through three deterministic layers so any model produces museum-grade cutaways on the first pass:
+
+1. **Spatial Solvers & Spread Presets First (`src/rig/layout.ts`, `src/rig/spreads.ts`, `references/layout.md`, `references/spreads.md`):** **NEVER hand-guess `(x, y, z)` coordinates for multi-part mechanisms, and NEVER hand-guess `BOX`, `CLEAR`, `HUD_CAM`, or raw callout coordinates on the stage:**
+   - **Page spreads (`spread("<kind>")` + `distributeCallouts()` + `renderHudStack()`):** Pick one of the 6 universal spread presets (`cutaway-vessel`, `exploded-stack`, `axial-cutaway`, `linked-train`, `concept-plate`, `system-tiers`) so hero framing, zoomed clear zones, left/right callout rails, and the upper-right HUD stack have mathematically guaranteed zero overlap at both `1440×900` and `1280×800`.
+   - Gears, watches, and drivetrains: `solveGearTrain` (exact pitch tangency, ratios, spin signs, module checks) + `assertNoCollisions` (zero overlaps) + `checkCavityFill` (no sparse "empty ashtray" cavities) + `composeExplodedLayers` (clean vertical layer separation for flat layered machines).
+   - Everyday fluid, thermal, or energy objects: `layoutFlowSpine` (sequential stages snapped along `"z"` or `"x"` with exact callout anchors).
+2. **Studio-Grade Rendering & Cutaways (`src/rig/draw.ts`, `src/rig/objects.ts`, `references/look.md`):** Use `finish: "metal" | "glass" | "satin"` for 3-point studio shading, `softShadow()` to ground hero solids, and `cutawayHatch()` on sliced walls. Use the sleek open-heart `watchCaseDial` (`lugs: false`, `cutaway: true` by default — **never** clunky straps, chunky rectangular lugs, or oversized decorative stands) and `calibrePlate` for watch movements. **Step 0 MUST open on the live cutaway or exploded working mechanism with anatomy callouts (`<g class="label">`)** — never a closed opaque exterior hiding the inside.
+3. **Mandatory Draft-First Vision Pass (BEFORE Voice & Full Steps):** Build a silent draft of **Step 0 + the main cutaway step** → shoot light & dark PNGs (`node <skill>/scripts/shoot-steps.mjs <page> --out <folder>/shots --fast`) → inspect them visually for silhouette, meshing, zero dead space, and studio polish → fix any layout flaw FIRST. Only *after* the silent draft looks museum-grade do you finish all remaining steps, record voice, and run the parallel independent review.
 
 ## One route, 3 visual lanes (show the real thing first!)
 
@@ -65,7 +76,10 @@ Choose the mode from explicit flags or natural-language cues in the user's reque
 Build *that shape* from the rig's parts, and say why if you depart from it. Never substitute abstract numbered boxes for a real physical object, and never force every abstract concept into a straight rail of slots.
 
 The parts (`src/rig/`):
-- **Everyday objects (`src/rig/objects.ts`, `references/objects.md`):** `OBJECT_VIEW`, `vesselShell`, `liquidColumn`, `dipTube`, `plungerNozzle`, `sprayCone`, `watchCaseDial`, `watchHand`, `coiledSpring`, `explainerCard`, `meterBar`, plus studio materials `glass`, `liquid`, `mist`, `rubber`, `wood`.
+- **Page Spread Design System (`src/rig/spreads.ts`, `references/spreads.md`):** `spread("cutaway-vessel" | "exploded-stack" | "axial-cutaway" | "linked-train" | "concept-plate" | "system-tiers")`, `distributeCallouts()`, `renderHudStack()` — standard zero-overlap layout for every Drawing page.
+- **Spatial layout solvers (`src/rig/layout.ts`, `references/layout.md`):** `solveGearTrain`, `assertNoCollisions`, `checkCavityFill`, `layoutFlowSpine`, `composeExplodedLayers`.
+- **Everyday objects & universal physical primitives (`src/rig/objects.ts`, `references/objects.md`):** `OBJECT_VIEW`, `vesselShell`, `liquidColumn`, `dipTube`, `plungerNozzle`, `sprayCone`, `watchCaseDial` (sleek open-heart cutaway, `lugs: false` default), `calibrePlate`, `watchHand`, `coiledSpring`, `axialHousing`, `turbineRotor`, `pistonAssembly`, `helicalCoil`, `electrodeStack`, `flowArrow3D`, `explainerCard`, `meterBar`, plus studio materials `glass`, `liquid`, `mist`, `rubber`, `wood`.
+- **Studio shading & cutaways (`src/rig/draw.ts`, `references/look.md`):** `drawMesh(..., { finish: "metal" | "glass" | "satin" })`, `softShadow()`, `cutawayHatch()`, `contactShadow()`, `plateShadow()`, `drawSpiralRibbon()`.
 - **Precision machines (`src/rig/mech.ts`, `references/figures.md`):** `spokedWheel`, `pinion`, `arbor`, `meshCentres`, `assertMeshed`, `bridge`, `jewelSetting`, `screw`, `cutawayShell`, `explodedStack`, `centreLines`, low-level meshes (`plate`, `turned`, `rod`, `sprocket`, `roundedHull`), `turningPart()`, `moveInPlane`, `checkContacts`.
 - **Abstract concepts (`src/rig/parts.ts`, `src/rig/concept.ts`, `references/figures.md`, `references/concept-rig.md`):** `cellDrawing`, `railCentres`, `cardDrawing`, `ringSlots`, `turnAt`, `markerDrawing`, `arrow`, `workingStrip`, `boardDrawing`, plus Concept Plate instruments (`deckTier`, `hubChassis`, `agentBlade`, `waferStack`, `portValve`, `vaultCore`).
 
@@ -80,7 +94,7 @@ A one-line prompt leaves these open. Decide them like this without asking. Ask o
 | Decision | Default | Why |
 |---|---|---|
 | **The scenario** (concept, sizes, values) **ask** if they change the answer | Small readable values (16 bits, 8 slots, 3 keys, or realistic everyday dimensions), chosen so every interesting case happens, each asserted in `model.test.mjs`; stated in Details | Small readable values stay legible on stage; a run without the key phenomenon explains nothing |
-| **Output** **ask** if unclear | A standalone HTML page. Drawing pages have no SVG or React export yet; say so if one is asked for | Every output is checked |
+| **Output** **ask** if unclear | A standalone HTML page (plus optional 1-command Figma-ready editable SVG export of any step via `scripts/export-drawing-svg.mjs` / `npm run export:drawing-svg`). Drawing pages have no React component export yet; say so if one is asked for | Every output is checked |
 | **What to contrast with** **ask** when "versus what?" is ambiguous | The naive alternative or failure case (as a step or What if) | A contrast makes the mechanism visible |
 | Visual lane | `--kind object` for real physical objects/phenomena; `--kind machine` for intricate/technical mechanisms; `--kind concept` for abstract systems | Readers recognize a real bottle or watch instantly; abstract boxes hide the physical intuition |
 | Mode & tone | **`everyday`** (plain college-level English, real model underneath, voice ON, 5–7 steps). Switch to `--fast`, `--technical`, or `--deep` (or combine them) when flags or wording ask for it | Everyday learners get an intuitive studio visual; engineers get exact SI math on request |
@@ -130,18 +144,17 @@ A model checks the picture; `src/claims/audit.mjs` checks the words; and a fresh
 
 1. **Choose lane & mode, then topics first** (Correctness, 1): pick `--kind object|machine|concept` and `--mode everyday|fast|technical|deep` (combining flags if requested), then write the one-line shape plan.
 2. **Scaffold:** `node <skill>/scripts/new-figure.mjs <name> --kind object|machine|concept --mode everyday|fast|technical|deep --dir <folder>`. Build it and look at it once so you know what passing looks like.
-3. **The model** (`model.mjs`): pure functions, no imports (the page inlines it). Test it against an independent reference and the cases the story needs (`model.test.mjs`).
-4. **The figure** (`figure.mjs`): build the real object (`src/rig/objects.ts`), mechanical assembly (`src/rig/mech.ts` + `turningPart()`), or canonical concept (`src/rig/parts.ts` / `src/rig/concept.ts`), drawn once in `figure()` and posed in `pose(state)`. **Working draft early:** build and inspect before polish.
-5. **The story** (`story.mjs`): steps with their `shot` and `subject`, headings, captions, narration (plain English for `everyday`, exact SI/formulas for `--technical`), `CLAIMS` and `COVERAGE`.
-6. **The hooks** (`build.mjs`): `at`, `stillAt`, `boundsOf`, `DATA.lab`, `question(n, r)`, What if variants (as needed for the mode), and `DATA.predict`.
-7. **Voice and build:** run `node <folder>/voice.mjs` (skip when `--fast` / `--no-voice`), then `node <folder>/build.mjs`.
-8. **Check and look**, until each passes:
+3. **The model & spatial layout** (`model.mjs`, `model.test.mjs`): pure functions, no imports (the page inlines it). Solve multi-part geometry with `src/rig/layout.ts` (`solveGearTrain`, `assertNoCollisions`, `checkCavityFill`, `layoutFlowSpine`, `composeExplodedLayers`) and assert clearance, cavity fill, and reference accuracy in `model.test.mjs`.
+4. **Silent Draft-First Vision Pass (`figure.mjs` — BEFORE voice & full steps):** Build Step 0 (open cutaway with anatomy callouts) + the main cutaway step using `finish: "metal" | "glass" | "satin"`, `softShadow()`, and `cutawayHatch()`. Build silently (skip `voice.mjs`), run `node <skill>/scripts/shoot-steps.mjs <page> --out <folder>/shots --fast`, and **inspect the light & dark PNGs right away** for silhouette, gear meshing, zero "empty ashtray" dead space, no collisions, and studio polish. Fix every visual/layout flaw FIRST before authoring the remaining steps.
+5. **The full story & hooks** (`story.mjs`, `build.mjs`): finish all steps with their `shot` and `subject`, headings, captions, narration (plain English for `everyday`, exact SI/formulas for `--technical`), `CLAIMS`, `COVERAGE`, `at`, `stillAt`, `boundsOf`, `DATA.lab`, `question(n, r)`, What if variants (as needed for the mode), and `DATA.predict`.
+6. **Voice and build:** run `node <folder>/voice.mjs` (skip when `--fast` / `--no-voice`), then `node <folder>/build.mjs`.
+7. **Check and look**, until each passes:
    - `node --test <folder>/*.test.mjs`
-   - `node <skill>/scripts/check-drawing.mjs <page>` (add `--fast` in `--fast` mode)
+   - `node <skill>/scripts/check-drawing.mjs <page>` (add `--fast` in `--fast` mode — enforces framing, 60 fps playback, OKLab contrast, opening anatomy callouts, and the 25,000 SVG path bloat ceiling)
    - `node <skill>/scripts/check-arithmetic.mjs <page>`
    - `node <skill>/scripts/shoot-steps.mjs <page> --out <folder>/shots` (add `--fast` in `--fast` mode), inspect every light & dark PNG, then `--check-fresh`.
-9. **Mandatory independent review:** run `review-brief.mjs <audit> <dir>/review.json <page> --shots <folder>/shots --mode <mode>` and dispatch to a fresh reviewer (or 2-agent parallel Domain + Visual reviewers). Fix every finding, rebuild, re-shoot, and re-verify until `checks.conceptual === "pass"` and `checks.visual === "pass"`.
-10. **Deliver** with this report, and nothing vaguer:
+8. **Mandatory independent review:** run `review-brief.mjs <audit> <dir>/review.json <page> --shots <folder>/shots --mode <mode>` and dispatch to a fresh reviewer (or 2-agent parallel Domain + Visual reviewers). Fix every finding, rebuild, re-shoot, and re-verify until `checks.conceptual === "pass"` and `checks.visual === "pass"`.
+9. **Deliver** with this report, and nothing vaguer:
 
     ```text
     Built <title> (<mode>, --kind <kind>): <n> steps, from <parts>. Model tested against <reference>.
@@ -153,12 +166,16 @@ A model checks the picture; `src/claims/audit.mjs` checks the words; and a fresh
 
 ## Craft rules (studio baseline, every model)
 
-`references/objects.md`, `references/figures.md`, and `references/look.md` give the reasons, tokens, and failure table.
-- **Bold shaded solids** in the studio materials (`src/rig/rig.css`, included before the page's own CSS), with heavier silhouettes than creases and shine on lit edges. Out-of-focus parts recede by tone, never by opacity.
-- **Everyday object studio kit (`src/rig/objects.ts`):** use `OBJECT_VIEW`, draw the recognizable real 3D object with cutaway internals (`vesselShell`, `liquidColumn`, `dipTube`, `plungerNozzle`, `sprayCone`, `watchCaseDial`, `watchHand`, `coiledSpring`) in real materials (`glass`, `liquid`, `mist`, `rubber`, `wood`), and pair it with a clean, never-receded side `explainerCard` / `meterBar`.
-- **Machine studio kit (`src/rig/mech.ts` + `turningPart()`):** wrap every turning thick solid in `turningPart()` (`worstErrPx < 0.5 px`). Separate flat layered machines with `explodedStack()` + `centreLines()`. Use `plateShadow` on concave/holed parts and `{ sort: "face" }` or `drawSpiralRibbon` on coils and spoked cutouts.
+`references/spreads.md`, `references/layout.md`, `references/objects.md`, `references/figures.md`, and `references/look.md` give the spreads, solvers, tokens, and failure table.
+- **Lay out every page with `spread()` + `distributeCallouts()` + `renderHudStack()` (`src/rig/spreads.ts`):** never hand-guess `BOX`, `CLEAR`, `HUD_CAM`, or raw label coordinates. Pick the matching spread preset (`cutaway-vessel`, `exploded-stack`, `axial-cutaway`, `linked-train`, `concept-plate`, or `system-tiers`).
+- **Solve geometry before drawing (`src/rig/layout.ts`):** never hand-guess `(x, y, z)` positions for gears, shafts, or stacked stages. Use `solveGearTrain`, `assertNoCollisions`, `checkCavityFill`, `layoutFlowSpine`, and `composeExplodedLayers`.
+- **Open cutaway Step 0 with anatomy callouts:** Step 0 must immediately reveal the working interior with `<g class="label">` anatomy callouts — never a closed opaque exterior/dial hiding the mechanism.
+- **No chunky straps, lugs, or dead pedestals:** keep hero silhouettes focused on what teaches. Never add chopped-off watch straps, boxy lugs, or oversized decorative stands wasting >15% of the frame.
+- **Bold shaded solids with studio finishes** (`src/rig/rig.css`, included before the page's own CSS): use `finish: "metal" | "glass" | "satin"`, `softShadow()`, and `cutawayHatch()`, with heavier silhouettes than creases and shine on lit edges. Out-of-focus parts recede by tone, never by opacity.
+- **Everyday object studio kit (`src/rig/objects.ts`):** use `OBJECT_VIEW`, draw the recognizable real 3D object with cutaway internals (`vesselShell`, `liquidColumn`, `dipTube`, `plungerNozzle`, `sprayCone`, open-heart `watchCaseDial`, `calibrePlate`, `watchHand`, `coiledSpring`) in real materials (`glass`, `liquid`, `mist`, `rubber`, `wood`), and pair it with a clean, never-receded side `explainerCard` / `meterBar`.
+- **Machine studio kit (`src/rig/mech.ts` + `turningPart()`):** wrap every turning thick solid in `turningPart()` (`worstErrPx < 0.5 px`). Separate flat layered machines with `composeExplodedLayers` / `explodedStack()` + `centreLines()`. Use `plateShadow` on concave/holed parts and `{ sort: "face" }` or `drawSpiralRibbon` on coils and spoked cutouts.
 - **Concept studio kit (`src/rig/parts.ts` or `src/rig/concept.ts`):** draw the field's canonical shape with live working on stage.
-- **Draw once, then move.** A figure rebuilt every frame stutters; `check-drawing` times every frame.
+- **Draw once, then move (and stay under 25k `<path>`s):** a figure rebuilt every frame stutters, and bloated procedural `<defs>` choke SVG rendering; reuse `<use>` templates and keep `check-drawing` well under the 25,000 path ceiling and 60 fps budget.
 - **Values are printed on parts** (or crisp `explainerCard` / `workingStrip` panels) and read in both themes; dark-mode `data-t-bad` and toned cells keep readable ink.
 - **Arrows end on a face and never cross a printed value or index** (route over a gap with `via`).
 - **Motion means something:** liquid rises as the plunger rebounds, mist fires as pressure peaks, a bit turns as its arrow lands. Nothing moves for decoration.
@@ -179,7 +196,9 @@ The legacy scene.ts pages have their own gates (`verify.mjs`, `pnpm verify:contr
 
 ## References
 
-- `references/objects.md`: **everyday physical objects (`--kind object`)**: choosing object vs machine vs concept, Object + Side Explainer layout, `src/rig/objects.ts` API & materials, and the plain-English checklist.
+- `references/spreads.md`: **Page Spread Design System & Figma-ready SVG export (`src/rig/spreads.ts`, `scripts/export-drawing-svg.mjs`)**: the 6 universal spread presets with exact zero-overlap zones, `spread()` / `distributeCallouts()` / `renderHudStack()` wiring, and editable vector SVG export for Figma.
+- `references/layout.md`: **spatial layout solvers (`src/rig/layout.ts`)**: `solveGearTrain`, `assertNoCollisions`, `checkCavityFill`, `layoutFlowSpine`, and `composeExplodedLayers` — use before drawing any multi-part mechanism.
+- `references/objects.md`: **everyday physical objects & universal engineering primitives (`--kind object`)**: choosing object vs machine vs concept, Object + Side Explainer layout, `src/rig/objects.ts` API (`calibrePlate`, open-heart `watchCaseDial`, `vesselShell`, `axialHousing`, `turbineRotor`, `pistonAssembly`, `helicalCoil`, `electrodeStack`, `flowArrow3D`) & materials, and the plain-English checklist.
 - `references/figures.md`: **the recipe for all three lanes and four modes**: the scaffold, object/machine/concept parts, the look, draw once and move, the camera, predictions, lab, insets, and every failure with its check.
 - `references/look.md`: studio materials, OKLab value contrast, shadows, type, and the look checks enforced by `check-drawing.mjs`.
 - `references/drawing.md`: the Drawing page for real machines: what every page has, the page contract, the flat cutaway for one-plane machines, and the rig's reference.

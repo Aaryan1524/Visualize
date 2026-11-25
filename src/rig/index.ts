@@ -19,3 +19,5 @@ export * from "./parts.ts";
 export * from "./concept.ts";
 export * from "./mech.ts";
 export * from "./objects.ts";
+export * from "./layout.ts";
+export * from "./spreads.ts";

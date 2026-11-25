@@ -1,7 +1,7 @@
 {
   "name": "visualize",
   "description": "An Agent Skill that turns a one-line request into a step-through visual explanation, with a voice, a prediction and practice, checked against a running model of the idea.",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -34,10 +34,11 @@
     "shoot": "node scripts/shoot.mjs",
     "verify:controls": "node scripts/verify.mjs --controls --quick",
     "export:svg": "node scripts/export-svg.mjs",
+    "export:drawing-svg": "node scripts/export-drawing-svg.mjs",
     "check:embed": "node scripts/check-embed.mjs",
     "new-scene": "node scripts/new-scene.mjs",
     "check:reproducible": "node scripts/check-reproducible.mjs",
-    "check:drawing": "node examples/escalator/build.mjs && node scripts/check-drawing.mjs dist/escalator.html && node scripts/check-arithmetic.mjs dist/escalator.html && node examples/lock/build.mjs && node scripts/check-drawing.mjs dist/lock.html && node scripts/check-arithmetic.mjs dist/lock.html && node examples/derailleur/build.mjs && node scripts/check-drawing.mjs dist/derailleur.html && node scripts/check-arithmetic.mjs dist/derailleur.html && node examples/bloom/build.mjs && node scripts/check-drawing.mjs dist/bloom.html && node scripts/check-arithmetic.mjs dist/bloom.html && node examples/multi-agent/build.mjs && node scripts/check-drawing.mjs dist/multi-agent.html && node scripts/check-arithmetic.mjs dist/multi-agent.html && node examples/automatic-watch/build.mjs && node scripts/check-drawing.mjs dist/automatic-watch.html && node scripts/check-arithmetic.mjs dist/automatic-watch.html && node examples/differential/build.mjs && node scripts/check-drawing.mjs dist/differential.html && node scripts/check-arithmetic.mjs dist/differential.html && node examples/perfume-atomizer/build.mjs && node scripts/check-drawing.mjs dist/perfume-atomizer.html && node scripts/check-arithmetic.mjs dist/perfume-atomizer.html"
+    "check:drawing": "node examples/escalator/build.mjs && node scripts/check-drawing.mjs dist/escalator.html && node scripts/check-arithmetic.mjs dist/escalator.html && node examples/lock/build.mjs && node scripts/check-drawing.mjs dist/lock.html && node scripts/check-arithmetic.mjs dist/lock.html && node examples/derailleur/build.mjs && node scripts/check-drawing.mjs dist/derailleur.html && node scripts/check-arithmetic.mjs dist/derailleur.html && node examples/bloom/build.mjs && node scripts/check-drawing.mjs dist/bloom.html && node scripts/check-arithmetic.mjs dist/bloom.html && node examples/multi-agent/build.mjs && node scripts/check-drawing.mjs dist/multi-agent.html && node scripts/check-arithmetic.mjs dist/multi-agent.html && node examples/automatic-watch/build.mjs && node scripts/check-drawing.mjs dist/automatic-watch.html && node scripts/check-arithmetic.mjs dist/automatic-watch.html && node examples/differential/build.mjs && node scripts/check-drawing.mjs dist/differential.html && node scripts/check-arithmetic.mjs dist/differential.html && node examples/perfume-atomizer/build.mjs && node scripts/check-drawing.mjs dist/perfume-atomizer.html && node scripts/check-arithmetic.mjs dist/perfume-atomizer.html && node examples/watch-everyday/build.mjs && node scripts/check-drawing.mjs dist/watch-everyday.html && node scripts/check-arithmetic.mjs dist/watch-everyday.html && node examples/turbofan/build.mjs && node scripts/check-drawing.mjs dist/turbofan.html && node scripts/check-arithmetic.mjs dist/turbofan.html"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
