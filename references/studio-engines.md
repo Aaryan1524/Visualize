@@ -171,6 +171,7 @@ Use Engine C for **every conceptual or abstract topic** (algorithms, data struct
 - **Zero nested dashed SaaS boxes** — group regions with generous negative space and one quiet uppercase mono eyebrow (`HASH MAP`, `RECENCY RAIL`).
 - **Zero top operation banner & zero badge soup** — render pure data tokens (bold key + tiny muted value underneath); let slot position and spring lift-arc motion carry rank & state instead of printing badges.
 - **Single Active Thread** — inactive pointers stay whisper-thin (`12–15%` opacity) smooth cubic Bézier arcs; only the active pointer illuminates with a single animated pulse dot.
+- **Tactile instruments over bare box-and-arrow flowcharts** — do not build an Engine C scene solely out of `stageNode` boxes and `arcLink` trees when the topic has pipelines, queues, token sequences, active worker pools, or message channels. Map sequential stages/keys/tokens/registers to `strip`, active pools/queues/windows/rails to `track`, and directional packet/message lanes to `flowPipe` (with canonical `±laneOffset` for opposite-direction pipes so labels never collide). Keep `stageNode` for discrete endpoints (e.g., Client/Server, Orchestrator/Result), state-machine states, or true tree/graph vertices.
 - **Max 1 outer-margin callout per step** — place it cleanly outside the instrument using `place: "top"` or `place: "bottom"`, and pass `hint: ""` to `studioPage()` so flat 2D conceptual stages have zero overlapping labels and zero 3D orbit chrome.
 
 ### The 5 Locked Braun/Rams Kinetic Primitives + Pruning (`stage`)
