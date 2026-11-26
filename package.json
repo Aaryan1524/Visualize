@@ -51,7 +51,7 @@
     "@types/three": "0.187.0",
     "esbuild": "^0.28.2",
     "kokoro-js": "1.2.1",
-    "puppeteer-core": "^25.17.0",
+    "puppeteer-core": "^25.18.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "typescript": "^7.0.2"
